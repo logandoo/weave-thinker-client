@@ -1,0 +1,1005 @@
+import logging
+import re
+
+from sqlalchemy import text
+
+logger = logging.getLogger(__name__)
+
+_EXT_IDENT_RE = re.compile(r"[a-zA-Z_][a-zA-Z0-9_]*")
+
+
+STARTUP_MIGRATIONS = [
+    # per-user 同步绑定波（2026-09-28 部署补齐）：sync_state 扩列「云账号绑定+游标」
+    ("sync_state_binding_url", "ALTER TABLE sync_state ADD COLUMN IF NOT EXISTS server_url VARCHAR(512)"),
+    ("sync_state_binding_user", "ALTER TABLE sync_state ADD COLUMN IF NOT EXISTS cloud_username VARCHAR(255)"),
+    ("sync_state_binding_pass", "ALTER TABLE sync_state ADD COLUMN IF NOT EXISTS cloud_password TEXT"),
+    ("sync_state_binding_enabled", "ALTER TABLE sync_state ADD COLUMN IF NOT EXISTS sync_enabled BOOLEAN DEFAULT FALSE"),
+    ("sync_state_tls_verify", "ALTER TABLE sync_state ADD COLUMN IF NOT EXISTS tls_verify BOOLEAN DEFAULT TRUE"),
+    # W20 设备执行身份绑定（2026-10-12）：名门期望值=云端身份导出，须持久化云端用户 UUID
+    ("sync_state_cloud_user_id", "ALTER TABLE sync_state ADD COLUMN IF NOT EXISTS cloud_user_id VARCHAR(64)"),
+    ("assistants_use_custom_model", "ALTER TABLE assistants ADD COLUMN IF NOT EXISTS use_custom_model BOOLEAN DEFAULT FALSE"),
+    ("assistants_custom_api_url", "ALTER TABLE assistants ADD COLUMN IF NOT EXISTS custom_api_url VARCHAR(500)"),
+    ("assistants_custom_api_key", "ALTER TABLE assistants ADD COLUMN IF NOT EXISTS custom_api_key VARCHAR(500)"),
+    ("assistants_custom_model_name", "ALTER TABLE assistants ADD COLUMN IF NOT EXISTS custom_model_name VARCHAR(200)"),
+    ("messages_reasoning_content", "ALTER TABLE messages ADD COLUMN IF NOT EXISTS reasoning_content TEXT"),
+    # PHASE 2B: structured tool-call history. Stores the OpenAI-style
+    # tool_calls array emitted by the model for this assistant message,
+    # paired with tool_results to enable structured replay so the model
+    # sees prior actions instead of fuzzy narrative text.
+    ("messages_tool_calls", "ALTER TABLE messages ADD COLUMN IF NOT EXISTS tool_calls TEXT"),
+    # P2 (2026-09-05): persist the turn's latest context_info (token usage
+    # snapshot) so the badge survives cross-device loads (mobile-sent turns
+    # previously had no token info anywhere except the sender's localStorage).
+    ("messages_context_info", "ALTER TABLE messages ADD COLUMN IF NOT EXISTS context_info TEXT"),
+    # PHASE 3: per-assistant override of the LLM used for tool-calling
+    # iterations. When NULL the main client is reused with thinking forced
+    # off; when populated, iterations get a separate cheaper client so the
+    # main model (often a reasoner) only runs during final synthesis.
+    ("assistants_subtask_custom_api_url", "ALTER TABLE assistants ADD COLUMN IF NOT EXISTS subtask_custom_api_url VARCHAR(500)"),
+    ("assistants_subtask_custom_api_key", "ALTER TABLE assistants ADD COLUMN IF NOT EXISTS subtask_custom_api_key VARCHAR(500)"),
+    ("assistants_subtask_custom_model_name", "ALTER TABLE assistants ADD COLUMN IF NOT EXISTS subtask_custom_model_name VARCHAR(200)"),
+    ("assistants_subtask_provider_type", "ALTER TABLE assistants ADD COLUMN IF NOT EXISTS subtask_provider_type VARCHAR(20)"),
+    ("assistants_subtask_extra_body", "ALTER TABLE assistants ADD COLUMN IF NOT EXISTS subtask_extra_body TEXT"),
+    ("assistants_use_subtask_model", "ALTER TABLE assistants ADD COLUMN IF NOT EXISTS use_subtask_model BOOLEAN DEFAULT FALSE"),
+
+    ("assistants_thinking_budget", "ALTER TABLE assistants ADD COLUMN IF NOT EXISTS thinking_budget INTEGER"),
+    # Qwen3.8(VLLM) provider sampling params: non-thinking set (min_p,
+    # repetition_penalty join the pre-existing temperature/top_p/top_k/
+    # presence_penalty) + thinking-mode set + preserve_thinking.
+    ("assistants_min_p", "ALTER TABLE assistants ADD COLUMN IF NOT EXISTS min_p FLOAT"),
+    ("assistants_repetition_penalty", "ALTER TABLE assistants ADD COLUMN IF NOT EXISTS repetition_penalty FLOAT"),
+    ("assistants_thinking_temperature", "ALTER TABLE assistants ADD COLUMN IF NOT EXISTS thinking_temperature FLOAT"),
+    ("assistants_thinking_top_p", "ALTER TABLE assistants ADD COLUMN IF NOT EXISTS thinking_top_p FLOAT"),
+    ("assistants_thinking_top_k", "ALTER TABLE assistants ADD COLUMN IF NOT EXISTS thinking_top_k INTEGER"),
+    ("assistants_thinking_min_p", "ALTER TABLE assistants ADD COLUMN IF NOT EXISTS thinking_min_p FLOAT"),
+    ("assistants_thinking_presence_penalty", "ALTER TABLE assistants ADD COLUMN IF NOT EXISTS thinking_presence_penalty FLOAT"),
+    ("assistants_thinking_repetition_penalty", "ALTER TABLE assistants ADD COLUMN IF NOT EXISTS thinking_repetition_penalty FLOAT"),
+    ("assistants_preserve_thinking", "ALTER TABLE assistants ADD COLUMN IF NOT EXISTS preserve_thinking BOOLEAN DEFAULT TRUE"),
+    # Background task system columns
+    ("agent_tasks_title", "ALTER TABLE agent_tasks ADD COLUMN IF NOT EXISTS title VARCHAR(255)"),
+    ("agent_tasks_assistant_id", "ALTER TABLE agent_tasks ADD COLUMN IF NOT EXISTS assistant_id VARCHAR(36)"),
+    ("agent_tasks_progress", "ALTER TABLE agent_tasks ADD COLUMN IF NOT EXISTS progress FLOAT DEFAULT 0"),
+    ("agent_tasks_iterations_done", "ALTER TABLE agent_tasks ADD COLUMN IF NOT EXISTS iterations_done INTEGER DEFAULT 0"),
+    ("agent_tasks_iterations_max", "ALTER TABLE agent_tasks ADD COLUMN IF NOT EXISTS iterations_max INTEGER DEFAULT 30"),
+    ("agent_tasks_elapsed_seconds", "ALTER TABLE agent_tasks ADD COLUMN IF NOT EXISTS elapsed_seconds FLOAT DEFAULT 0"),
+    ("agent_tasks_started_at", "ALTER TABLE agent_tasks ADD COLUMN IF NOT EXISTS started_at TIMESTAMP"),
+    ("agent_tasks_completed_at", "ALTER TABLE agent_tasks ADD COLUMN IF NOT EXISTS completed_at TIMESTAMP"),
+    ("agent_tasks_output_conversation_id", "ALTER TABLE agent_tasks ADD COLUMN IF NOT EXISTS output_conversation_id VARCHAR(36)"),
+    ("agent_tasks_output_note_id", "ALTER TABLE agent_tasks ADD COLUMN IF NOT EXISTS output_note_id VARCHAR(36)"),
+    ("agent_tasks_search_results", "ALTER TABLE agent_tasks ADD COLUMN IF NOT EXISTS search_results TEXT"),
+    ("agent_tasks_browser_results", "ALTER TABLE agent_tasks ADD COLUMN IF NOT EXISTS browser_results TEXT"),
+    ("agent_tasks_intermediate_steps", "ALTER TABLE agent_tasks ADD COLUMN IF NOT EXISTS intermediate_steps TEXT"),
+    # Scheduled task conversation persistence
+    ("scheduled_tasks_conversation_id", "ALTER TABLE scheduled_tasks ADD COLUMN IF NOT EXISTS conversation_id VARCHAR(36)"),
+    # FTS support for session_search tool
+    ("messages_search_vector", "ALTER TABLE messages ADD COLUMN IF NOT EXISTS search_vector tsvector"),
+    ("idx_messages_search_vector", "CREATE INDEX IF NOT EXISTS idx_messages_search_vector ON messages USING GIN(search_vector)"),
+    # Conversation-scoped message queries (conversation search snippets, message
+    # listing) were doing full-table Seq Scans — every per-conversation lookup
+    # scanned all 4000+ rows. With 100+ matched conversations a search turn
+    # cost 13-43s (measured 2026-08-07).
+    ("idx_messages_conversation_id", "CREATE INDEX IF NOT EXISTS idx_messages_conversation_id ON messages(conversation_id)"),
+    ("messages_search_vector_function", """CREATE OR REPLACE FUNCTION messages_search_vector_update() RETURNS trigger AS $$
+BEGIN
+    NEW.search_vector :=
+        setweight(to_tsvector('simple', COALESCE(NEW.content, '')), 'A') ||
+        setweight(to_tsvector('simple', COALESCE(NEW.reasoning_content, '')), 'B');
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql"""),
+    ("messages_search_vector_trigger", """DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'messages_search_vector_trigger') THEN
+        CREATE TRIGGER messages_search_vector_trigger
+            BEFORE INSERT OR UPDATE ON messages
+            FOR EACH ROW EXECUTE FUNCTION messages_search_vector_update();
+    END IF;
+END;
+$$"""),
+    ("assistants_provider_type", "ALTER TABLE assistants ADD COLUMN IF NOT EXISTS provider_type VARCHAR(20) DEFAULT 'deepseek'"),
+    ("assistants_provider_type_backfill", "UPDATE assistants SET provider_type = 'deepseek' WHERE provider_type IS NULL"),
+    ("assistants_extra_body", "ALTER TABLE assistants ADD COLUMN IF NOT EXISTS extra_body TEXT"),
+    ("create_export_tasks", """CREATE TABLE IF NOT EXISTS export_tasks (
+        id VARCHAR(36) PRIMARY KEY,
+        user_id VARCHAR(36) REFERENCES users(id) ON DELETE CASCADE NOT NULL,
+        task_type VARCHAR(20) NOT NULL DEFAULT 'single',
+        format VARCHAR(10) NOT NULL DEFAULT 'pdf',
+        note_id VARCHAR(36),
+        note_ids TEXT,
+        status VARCHAR(20) NOT NULL DEFAULT 'pending',
+        progress FLOAT DEFAULT 0.0,
+        file_path VARCHAR(500),
+        filename VARCHAR(255),
+        error TEXT,
+        created_at TIMESTAMP DEFAULT NOW(),
+        started_at TIMESTAMP,
+        completed_at TIMESTAMP
+    )"""),
+    # Conversation groups
+    ("create_conversation_groups", """CREATE TABLE IF NOT EXISTS conversation_groups (
+        id VARCHAR(36) PRIMARY KEY,
+        user_id VARCHAR(36) REFERENCES users(id) ON DELETE CASCADE NOT NULL,
+        assistant_id VARCHAR(36) REFERENCES assistants(id) ON DELETE CASCADE,
+        name VARCHAR(100) NOT NULL DEFAULT '新分组',
+        color VARCHAR(20) NOT NULL DEFAULT '#3b82f6',
+        sort_order INTEGER DEFAULT 0,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+    )"""),
+    ("conversations_group_id", "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS group_id VARCHAR(36) REFERENCES conversation_groups(id) ON DELETE SET NULL"),
+    ("conversations_sort_order", "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0"),
+    ("conversations_sort_order_backfill", "UPDATE conversations SET sort_order = 0 WHERE sort_order IS NULL"),
+    # 同族防御:conversation_groups 同列同渠道(NULL 毒化),见 conversations 条目
+    ("conversation_groups_sort_order_backfill", "UPDATE conversation_groups SET sort_order = 0 WHERE sort_order IS NULL"),
+    ("idx_conversations_group_id", "CREATE INDEX IF NOT EXISTS idx_conversations_group_id ON conversations(group_id)"),
+    ("idx_conversation_groups_user", "CREATE INDEX IF NOT EXISTS idx_conversation_groups_user ON conversation_groups(user_id)"),
+    ("idx_conversation_groups_assistant", "CREATE INDEX IF NOT EXISTS idx_conversation_groups_assistant ON conversation_groups(assistant_id)"),
+    # Deathmatch (死磕) mode columns on conversations
+    ("conversations_deathmatch_mode", "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS deathmatch_mode BOOLEAN DEFAULT FALSE"),
+    ("conversations_deathmatch_goal", "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS deathmatch_goal TEXT"),
+    ("conversations_deathmatch_status", "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS deathmatch_status VARCHAR(20) DEFAULT 'inactive'"),
+    ("conversations_deathmatch_turns", "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS deathmatch_turns INTEGER DEFAULT 0"),
+    ("conversations_deathmatch_max_turns", "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS deathmatch_max_turns INTEGER DEFAULT 0"),  # 0=unlimited (autonomy wave 2026-08-31; applied rows keep their snapshot)
+    # Heal pre-autonomy rows: 9999 was the pre-2026-08-31 default snapshot —
+    # a fake budget that renders "共9999轮". Normalize to 0 (unlimited), the
+    # current config default (user directive 2026-09-04).
+    ("conversations_deathmatch_max_turns_legacy_unlimited", "UPDATE conversations SET deathmatch_max_turns = 0 WHERE deathmatch_max_turns >= 9999"),
+    ("conversations_deathmatch_consecutive_failures", "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS deathmatch_consecutive_failures INTEGER DEFAULT 0"),
+    ("conversations_deathmatch_verdict", "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS deathmatch_verdict TEXT"),
+    ("conversations_deathmatch_reason", "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS deathmatch_reason TEXT"),
+    ("conversations_deathmatch_grilling_complete", "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS deathmatch_grilling_complete BOOLEAN DEFAULT FALSE"),
+    ("conversations_deathmatch_grilling_total", "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS deathmatch_grilling_total INTEGER DEFAULT 0"),
+    ("conversations_deathmatch_grilling_completed", "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS deathmatch_grilling_completed INTEGER DEFAULT 0"),
+    ("conversations_deathmatch_grilling_round", "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS deathmatch_grilling_round INTEGER DEFAULT 0"),
+    ("conversations_deathmatch_grilling_round_total", "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS deathmatch_grilling_round_total INTEGER DEFAULT 3"),
+    ("conversations_deathmatch_grilling_qa_history", "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS deathmatch_grilling_qa_history JSONB DEFAULT '[]'::jsonb"),
+    ("conversations_deathmatch_context_summary", "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS deathmatch_context_summary TEXT"),
+    ("conversations_deathmatch_expected_marker", "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS deathmatch_expected_marker TEXT"),
+    ("conversations_deathmatch_marker_miss_count", "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS deathmatch_marker_miss_count INTEGER DEFAULT 0"),
+    ("conversations_deathmatch_compressed_context", "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS deathmatch_compressed_context TEXT"),
+    # PEVR extension (loop_improve.md Phase 3)
+    ("conversations_deathmatch_plan", "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS deathmatch_plan JSONB DEFAULT NULL"),
+    ("conversations_deathmatch_plan_version", "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS deathmatch_plan_version INTEGER DEFAULT 0"),
+    ("conversations_deathmatch_reflections", "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS deathmatch_reflections JSONB DEFAULT '[]'::jsonb"),
+    ("conversations_deathmatch_wall_time_started_at", "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS deathmatch_wall_time_started_at TIMESTAMP DEFAULT NULL"),
+    ("conversations_deathmatch_max_wall_time_seconds", "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS deathmatch_max_wall_time_seconds INTEGER DEFAULT 0"),  # 0=unlimited (autonomy wave 2026-08-31; applied rows keep their snapshot)
+    ("conversations_deathmatch_last_verification_result", "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS deathmatch_last_verification_result JSONB DEFAULT NULL"),
+    ("conversations_deathmatch_verify_failures", "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS deathmatch_verify_failures INTEGER DEFAULT 0"),
+    ("conversations_deathmatch_human_gate", "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS deathmatch_human_gate TEXT"),
+    ("conversations_deathmatch_wall_time_used_seconds", "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS deathmatch_wall_time_used_seconds INTEGER DEFAULT 0"),
+    ("conversations_deathmatch_bible_draft", "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS deathmatch_bible_draft JSONB DEFAULT NULL"),
+    ("conversations_deathmatch_subgoals", "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS deathmatch_subgoals JSONB DEFAULT NULL"),
+    ("create_user_asr_hotwords", """CREATE TABLE IF NOT EXISTS user_asr_hotwords (
+        id VARCHAR(36) PRIMARY KEY,
+        user_id VARCHAR(36) REFERENCES users(id) ON DELETE CASCADE NOT NULL,
+        text VARCHAR(120) NOT NULL,
+        weight INTEGER NOT NULL DEFAULT 4,
+        lang VARCHAR(10),
+        dashscope_vocabulary_id VARCHAR(120),
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+    )"""),
+    ("idx_user_asr_hotwords_user", "CREATE INDEX IF NOT EXISTS idx_user_asr_hotwords_user ON user_asr_hotwords(user_id)"),
+    ("user_asr_hotwords_dashscope_vocabulary_id", "ALTER TABLE user_asr_hotwords ADD COLUMN IF NOT EXISTS dashscope_vocabulary_id VARCHAR(120)"),
+    # User skills table
+    ("create_user_skills", """CREATE TABLE IF NOT EXISTS user_skills (
+        id VARCHAR(36) PRIMARY KEY,
+        user_id VARCHAR(36) REFERENCES users(id) ON DELETE CASCADE NOT NULL,
+        name VARCHAR(100) NOT NULL,
+        description TEXT,
+        content TEXT NOT NULL,
+        is_active BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+    )"""),
+    ("idx_user_skills_user", "CREATE INDEX IF NOT EXISTS idx_user_skills_user ON user_skills(user_id)"),
+    ("idx_user_skills_user_name", "CREATE UNIQUE INDEX IF NOT EXISTS idx_user_skills_user_name ON user_skills(user_id, name)"),
+    # Skill files table
+    ("create_skill_files", """CREATE TABLE IF NOT EXISTS skill_files (
+        id VARCHAR(36) PRIMARY KEY,
+        skill_id VARCHAR(36) REFERENCES user_skills(id) ON DELETE CASCADE NOT NULL,
+        file_path VARCHAR(500) NOT NULL,
+        file_content TEXT NOT NULL,
+        file_type VARCHAR(50) NOT NULL,
+        is_executable BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMP DEFAULT NOW()
+    )"""),
+    ("idx_skill_files_skill", "CREATE INDEX IF NOT EXISTS idx_skill_files_skill ON skill_files(skill_id)"),
+    # Agent permission settings per user
+    ("users_agent_permissions", "ALTER TABLE users ADD COLUMN IF NOT EXISTS agent_permissions TEXT"),
+    # Scheduled task retry support
+    ("scheduled_tasks_fail_count", "ALTER TABLE scheduled_tasks ADD COLUMN IF NOT EXISTS fail_count INTEGER DEFAULT 0"),
+    # Phase 5.5: Multi-instance shared state support
+    ("create_shared_kv_store", """CREATE TABLE IF NOT EXISTS shared_kv_store (
+        key TEXT PRIMARY KEY,
+        value BYTEA NOT NULL,
+        expires_at DOUBLE PRECISION,
+        worker_id TEXT,
+        created_at DOUBLE PRECISION DEFAULT EXTRACT(EPOCH FROM NOW())
+    )"""),
+    ("idx_shared_kv_expires", "CREATE INDEX IF NOT EXISTS idx_shared_kv_expires ON shared_kv_store(expires_at)"),
+    # Track which worker is handling an agent task
+    ("agent_tasks_worker_id", "ALTER TABLE agent_tasks ADD COLUMN IF NOT EXISTS worker_id TEXT"),
+    # Worker instance registry for cross-worker health checks
+    ("create_worker_instances", """CREATE TABLE IF NOT EXISTS worker_instances (
+        id TEXT PRIMARY KEY,
+        host TEXT,
+        port INTEGER,
+        pid INTEGER,
+        started_at DOUBLE PRECISION NOT NULL,
+        last_heartbeat DOUBLE PRECISION NOT NULL,
+        status TEXT DEFAULT 'active',
+        metadata TEXT
+    )"""),
+    # Rename the legacy voice assistant (酬) to 语音助理 for existing installs
+    ("assistants_rename_voice_assistant", "UPDATE assistants SET name = '语音助理' WHERE name = '酬'"),
+    # ---- Memory & Dreaming v2: 纯列 ALTER（不依赖 pgvector，pgvector 缺失时也应执行）----
+    # ALTER user_agent_states: new columns for concept extraction watermarks + management
+    ("uas_last_note_processed_at", "ALTER TABLE user_agent_states ADD COLUMN IF NOT EXISTS last_note_processed_at TIMESTAMP"),
+    ("uas_last_message_processed_at", "ALTER TABLE user_agent_states ADD COLUMN IF NOT EXISTS last_message_processed_at TIMESTAMP"),
+    ("uas_last_file_memory_processed_at", "ALTER TABLE user_agent_states ADD COLUMN IF NOT EXISTS last_file_memory_processed_at TIMESTAMP"),
+    ("uas_last_subconscious_scan_at", "ALTER TABLE user_agent_states ADD COLUMN IF NOT EXISTS last_subconscious_scan_at TIMESTAMP"),
+    ("uas_last_consolidation_at", "ALTER TABLE user_agent_states ADD COLUMN IF NOT EXISTS last_consolidation_at TIMESTAMP"),
+    ("uas_total_concept_count", "ALTER TABLE user_agent_states ADD COLUMN IF NOT EXISTS total_concept_count INTEGER DEFAULT 0"),
+    ("uas_total_episode_count", "ALTER TABLE user_agent_states ADD COLUMN IF NOT EXISTS total_episode_count INTEGER DEFAULT 0"),
+    ("uas_latest_dream_id", "ALTER TABLE user_agent_states ADD COLUMN IF NOT EXISTS latest_dream_id VARCHAR(36)"),
+    ("uas_metadata_json", "ALTER TABLE user_agent_states ADD COLUMN IF NOT EXISTS metadata_json TEXT"),
+    # ALTER agent_dreams: new columns
+    ("ad_source_concept_count", "ALTER TABLE agent_dreams ADD COLUMN IF NOT EXISTS source_concept_count INTEGER DEFAULT 0"),
+    ("ad_source_cluster_count", "ALTER TABLE agent_dreams ADD COLUMN IF NOT EXISTS source_cluster_count INTEGER DEFAULT 0"),
+    ("ad_metadata_json", "ALTER TABLE agent_dreams ADD COLUMN IF NOT EXISTS metadata_json TEXT"),
+    ("ad_dream_type", "ALTER TABLE agent_dreams ADD COLUMN IF NOT EXISTS dream_type VARCHAR(20) DEFAULT 'consolidation'"),
+    # 2026-08-09 数据迁移：历史 v1 nightly dream 误标为 consolidation 且 metadata 为空
+    # （v2 consolidation 恒写 metadata，metadata_json IS NULL 是稳健判别式——
+    # 用 source_note_count>0 会漏掉零笔记用户的 v1 行）；改为 nightly + provenance，
+    # 注入路径（_get_latest_dream 限定 consolidation）不再读到 v1 内容
+    ("ad_mislabeled_v1_nightly", """UPDATE agent_dreams SET dream_type = 'nightly', metadata_json = '{"source":"v1_nightly"}' WHERE dream_type = 'consolidation' AND (metadata_json IS NULL OR metadata_json = '')"""),
+    # web_search_results: 每次联网检索命中的结果逐条落库（溯源/记忆用）。
+    # 与 memory v2 无关，必须置于 pgvector_extension 之前——否则 pgvector 缺失时
+    # 该块随 memory 迁移整体跳过（见 run_startup_migrations 的 mem_start 区间）。
+    ("create_web_search_results", """CREATE TABLE IF NOT EXISTS web_search_results (
+        id VARCHAR(36) PRIMARY KEY,
+        user_id VARCHAR(36) REFERENCES users(id) ON DELETE SET NULL,
+        conversation_id VARCHAR(36) REFERENCES conversations(id) ON DELETE SET NULL,
+        query TEXT NOT NULL,
+        provider VARCHAR(20) NOT NULL,
+        result_rank INTEGER NOT NULL DEFAULT 0,
+        title TEXT,
+        url TEXT NOT NULL,
+        snippet TEXT,
+        published_date VARCHAR(10),
+        extra JSONB,
+        created_at TIMESTAMP DEFAULT NOW()
+    )"""),
+    ("idx_wsr_url", "CREATE INDEX IF NOT EXISTS idx_wsr_url ON web_search_results(url)"),
+    ("idx_wsr_query", "CREATE INDEX IF NOT EXISTS idx_wsr_query ON web_search_results(query)"),
+    ("idx_wsr_created_at", "CREATE INDEX IF NOT EXISTS idx_wsr_created_at ON web_search_results(created_at DESC)"),
+    ("idx_wsr_user_ts", "CREATE INDEX IF NOT EXISTS idx_wsr_user_ts ON web_search_results(user_id, created_at DESC)"),
+    # ---- 模型网关解耦（2026-08-30）：助手模型选择改为逻辑别名 ----
+    # 只加列不删列（回滚安全）；旧 custom_* 字段后端保留 legacy 读取。
+    ("assistants_model_alias", "ALTER TABLE assistants ADD COLUMN IF NOT EXISTS model_alias VARCHAR(64)"),
+    ("assistants_subtask_model_alias", "ALTER TABLE assistants ADD COLUMN IF NOT EXISTS subtask_model_alias VARCHAR(64)"),
+    ("assistants_citation_style", "ALTER TABLE assistants ADD COLUMN IF NOT EXISTS citation_style VARCHAR(64)"),
+    # 存量回填（幂等，仅 NULL 行）：无任何行级覆盖的默认助手 → 对应别名；
+    # 带行级覆盖（custom_*）的行保持 NULL → legacy inline 端点继续生效。
+    ("assistants_backfill_model_alias_default", """UPDATE assistants SET model_alias = 'deepseek'
+        WHERE model_alias IS NULL
+          AND (provider_type IS NULL OR provider_type = '' OR provider_type = 'deepseek')
+          AND COALESCE(use_custom_model, FALSE) = FALSE
+          AND COALESCE(custom_api_url, '') = ''
+          AND COALESCE(custom_api_key, '') = ''
+          AND COALESCE(custom_model_name, '') = ''"""),
+    ("assistants_backfill_model_alias_qwen38", """UPDATE assistants SET model_alias = 'qwen3.8_27b'
+        WHERE model_alias IS NULL
+          AND provider_type = 'qwen3.8_vllm'
+          AND COALESCE(custom_api_url, '') = ''
+          AND COALESCE(custom_api_key, '') = ''
+          AND COALESCE(custom_model_name, '') = ''"""),
+    ("assistants_backfill_model_alias_providers", """UPDATE assistants SET model_alias = provider_type
+        WHERE model_alias IS NULL
+          AND provider_type IS NOT NULL
+          AND provider_type NOT IN ('', 'custom', 'qwen3.8_vllm', 'deepseek')
+          AND COALESCE(use_custom_model, FALSE) = FALSE
+          AND COALESCE(custom_api_url, '') = ''
+          AND COALESCE(custom_api_key, '') = ''
+          AND COALESCE(custom_model_name, '') = ''"""),
+    # 两文件合并（2026-08-31）：qwen3.8_vllm 镜像别名退役——无行级覆盖的 legacy
+    # qwen 行迁到规范别名 qwen3.8_27b（endpoint 池只保留一个 Qwen3.8(Local)）。
+    # 带行级覆盖的行保持 NULL（inline 路径用行值，不依赖 [providers]）。
+    ("assistants_backfill_model_alias_qwen38_canonical", """UPDATE assistants SET model_alias = 'qwen3.8_27b'
+        WHERE model_alias IS NULL
+          AND provider_type = 'qwen3.8_vllm'
+          AND COALESCE(use_custom_model, FALSE) = FALSE
+          AND COALESCE(custom_api_url, '') = ''
+          AND COALESCE(custom_api_key, '') = ''
+          AND COALESCE(custom_model_name, '') = ''"""),
+    # 别名去点规范化（2026-09-01 wave2）：endpoint 池别名 qwen3.8_27b → qwen3.8
+    # （TOML 裸键友好；wire model_name 仍为 qwen3.8_27b，仅注册表键改名）。
+    ("assistants_rename_model_alias_qwen38", """UPDATE assistants SET model_alias = 'qwen3.8'
+        WHERE model_alias = 'qwen3.8_27b'"""),
+    ("assistants_rename_subtask_model_alias_qwen38", """UPDATE assistants SET subtask_model_alias = 'qwen3.8'
+        WHERE subtask_model_alias = 'qwen3.8_27b'"""),
+    # Qwen3.8-Next 退役（2026-09-15）：调用/回复结构与 Qwen3.8(Local) 同构，
+    # 池中仅保留 Qwen3.8(Local)（用户指令）。存量行重映射到 qwen3.8。
+    ("assistants_remap_model_alias_qwen38_next", """UPDATE assistants SET model_alias = 'qwen3.8'
+        WHERE model_alias = 'qwen3.8_next'"""),
+    ("assistants_remap_subtask_model_alias_qwen38_next", """UPDATE assistants SET subtask_model_alias = 'qwen3.8'
+        WHERE subtask_model_alias = 'qwen3.8_next'"""),
+    # ---- Memory & Dreaming v2: pgvector + schema（以下块依赖 pgvector，缺失时整体跳过）----
+    # P1-5 (2026-08-30): per-goal settled-verdict ledger — step completions and
+    # reconcile overturns are persisted so the judge/verifier cannot flip-flop
+    # a settled verdict without new evidence (普通模式审计链同构移植).
+    ("conversations_deathmatch_settled_ledger", "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS deathmatch_settled_ledger JSONB"),
+    # C3 (2026-08-30, JIT-Agent harness bank): per-goal deathmatch harness
+    # archive — terminal goal-loop states with config snapshot + outcome
+    # metrics; the data facility for harness A/B acceptance gates.
+    ("create_deathmatch_harness_runs", """CREATE TABLE IF NOT EXISTS deathmatch_harness_runs (
+        id VARCHAR(36) PRIMARY KEY,
+        conversation_id VARCHAR(36) NOT NULL,
+        final_status VARCHAR(32) NOT NULL,
+        goal TEXT,
+        turns INTEGER DEFAULT 0,
+        wall_time_used_seconds INTEGER DEFAULT 0,
+        verify_failures INTEGER DEFAULT 0,
+        plan_steps INTEGER DEFAULT 0,
+        plan_done INTEGER DEFAULT 0,
+        judge_model VARCHAR(200),
+        verify_model VARCHAR(200),
+        config_json TEXT,
+        created_at TIMESTAMP DEFAULT NOW()
+    )"""),
+    ("create_deathmatch_harness_runs_conv_idx", "CREATE INDEX IF NOT EXISTS idx_deathmatch_harness_runs_conv ON deathmatch_harness_runs (conversation_id)"),
+    # B4 复发轴（A4.9 W2-I1）：归档行携带末次 verify issues（JSON 数组文本），
+    # 供 deathmatch_harness_report 的复发问题类聚合；无此列时该轴空转。
+    ("deathmatch_harness_runs_issues_json", "ALTER TABLE deathmatch_harness_runs ADD COLUMN IF NOT EXISTS issues_json TEXT"),
+    # 用户信息（2026-09-13）：昵称 + 头像 data URL（256×256 JPEG，服务端重编码）。
+    ("users_nickname", "ALTER TABLE users ADD COLUMN IF NOT EXISTS nickname VARCHAR(100)"),
+    ("users_avatar_data", "ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_data TEXT"),
+    # 用户级模型供应商覆盖（2026-09-13）：每用户每 kind 至多一行；UNIQUE 防重复。
+    ("create_user_model_providers", """CREATE TABLE IF NOT EXISTS user_model_providers (
+        id VARCHAR(36) PRIMARY KEY,
+        user_id VARCHAR(36) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        kind VARCHAR(20) NOT NULL,
+        enabled BOOLEAN NOT NULL DEFAULT TRUE,
+        base_url VARCHAR(500),
+        api_key VARCHAR(500),
+        model_name VARCHAR(200),
+        params_json TEXT,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW(),
+        UNIQUE (user_id, kind)
+    )"""),
+    # A4.9 Important 修复（2026-09-13）：既有表（create_all 先于迁移建表、
+    # 无 UNIQUE）补唯一性。先去重（同 (user_id, kind) 保留 ctid 最大行=最新）
+    # 再建唯一索引；幂等。
+    ("user_model_providers_dedupe", """DELETE FROM user_model_providers a USING user_model_providers b
+        WHERE a.user_id = b.user_id AND a.kind = b.kind AND a.ctid < b.ctid"""),
+    ("user_model_providers_unique", "CREATE UNIQUE INDEX IF NOT EXISTS uq_user_model_providers_user_kind ON user_model_providers (user_id, kind)"),
+    # 逐供应商 LLM 覆写（2026-09-15）：加 provider 列（存量行 ''=legacy 全局
+    # llm 回落）；旧 (user_id, kind) 唯一索引必须换成 (user_id, kind, provider)
+    # ——否则每 kind 仍只能一行、逐供应商覆写写不进去。
+    ("user_model_providers_provider", "ALTER TABLE user_model_providers ADD COLUMN IF NOT EXISTS provider VARCHAR(64)"),
+    ("user_model_providers_provider_fill", "UPDATE user_model_providers SET provider = '' WHERE provider IS NULL"),
+    # A4.9 Critical 修复（2026-09-15）：全新库 create_all 先生成 ORM
+    # UniqueConstraint → 旧唯一性是「约束型索引」，DROP INDEX 会报
+    # "cannot drop index ... because constraint ... requires it" 并炸启动。
+    # 必须先 DROP CONSTRAINT（独立索引场景为 no-op），再 DROP INDEX。
+    ("user_model_providers_drop_kind_constraint", "ALTER TABLE user_model_providers DROP CONSTRAINT IF EXISTS uq_user_model_providers_user_kind"),
+    ("user_model_providers_drop_kind_unique", "DROP INDEX IF EXISTS uq_user_model_providers_user_kind"),
+    ("user_model_providers_dedupe_provider", """DELETE FROM user_model_providers a USING user_model_providers b
+        WHERE a.user_id = b.user_id AND a.kind = b.kind
+          AND COALESCE(a.provider, '') = COALESCE(b.provider, '') AND a.ctid < b.ctid"""),
+    ("user_model_providers_unique_provider", "CREATE UNIQUE INDEX IF NOT EXISTS uq_user_model_providers_user_kind_provider ON user_model_providers (user_id, kind, provider)"),
+    # provider 列收敛为 NOT NULL DEFAULT ''（新库 create_all 已是 NOT NULL；
+    # 旧库补列后必须显式收敛，防 NULL 在唯一索引中「互不相等」的重复行漏洞）。
+    ("user_model_providers_provider_not_null", """UPDATE user_model_providers SET provider = '' WHERE provider IS NULL"""),
+    ("user_model_providers_provider_default", "ALTER TABLE user_model_providers ALTER COLUMN provider SET DEFAULT ''"),
+    ("user_model_providers_provider_not_null_enforce", "ALTER TABLE user_model_providers ALTER COLUMN provider SET NOT NULL"),
+    # ── durable 执行：检查点续跑 + 持久作业。
+    # 与 memory v2 无关，必须置于 pgvector_extension 之前（同上方约定）。
+    ("agent_tasks_checkpoint", "ALTER TABLE agent_tasks ADD COLUMN IF NOT EXISTS checkpoint TEXT"),
+    ("durable_jobs", """CREATE TABLE IF NOT EXISTS durable_jobs (
+        id VARCHAR(36) PRIMARY KEY,
+        user_id VARCHAR(36) REFERENCES users(id) ON DELETE CASCADE,
+        source VARCHAR(20) NOT NULL DEFAULT 'tool',
+        spec TEXT NOT NULL,
+        idempotency_key VARCHAR(128) UNIQUE,
+        state VARCHAR(20) NOT NULL DEFAULT 'queued',
+        attempts INTEGER DEFAULT 0,
+        lease_owner VARCHAR(64),
+        lease_until TIMESTAMP,
+        pid INTEGER,
+        log_path VARCHAR(512),
+        exit_code INTEGER,
+        result_digest TEXT,
+        cancel_requested_at TIMESTAMP,
+        cancel_state VARCHAR(20),
+        error TEXT,
+        timeout_seconds DOUBLE PRECISION DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        started_at TIMESTAMP,
+        finished_at TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )"""),
+    ("durable_job_events", """CREATE TABLE IF NOT EXISTS durable_job_events (
+        id SERIAL PRIMARY KEY,
+        job_id VARCHAR(36) REFERENCES durable_jobs(id) ON DELETE CASCADE,
+        seq INTEGER NOT NULL,
+        event_type VARCHAR(40) NOT NULL,
+        payload TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(job_id, seq)
+    )"""),
+    ("durable_job_artifacts", """CREATE TABLE IF NOT EXISTS durable_job_artifacts (
+        id SERIAL PRIMARY KEY,
+        job_id VARCHAR(36) REFERENCES durable_jobs(id) ON DELETE CASCADE,
+        path VARCHAR(1024) NOT NULL,
+        sha256 VARCHAR(64) NOT NULL,
+        bytes INTEGER DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )"""),
+    ("side_effect_ledger", """CREATE TABLE IF NOT EXISTS side_effect_ledger (
+        id SERIAL PRIMARY KEY,
+        principal_type VARCHAR(20) NOT NULL,
+        principal_id VARCHAR(36) NOT NULL,
+        cursor INTEGER NOT NULL,
+        tool_name VARCHAR(64) NOT NULL,
+        idempotency_key VARCHAR(160) UNIQUE NOT NULL,
+        status VARCHAR(20) NOT NULL DEFAULT 'pending',
+        result_ref TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )"""),
+    # ==== 非 memory-v2 迁移区（W4 归位 2026-10-06）========================
+    # 与 memory v2 无关的迁移一律置于 pgvector_extension 之前（同上方两处约定）：
+    # run_startup_migrations 在 pgvector 缺失时跳过该标记起的连续后缀（§9.5 降级），
+    # 落在后缀里的非 memory 迁移随 memory 块整体跳过 → 无 pgvector 库缺列/缺表。
+    # 后缀纯度由 tests/test_startup_migrations_sql.py
+    # ::test_pgvector_skip_window_suffix_purity 守卫。
+    # UI 偏好（皮肤选择等）：JSON 字符串，见 app/api/skins.py
+    ("users_ui_preferences", "ALTER TABLE users ADD COLUMN IF NOT EXISTS ui_preferences TEXT"),
+    # F2/DC9（2026-09-14）：messages 分页复合索引（加法式，可随时建）
+    ("idx_messages_conv_created", "CREATE INDEX IF NOT EXISTS idx_messages_conv_created ON messages(conversation_id, created_at)"),
+    # F1（2026-09-14）：后台任务运行中补充消息（可空 JSON 数组）
+    ("at_pending_messages", "ALTER TABLE agent_tasks ADD COLUMN IF NOT EXISTS pending_messages TEXT"),
+    # ── 死磕 DAG 波次 W0-W2（2026-09-18）─────────────────────────────
+    ("conversations_deathmatch_acceptance_criteria", "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS deathmatch_acceptance_criteria JSON"),
+    ("conversations_deathmatch_failed_directions", "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS deathmatch_failed_directions JSON"),
+    ("conversations_deathmatch_pause_state", "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS deathmatch_pause_state JSON"),
+    ("conversations_deathmatch_events", "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS deathmatch_events JSON"),
+    ("conversations_deathmatch_no_progress_replans", "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS deathmatch_no_progress_replans INTEGER DEFAULT 0"),
+    # AEWM 借鉴波（2026-09-25）：证伪台账（anti task-state contamination）
+    ("conversations_deathmatch_retracted_claims", "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS deathmatch_retracted_claims JSONB"),
+    # conv-open 性能治理 P1-1（2026-10-03）：超限 tool_results/reasoning_content/
+    # tool_calls 全文外置（DESIGN_conv_open_performance.md），行内留显式 stub。
+    ("message_payloads_v1", (
+        "CREATE TABLE IF NOT EXISTS message_payloads ("
+        "id VARCHAR(36) PRIMARY KEY, "
+        "message_id VARCHAR(36) NOT NULL REFERENCES messages(id) ON DELETE CASCADE, "
+        "field VARCHAR(32) NOT NULL, "
+        "content TEXT NOT NULL, "
+        "size_bytes INTEGER NOT NULL DEFAULT 0, "
+        "sha256 VARCHAR(64) NOT NULL, "
+        "created_at TIMESTAMP WITHOUT TIME ZONE)"
+    )),
+    ("idx_message_payloads_message", "CREATE INDEX IF NOT EXISTS idx_message_payloads_message ON message_payloads(message_id, field)"),
+    # 评审 C1 修复（2026-10-03）：per-(message_id,field) 归属唯一，弃 sha 全局去重
+    # （共享行 + CASCADE = 删一消息毁他消息的静默数据丢失）。
+    ("idx_message_payloads_sha", "CREATE INDEX IF NOT EXISTS idx_message_payloads_sha ON message_payloads(sha256)"),
+    ("message_payloads_v2_uniq", (
+        "DO $$ BEGIN "
+        "IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname='message_payloads_sha256_key') THEN "
+        "ALTER TABLE message_payloads DROP CONSTRAINT message_payloads_sha256_key; END IF; "
+        "IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='uq_message_payloads_msg_field') THEN "
+        "ALTER TABLE message_payloads ADD CONSTRAINT uq_message_payloads_msg_field UNIQUE (message_id, field); END IF; "
+        "END $$"
+    )),
+    # v3（2026-10-05）：v2 只卸了 CONSTRAINT 形态；v1 窗口期由 create_all 建的库
+    # 携带的是 UNIQUE INDEX 形态 ix_message_payloads_sha256——残留会导致两条字节
+    # 相同的肥字段外置时 IntegrityError（写路径 500）。卸唯一索引并按模型
+    # index=True 语义重建为普通索引（asyncpg 单语句限制：两条迁移分开执行）。
+    ("message_payloads_v3_sha_idx_drop", (
+        "DO $$ BEGIN "
+        "IF EXISTS (SELECT 1 FROM pg_indexes WHERE indexname='ix_message_payloads_sha256' "
+        "AND indexdef ILIKE 'CREATE UNIQUE%') THEN "
+        "DROP INDEX ix_message_payloads_sha256; END IF; END $$"
+    )),
+    ("message_payloads_v3_sha_idx_recreate",
+     "CREATE INDEX IF NOT EXISTS ix_message_payloads_sha256 ON message_payloads(sha256)"),
+    # 渐进落库（2026-10-06，conv ae9aa092）：run 开始即建 assistant 行
+    # （delivery_status='streaming'），周期刷写正文；进程死亡 → 启动 sweep 翻
+    # 'interrupted'；正常 finalize/用户 stop → 'final'。
+    ("messages_delivery_status",
+     "ALTER TABLE messages ADD COLUMN IF NOT EXISTS delivery_status VARCHAR(16) NOT NULL DEFAULT 'final'"),
+    ("idx_messages_delivery_status",
+     "CREATE INDEX IF NOT EXISTS idx_messages_delivery_status ON messages(delivery_status)"),
+    # 被拒/中断草稿台账：审计打回的草稿全文+裁决元数据保留并标记（用户裁定）。
+    ("message_attempts_v1", (
+        "CREATE TABLE IF NOT EXISTS message_attempts ("
+        "id VARCHAR(36) PRIMARY KEY, "
+        "message_id VARCHAR(36) NOT NULL REFERENCES messages(id) ON DELETE CASCADE, "
+        "conversation_id VARCHAR(36) NOT NULL REFERENCES conversations(id) ON DELETE CASCADE, "
+        "attempt_no INTEGER NOT NULL DEFAULT 1, "
+        "status VARCHAR(16) NOT NULL DEFAULT 'rejected', "
+        "content TEXT NOT NULL DEFAULT '', "
+        "verdict_json TEXT, "
+        "created_at TIMESTAMP WITHOUT TIME ZONE)"
+    )),
+    ("idx_message_attempts_message",
+     "CREATE INDEX IF NOT EXISTS idx_message_attempts_message ON message_attempts(message_id, attempt_no)"),
+    # A4.9 r1 M3：message_id 可空 + ON DELETE SET NULL——空终态清理删行时台账
+    # 不随 CASCADE 消失（「被拒草稿保留并标记」用户裁定）。幂等：约束存在才换。
+    ("message_attempts_v2_setnull", (
+        "DO $$ BEGIN "
+        "IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname='message_attempts_message_id_fkey') THEN "
+        "ALTER TABLE message_attempts DROP CONSTRAINT message_attempts_message_id_fkey; END IF; "
+        "END $$"
+    )),
+    ("message_attempts_v2_setnull_col",
+     "ALTER TABLE message_attempts ALTER COLUMN message_id DROP NOT NULL"),
+    ("message_attempts_v2_setnull_fk", (
+        "ALTER TABLE message_attempts ADD CONSTRAINT message_attempts_message_id_fkey "
+        "FOREIGN KEY (message_id) REFERENCES messages(id) ON DELETE SET NULL"
+    )),
+    # W4 项6a（2026-10-06）双索引去重：model Column(index=True) 以 ix_<table>_<col>
+    # 为正名（create_all 建）；迁移异名索引会造成全新库双索引（写放大）。
+    # 存量库已按旧名建过 → drop 异名 + ensure 模型名（create_all 不给旧表补索引）。
+    ("messages_delivery_status_idx_unify_drop",
+     "DO $$ BEGIN IF EXISTS (SELECT 1 FROM pg_indexes WHERE indexname='idx_messages_delivery_status') "
+     "THEN DROP INDEX idx_messages_delivery_status; END IF; END $$"),
+    ("messages_delivery_status_idx_unify_create",
+     "CREATE INDEX IF NOT EXISTS ix_messages_delivery_status ON messages(delivery_status)"),
+    # W4 项6a：message_payloads.sha256 同款遮蔽——ix_message_payloads_sha256 由
+    # message_payloads_v3_sha_idx_recreate 保证存在，idx_message_payloads_sha 为
+    # 异名残留，仅需 drop。
+    ("message_payloads_sha_idx_unify_drop",
+     "DO $$ BEGIN IF EXISTS (SELECT 1 FROM pg_indexes WHERE indexname='idx_message_payloads_sha') "
+     "THEN DROP INDEX idx_message_payloads_sha; END IF; END $$"),
+    # W4 Minor-4 二波（2026-10-06）复合/前缀冗余去重：同列组/严格前缀的短方是纯
+    # 写放大，长索引（uq/复合）已覆盖其查询面。守卫
+    # test_no_redundant_index_pairs 钉住「存活索引同列组 ≤1 · 非唯一短方必 drop」。
+    ("idx_msg_payloads_redundant_drop",
+     "DO $$ BEGIN "
+     "IF EXISTS (SELECT 1 FROM pg_indexes WHERE indexname='idx_message_payloads_message') THEN "
+     "DROP INDEX idx_message_payloads_message; END IF; "
+     "IF EXISTS (SELECT 1 FROM pg_indexes WHERE indexname='ix_message_payloads_message_id') THEN "
+     "DROP INDEX ix_message_payloads_message_id; END IF; END $$"),
+    ("idx_msg_attempts_redundant_drop",
+     "DO $$ BEGIN IF EXISTS (SELECT 1 FROM pg_indexes WHERE indexname='ix_message_attempts_message_id') "
+     "THEN DROP INDEX ix_message_attempts_message_id; END IF; END $$"),
+    ("idx_prefix_redundant_drop",
+     "DO $$ BEGIN "
+     "IF EXISTS (SELECT 1 FROM pg_indexes WHERE indexname='idx_messages_conversation_id') THEN "
+     "DROP INDEX idx_messages_conversation_id; END IF; "
+     "IF EXISTS (SELECT 1 FROM pg_indexes WHERE indexname='idx_user_skills_user') THEN "
+     "DROP INDEX idx_user_skills_user; END IF; END $$"),
+    # W6（2026-10-06 三波）：导出登记/去重——内容指纹列（同内容复用产物零渲染）。
+    # 与 memory v2 无关，置于 pgvector_extension 之前（后缀纯度守卫）。
+    ("export_tasks_content_hash",
+     "ALTER TABLE export_tasks ADD COLUMN IF NOT EXISTS content_hash VARCHAR(64)"),
+    ("ix_export_tasks_content_hash",
+     "CREATE INDEX IF NOT EXISTS ix_export_tasks_content_hash ON export_tasks(content_hash)"),
+    # 挂账清理波（2026-10-07）：endnote 全链——worker 渲染开关列。与 memory v2 无关，
+    # 置于 pgvector_extension 之前（后缀纯度守卫 test_startup_migrations_sql）。
+    ("export_tasks_endnote_enabled",
+     "ALTER TABLE export_tasks ADD COLUMN IF NOT EXISTS endnote_enabled BOOLEAN NOT NULL DEFAULT TRUE"),
+    # W9 parked 项 9（UPSTREAM_TODO_20261007）：墓碑载荷列——user_model_providers
+    # 自然键（kind/provider）供 resync 墓碑回放的 apply_change 兜底（异 id 归并
+    # 行）；存量从仍存的 delete 事件回填。与 memory v2 无关，置于
+    # pgvector_extension 之前（后缀纯度守卫 test_startup_migrations_sql）。
+    ("sync_tombstones_payload",
+     "ALTER TABLE sync_tombstones ADD COLUMN IF NOT EXISTS payload JSONB"),
+    # 回填守则（W9 复审 A2/A4）：
+    # ① 仅对象载荷（jsonb_typeof='object'）——delete 事件的 payload=None 按
+    #    JSON null 落库，裸 IS NOT NULL 会误纳 null 字面量导致任意命中；
+    # ② 确定性取最新（max(seq)）——同 id 多条 delete 事件时不得任意选；
+    # ③ 目标覆盖 SQL NULL 与 JSON null（旧列存量两态）。
+    ("sync_tombstones_payload_backfill",
+     "UPDATE sync_tombstones t SET payload = e.payload "
+     "FROM sync_events e "
+     "WHERE t.entity_type = 'user_model_providers' "
+     "AND (t.payload IS NULL OR jsonb_typeof(t.payload) = 'null') "
+     "AND e.entity_type = 'user_model_providers' AND e.op = 'delete' "
+     "AND e.entity_id = t.entity_id AND e.user_id = t.user_id "
+     "AND jsonb_typeof(e.payload) = 'object' "
+     "AND e.seq = (SELECT max(e2.seq) FROM sync_events e2 "
+     "WHERE e2.user_id = t.user_id AND e2.entity_type = 'user_model_providers' "
+     "AND e2.op = 'delete' AND e2.entity_id = t.entity_id "
+     "AND jsonb_typeof(e2.payload) = 'object')"),
+    ("pgvector_extension", "CREATE EXTENSION IF NOT EXISTS vector"),
+    # memory_concepts
+    ("create_memory_concepts", """CREATE TABLE IF NOT EXISTS memory_concepts (
+        id VARCHAR(36) PRIMARY KEY,
+        user_id VARCHAR(36) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        canonical_name VARCHAR(500) NOT NULL,
+        description_short VARCHAR(80) NOT NULL,
+        description_full TEXT,
+        aliases TEXT,
+        weight FLOAT NOT NULL DEFAULT 0.5,
+        stability FLOAT NOT NULL DEFAULT 14.0,
+        source_trust VARCHAR(20) NOT NULL DEFAULT 'user_stated',
+        memory_type VARCHAR(20) NOT NULL DEFAULT 'semantic',
+        activation_strength FLOAT NOT NULL DEFAULT 1.0,
+        recurrence_count INTEGER NOT NULL DEFAULT 0,
+        last_recurrence_at TIMESTAMP,
+        hot_forget_count INTEGER NOT NULL DEFAULT 0,
+        status VARCHAR(20) NOT NULL DEFAULT 'active',
+        source_type VARCHAR(50) NOT NULL DEFAULT 'extracted',
+        source_raw_ids TEXT,
+        source_unit_ids TEXT,
+        needs_review BOOLEAN NOT NULL DEFAULT FALSE,
+        metadata_json TEXT,
+        last_recalled_at TIMESTAMP,
+        valid_from TIMESTAMP DEFAULT NOW(),
+        valid_to TIMESTAMP,
+        superseded_by VARCHAR(36),
+        embedding vector(1024),  -- 维度须与 [endpoints.embedding].extra.dim 一致（Wave D 2026-08-31）
+        embedding_updated_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+    )"""),
+    ("idx_concepts_user_status", "CREATE INDEX IF NOT EXISTS idx_concepts_user_status ON memory_concepts(user_id, status)"),
+    ("idx_concepts_user_weight", "CREATE INDEX IF NOT EXISTS idx_concepts_user_weight ON memory_concepts(user_id, weight DESC)"),
+    ("idx_concepts_user_recalled", "CREATE INDEX IF NOT EXISTS idx_concepts_user_recalled ON memory_concepts(user_id, last_recalled_at DESC)"),
+    ("idx_concepts_needs_review", "CREATE INDEX IF NOT EXISTS idx_concepts_needs_review ON memory_concepts(user_id, needs_review) WHERE needs_review = TRUE"),
+    ("idx_concepts_embedding", "CREATE INDEX IF NOT EXISTS idx_concepts_embedding ON memory_concepts USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 64)"),
+    # memory_clusters
+    ("create_memory_clusters", """CREATE TABLE IF NOT EXISTS memory_clusters (
+        id VARCHAR(36) PRIMARY KEY,
+        user_id VARCHAR(36) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        name VARCHAR(255) NOT NULL,
+        summary TEXT,
+        weight FLOAT NOT NULL DEFAULT 0.5,
+        embedding vector(1024),  -- 维度须与 [endpoints.embedding].extra.dim 一致（Wave D 2026-08-31）
+        member_count INTEGER NOT NULL DEFAULT 0,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+    )"""),
+    ("idx_clusters_user", "CREATE INDEX IF NOT EXISTS idx_clusters_user ON memory_clusters(user_id)"),
+    # concept_cluster_members
+    ("create_concept_cluster_members", """CREATE TABLE IF NOT EXISTS concept_cluster_members (
+        concept_id VARCHAR(36) NOT NULL REFERENCES memory_concepts(id) ON DELETE CASCADE,
+        cluster_id VARCHAR(36) NOT NULL REFERENCES memory_clusters(id) ON DELETE CASCADE,
+        PRIMARY KEY (concept_id, cluster_id)
+    )"""),
+    ("idx_ccm_cluster", "CREATE INDEX IF NOT EXISTS idx_ccm_cluster ON concept_cluster_members(cluster_id)"),
+    # concept_relations
+    ("create_concept_relations", """CREATE TABLE IF NOT EXISTS concept_relations (
+        id VARCHAR(36) PRIMARY KEY,
+        user_id VARCHAR(36) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        source_id VARCHAR(36) NOT NULL REFERENCES memory_concepts(id) ON DELETE CASCADE,
+        target_id VARCHAR(36) NOT NULL REFERENCES memory_concepts(id) ON DELETE CASCADE,
+        relation_type VARCHAR(50) NOT NULL,
+        description TEXT,
+        weight FLOAT NOT NULL DEFAULT 0.5,
+        created_at TIMESTAMP DEFAULT NOW(),
+        CHECK (source_id != target_id)
+    )"""),
+    ("idx_rel_source", "CREATE INDEX IF NOT EXISTS idx_rel_source ON concept_relations(source_id)"),
+    ("idx_rel_target", "CREATE INDEX IF NOT EXISTS idx_rel_target ON concept_relations(target_id)"),
+    ("idx_rel_user", "CREATE INDEX IF NOT EXISTS idx_rel_user ON concept_relations(user_id)"),
+    # memory_clarifications
+    ("create_memory_clarifications", """CREATE TABLE IF NOT EXISTS memory_clarifications (
+        id VARCHAR(36) PRIMARY KEY,
+        user_id VARCHAR(36) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        conversation_id VARCHAR(36),
+        message_id VARCHAR(36),
+        original_text TEXT NOT NULL,
+        correction_type VARCHAR(30) NOT NULL,
+        affected_concept_ids TEXT,
+        new_description TEXT,
+        confidence FLOAT NOT NULL DEFAULT 0.0,
+        applied BOOLEAN DEFAULT FALSE,
+        applied_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT NOW()
+    )"""),
+    ("idx_clar_user", "CREATE INDEX IF NOT EXISTS idx_clar_user ON memory_clarifications(user_id)"),
+    ("idx_clar_applied", "CREATE INDEX IF NOT EXISTS idx_clar_applied ON memory_clarifications(user_id, applied)"),
+    # W4 Minor-4 二波（2026-10-06）：idx_clar_user 是 (user_id, applied) 的严格前缀
+    # 冗余——长索引覆盖 user_id 查询；drop 短方（守卫 test_no_redundant_index_pairs）。
+    ("idx_clar_user_redundant_drop",
+     "DO $$ BEGIN IF EXISTS (SELECT 1 FROM pg_indexes WHERE indexname='idx_clar_user') "
+     "THEN DROP INDEX idx_clar_user; END IF; END $$"),
+    # subconscious_log
+    ("create_subconscious_log", """CREATE TABLE IF NOT EXISTS subconscious_log (
+        id VARCHAR(36) PRIMARY KEY,
+        user_id VARCHAR(36) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        unit_kind VARCHAR(20) NOT NULL DEFAULT 'message',
+        raw_text TEXT NOT NULL,
+        source_ids TEXT NOT NULL,
+        embedding vector(1024),  -- 维度须与 [endpoints.embedding].extra.dim 一致（Wave D 2026-08-31）
+        promoted BOOLEAN NOT NULL DEFAULT FALSE,
+        promoted_at TIMESTAMP,
+        recurrence_count INTEGER NOT NULL DEFAULT 0,
+        last_recurrence_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT NOW()
+    )"""),
+    ("idx_sub_user_created", "CREATE INDEX IF NOT EXISTS idx_sub_user_created ON subconscious_log(user_id, created_at DESC)"),
+    ("idx_sub_user_unpromoted", "CREATE INDEX IF NOT EXISTS idx_sub_user_unpromoted ON subconscious_log(user_id, promoted) WHERE promoted = FALSE"),
+    ("idx_sub_embedding", "CREATE INDEX IF NOT EXISTS idx_sub_embedding ON subconscious_log USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 64)"),
+    # 2026-08-10 队头阻塞修复：单元作为批次头的扫描次数预算（防最旧 50 条永不晋升挡住新单元）
+    ("add_subconscious_recurrence_scan_count", "ALTER TABLE subconscious_log ADD COLUMN IF NOT EXISTS recurrence_scan_count INTEGER NOT NULL DEFAULT 0"),
+    # 2026-08-10 权重语义修正：importance = 持久重要性（与 weight 热度正交），
+    # 创建时由提取 LLM 判定/规则兜底；展示与检索排序以 importance 主导
+    ("add_concept_importance", "ALTER TABLE memory_concepts ADD COLUMN IF NOT EXISTS importance DOUBLE PRECISION NOT NULL DEFAULT 0.5"),
+    # 2026-08-10 F1 修复：独立"已评估"标记（importance=0.5 是合法 verdict，不能当哨兵）
+    ("add_concept_importance_evaluated", "ALTER TABLE memory_concepts ADD COLUMN IF NOT EXISTS importance_evaluated BOOLEAN NOT NULL DEFAULT FALSE"),
+    # memory_episodes
+    ("create_memory_episodes", """CREATE TABLE IF NOT EXISTS memory_episodes (
+        id VARCHAR(36) PRIMARY KEY,
+        user_id VARCHAR(36) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        narrative TEXT NOT NULL,
+        source_unit_ids TEXT NOT NULL,
+        source_concept_ids TEXT,
+        valid_from TIMESTAMP DEFAULT NOW(),
+        valid_to TIMESTAMP,
+        superseded_by VARCHAR(36),
+        embedding vector(1024),  -- 维度须与 [endpoints.embedding].extra.dim 一致（Wave D 2026-08-31）
+        merged_from VARCHAR(36),
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+    )"""),
+    ("idx_epi_user_created", "CREATE INDEX IF NOT EXISTS idx_epi_user_created ON memory_episodes(user_id, valid_from DESC)"),
+    ("idx_epi_embedding", "CREATE INDEX IF NOT EXISTS idx_epi_embedding ON memory_episodes USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 64)"),
+    # memory_concepts: 防御性 ALTER（老库 CREATE 无此列时补齐；新库 CREATE 已含则幂等跳过）
+    ("mc_last_recurrence_at", "ALTER TABLE memory_concepts ADD COLUMN IF NOT EXISTS last_recurrence_at TIMESTAMP"),
+    # memory_episodes: recall tracking (M&D §5.3.1a-2)
+    ("me_last_recalled_at", "ALTER TABLE memory_episodes ADD COLUMN IF NOT EXISTS last_recalled_at TIMESTAMP"),
+    # memory_episodes: 来源标记（§8.5.5 回滚按 source_type='migration' 精确删除）
+    ("me_source_type", "ALTER TABLE memory_episodes ADD COLUMN IF NOT EXISTS source_type VARCHAR(50) DEFAULT 'extracted'"),
+    # memory_concepts: 衰减写回时间戳（2026-08-16）——run_weight_decay 写回
+    # weight 时记录 anchor，dream/active-dreaming 的有效权重用"距上次写回/召回"
+    # 的残差衰减，避免同一事务内二次全量衰减（A4.9 审查 C1/C2）
+    ("mc_weight_decayed_at", "ALTER TABLE memory_concepts ADD COLUMN IF NOT EXISTS weight_decayed_at TIMESTAMP"),
+    ("idx_epi_source_type", "CREATE INDEX IF NOT EXISTS idx_epi_source_type ON memory_episodes(user_id, source_type)"),
+    # memory_llm_calls
+    ("create_memory_llm_calls", """CREATE TABLE IF NOT EXISTS memory_llm_calls (
+        id VARCHAR(36) PRIMARY KEY,
+        user_id VARCHAR(36) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        kind VARCHAR(50) NOT NULL,
+        model VARCHAR(100),
+        prompt_tokens INTEGER NOT NULL DEFAULT 0,
+        completion_tokens INTEGER NOT NULL DEFAULT 0,
+        created_at TIMESTAMP DEFAULT NOW()
+    )"""),
+    ("idx_mlc_user_ts", "CREATE INDEX IF NOT EXISTS idx_mlc_user_ts ON memory_llm_calls(user_id, created_at DESC)"),
+    # DC2（2026-09-14）：集群向量溯源列（A1 修复时写入；其余向量表 B7 补齐）
+    ("mc_cluster_embedding_model", "ALTER TABLE memory_clusters ADD COLUMN IF NOT EXISTS embedding_model VARCHAR(100)"),
+    # DC1（2026-09-14）：记忆 LLM 调用计费分类——read 类调用只做遥测，
+    # 不得进入成本治理降级口径（旧行无值为 write，兼容历史）
+    ("mlc_billing_class", "ALTER TABLE memory_llm_calls ADD COLUMN IF NOT EXISTS billing_class VARCHAR(20) DEFAULT 'write'"),
+    # DC2/B2（2026-09-14）：向量溯源列 + 幂等去重键 + 待补嵌标记
+    ("mc_concept_embedding_model", "ALTER TABLE memory_concepts ADD COLUMN IF NOT EXISTS embedding_model VARCHAR(100)"),
+    ("me_embedding_model", "ALTER TABLE memory_episodes ADD COLUMN IF NOT EXISTS embedding_model VARCHAR(100)"),
+    ("sub_embedding_model", "ALTER TABLE subconscious_log ADD COLUMN IF NOT EXISTS embedding_model VARCHAR(100)"),
+    ("sub_content_hash", "ALTER TABLE subconscious_log ADD COLUMN IF NOT EXISTS content_hash VARCHAR(64)"),
+    ("sub_needs_embedding", "ALTER TABLE subconscious_log ADD COLUMN IF NOT EXISTS needs_embedding BOOLEAN DEFAULT FALSE"),
+    # B2/I3（2026-09-14）：存量 NULL 嵌入（未晋升）标记待补嵌；存量 content_hash
+    # 为空不回溯（幂等去重只对新行生效；存量重复按 DC3 决策不清理）
+    ("sub_flag_missing_embeddings", "UPDATE subconscious_log SET needs_embedding = TRUE WHERE embedding IS NULL AND promoted = FALSE AND needs_embedding = FALSE"),
+    ("idx_sub_content_hash", "CREATE INDEX IF NOT EXISTS idx_sub_content_hash ON subconscious_log(user_id, content_hash)"),
+    # C1（2026-09-14）：逐轮召回台账（观测；只存元数据不存内容；DC7 FK CASCADE）
+    ("mrl_create", """CREATE TABLE IF NOT EXISTS memory_recall_log (
+        id VARCHAR(36) PRIMARY KEY,
+        user_id VARCHAR(36) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        conversation_id VARCHAR(36) REFERENCES conversations(id) ON DELETE CASCADE,
+        query_hash VARCHAR(32),
+        candidate_ids TEXT,
+        tier_scores TEXT,
+        gate_score DOUBLE PRECISION DEFAULT 0,
+        budget_chars INTEGER NOT NULL DEFAULT 0,
+        injected_chars INTEGER NOT NULL DEFAULT 0,
+        truncated BOOLEAN NOT NULL DEFAULT FALSE,
+        elapsed_ms INTEGER NOT NULL DEFAULT 0,
+        cache_hit BOOLEAN NOT NULL DEFAULT FALSE,
+        created_at TIMESTAMP DEFAULT NOW()
+    )"""),
+    ("mrl_idx_user_created", "CREATE INDEX IF NOT EXISTS idx_mrl_user_created ON memory_recall_log(user_id, created_at DESC)"),
+    # D1（2026-09-14）：RippleMem P/L/T 线索列（可空；存量行保持 NULL，不回填）
+    ("me_participants", "ALTER TABLE memory_episodes ADD COLUMN IF NOT EXISTS participants VARCHAR(1000)"),
+    ("me_locations", "ALTER TABLE memory_episodes ADD COLUMN IF NOT EXISTS locations VARCHAR(1000)"),
+    # D1/DC5（2026-09-14）：边来源列（存量行默认 llm 语义；读侧白名单门控）
+    ("cr_edge_source", "ALTER TABLE concept_relations ADD COLUMN IF NOT EXISTS edge_source VARCHAR(20) DEFAULT 'llm'"),
+]
+
+
+# §9.5 pgvector 缺失降级：启动探测结果（run_startup_migrations 期间更新）。
+# False 时 memory v2 迁移整体跳过、init_db 的 create_all 排除 memory 表、
+# main.py 强制 memory.enabled=false —— 服务继续以旧记忆方案运行，不崩溃。
+PGVECTOR_AVAILABLE = True
+
+_MEMORY_MIGRATION_START = "pgvector_extension"
+
+_VECTOR_TABLES = [
+    ("subconscious_log", "embedding", "idx_sub_embedding"),
+    ("memory_concepts", "embedding", "idx_concepts_embedding"),
+    ("memory_episodes", "embedding", "idx_epi_embedding"),
+    ("memory_clusters", "embedding", None),
+]
+
+
+async def probe_pgvector(conn, extension: str = "vector") -> bool:
+    """§9.5 启动探测：pgvector 扩展是否可用（已安装或可创建）。
+
+    CREATE EXTENSION 失败（无权限/未安装）会被 PG 拒绝并使事务进入 aborted
+    状态——savepoint 隔离保证探测失败不毒化调用方事务（init_db 后续
+    create_all 依赖同一事务）。
+    """
+    if not _EXT_IDENT_RE.fullmatch(extension):
+        logger.error("probe_pgvector: 非法扩展名标识符 %r", extension)
+        return False
+    try:
+        async with conn.begin_nested():
+            await conn.execute(text(f"CREATE EXTENSION IF NOT EXISTS {extension}"))
+    except Exception:
+        return False
+    try:
+        r = await conn.execute(text("SELECT extversion FROM pg_extension WHERE extname = :ext"),
+                               {"ext": extension})
+    except Exception:
+        # SELECT 失败属异常环境（事务已毒化等），与"扩展缺失"区分开——
+        # 不当静默禁用：记录 warning 便于排查当次启动 memory 被禁的原因
+        logger.warning("probe_pgvector: pg_extension 查询失败，按不可用处理", exc_info=True)
+        return False
+    return r.scalar() is not None
+
+
+def _expected_embedding_dim(conf: dict) -> int:
+    """期望 embedding 维度（2026-08-31 Wave D）：[endpoints.embedding].extra.dim
+    （端点池 doctrine 源）→ legacy [memory].embedding_dim → **0 = 未知**。
+
+    0 时对账必须跳过——绝不默认 1536：Wave C 曾因默认值把三个正常 1024 表
+    判成 mismatch（cast 失败被吞，险些改坏）。"""
+    try:
+        from app.model_gateway.registry import get_model_registry
+        ep = get_model_registry().get("embedding")
+        v = int((ep.extra or {}).get("dim", 0) or 0)
+        if v > 0:
+            return v
+    except Exception:
+        pass
+    try:
+        v = int((conf.get("memory", {}) or {}).get("embedding_dim", 0) or 0)
+        if v > 0:
+            return v
+    except Exception:
+        pass
+    return 0
+
+
+async def _reconcile_vector_dims(conn) -> None:
+    """检测 DB 中 vector 列维度是否与配置 embedding 维度一致，不一致则 ALTER 重建。
+
+    典型场景：旧迁移创建 vector(1536)，用户切换 embedding 模型后配置改为 1024。
+    期望维度来自 [endpoints.embedding].extra.dim（legacy [memory].embedding_dim
+    兜底）；未知时整体跳过。跨维度旧向量先置 NULL（维度不匹配的向量本就无法
+    被当前模型检索，且写入早已失败——见 memory_clusters 1536 事故）。"""
+    try:
+        from app.core.config import get_config
+        conf = get_config()._config or {}
+    except Exception:
+        return
+    # memory v2 关闭时表可能不存在/不需对账（R2 Minor：先于 dim-unknown 判定，
+    # 避免 disabled 部署收到无关的"声明 extra.dim"大警告）
+    try:
+        _mem_enabled = bool((conf.get("memory", {}) or {}).get("enabled", True))
+    except Exception:
+        _mem_enabled = True
+    if not _mem_enabled:
+        logger.info("vector dim reconcile skipped: [memory] enabled=false")
+        return
+    expected = _expected_embedding_dim(conf)
+    if not expected:
+        logger.warning(
+            "vector dim reconcile SKIPPED: expected dim unknown — declare "
+            "[endpoints.embedding].extra.dim (= model output dims) so the "
+            "reconcile can align vector columns; 0-unknown never guesses "
+            "(A4.9 W-D: no 1536 default)"
+        )
+        return
+
+    for table, col, idx_name in _VECTOR_TABLES:
+        try:
+            async with conn.begin_nested():
+                r = await conn.execute(text(
+                    "SELECT format_type(atttypid, atttypmod) FROM pg_attribute "
+                    "WHERE attrelid = CAST(:tbl AS regclass) AND attname = :col AND NOT attisdropped"
+                ), {"tbl": table, "col": col})
+                fmt = r.scalar()
+                if not fmt:
+                    continue
+                match = re.search(r"vector\((\d+)\)", fmt)
+                if not match:
+                    continue
+                current = int(match.group(1))
+                if current == expected:
+                    continue
+                logger.warning(
+                    "vector dim mismatch: %s.%s is vector(%d), config expects %d — altering",
+                    table, col, current, expected,
+                )
+                if idx_name:
+                    await conn.execute(text(f"DROP INDEX IF EXISTS {idx_name}"))
+                # 跨维度旧向量先清空（否则 ALTER 需要未定义的跨维 cast）。
+                # I1（A4.9 W-D）：行数必须留痕——这是破坏性操作，静默清空
+                # 数千条向量 = 数据丢失事故而非"对账"。
+                _null_res = await conn.execute(text(
+                    f"UPDATE {table} SET {col} = NULL "
+                    f"WHERE {col} IS NOT NULL AND vector_dims({col}) <> {expected}"
+                ))
+                if _null_res.rowcount:
+                    logger.warning(
+                        "vector dim reconcile: nulled %d mismatched %s.%s rows "
+                        "(old-dim vectors are unretrievable under the %d-dim model; "
+                        "re-embeddable from retained text)",
+                        _null_res.rowcount, table, col, expected,
+                    )
+                await conn.execute(text(
+                    f"ALTER TABLE {table} ALTER COLUMN {col} TYPE vector({expected})"
+                ))
+                if idx_name:
+                    await conn.execute(text(
+                        f"CREATE INDEX {idx_name} ON {table} USING hnsw ({col} vector_cosine_ops) "
+                        f"WITH (m = 16, ef_construction = 64)"
+                    ))
+                logger.info("vector dim reconciled: %s.%s → vector(%d)", table, col, expected)
+        except Exception:
+            logger.warning("vector dim reconcile failed for %s.%s", table, col, exc_info=True)
+
+
+async def run_startup_migrations(conn) -> None:
+    global PGVECTOR_AVAILABLE
+    # §9.5：无条件探测（ cheap + 幂等）——已记录 applied 的旧库亦需覆盖
+    # “migration_versions 被恢复进无 pgvector 集群”场景，不能靠 applied 跳过探测
+    PGVECTOR_AVAILABLE = await probe_pgvector(conn)
+
+    await conn.execute(text(
+        """CREATE TABLE IF NOT EXISTS migration_versions (
+            version VARCHAR(255) PRIMARY KEY,
+            applied_at TIMESTAMP DEFAULT NOW()
+        )"""
+    ))
+
+    versions = [v for v, _ in STARTUP_MIGRATIONS]
+    mem_start = versions.index(_MEMORY_MIGRATION_START) if _MEMORY_MIGRATION_START in versions else len(STARTUP_MIGRATIONS)
+
+    for idx, (version, statement) in enumerate(STARTUP_MIGRATIONS):
+        if idx >= mem_start and not PGVECTOR_AVAILABLE:
+            # memory v2 迁移块（pgvector_extension 起，必须保持连续后缀——
+            # 由 tests/test_startup_migrations_sql.py::test_pgvector_skip_window_suffix_purity
+            # 后缀纯度断言守护）整体跳过，
+            # 不记录版本号，安装 pgvector 后重启可补跑
+            if idx == mem_start:
+                msg = (
+                    "pgvector 扩展不可用（CREATE EXTENSION vector 失败或未安装）；"
+                    "跳过 memory v2 全部迁移，memory 子系统将被禁用。"
+                    "请安装 pgvector（如 brew install pgvector）并授予 CREATE EXTENSION 权限后重启。")
+                try:
+                    from app.core.config import get_config
+                    _mem_requested = bool(get_config().memory.get("enabled")) or \
+                        bool(get_config().memory.get("migration_enabled"))
+                except Exception:
+                    _mem_requested = True  # 配置读不出时按高调处理，不错过告警
+                if _mem_requested:
+                    logger.error(msg)
+                else:
+                    # memory 未开启时降级为 info，避免每次启动刷错误日志
+                    logger.info(msg)
+            continue
+
+        result = await conn.execute(
+            text("SELECT 1 FROM migration_versions WHERE version = :version"),
+            {"version": version},
+        )
+        if result.scalar_one_or_none():
+            continue
+
+        await conn.execute(text(statement))
+        await conn.execute(
+            text("INSERT INTO migration_versions (version) VALUES (:version)"),
+            {"version": version},
+        )
+
+    # 静态迁移跑完后，校验 vector 列维度是否与配置一致
+    if PGVECTOR_AVAILABLE:
+        await _reconcile_vector_dims(conn)

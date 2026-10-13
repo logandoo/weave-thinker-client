@@ -1,0 +1,302 @@
+/**
+ * SSE payload dispatch + handler contracts for the chat stream.
+ *
+ * Extracted from api/chat.ts into a dependency-free module so the dispatch
+ * logic (busy / superseded / part-event routing) can be unit-tested under
+ * plain Node without pulling in axios / pinia / vue imports.
+ */
+import type { Conversation, Message, ChatRequest, ConversationUpdate, BulkDeleteResult, ConversationSearchResult, SearchProgress, SearchFailed, ToolStatus, AgentStep, SubAgentThinking, FileAttachment, TaskProgress, ToolCallEvent, ToolResultEvent, IterationEvent, PartStartedEvent, PartDeltaEvent, PartUpdatedEvent, ContextInfo } from '../types'
+
+export interface StreamStatusResult {
+  has_buffer: boolean
+  status: 'incomplete' | 'complete' | 'none'
+  is_running: boolean
+  db_message_id: string | null
+  content_length: number
+  /** True when the backend run is still in its SETUP phase (no buffer
+   *  created yet — coordinator pre-pass / memory / workspace gather, or a
+   *  detached setup-recovery re-drive after an SSE abort). The frontend
+   *  must keep waiting instead of treating "no buffer" as "agent stopped":
+   *  the answer is produced and self-saved once setup completes (conv
+   *  b078987b, 2026-08-03). */
+  setup_in_progress?: boolean
+  /** True when the status request itself failed (network down) — callers must
+   *  not treat this as a definitive "no buffer / agent stopped" answer. */
+  error?: boolean
+}
+
+/** Replay snapshot payload from POST /chat/stream/resume. */
+export interface ReplayPayload {
+  /** SSE protocol version. >= 2 means display_sequence items carry part_id
+   *  and the live stream emits part_started/part_delta/part_updated. */
+  version?: number
+  content: string
+  reasoning: string
+  layer1: { content: string; reasoning: string }
+  layer2: { content: string; reasoning: string }
+  tool_calls: any[]
+  tool_results: any[]
+  agent_steps: any[]
+  content_segments: string[]
+  display_sequence: any[]
+  file_attachments: any[]
+  search_progress: any[]
+  search_failed: any | null
+  iteration: any
+  context_info?: ContextInfo
+  status: string
+  is_running: boolean
+  db_message_id: string | null
+}
+
+/** Handler bundle for streamChat. Options-object form replaces the previous
+ * 22-positional-parameter signature — positional drift had already silently
+ * miswired 3 of 5 callsites (onDeathmatchVerdict/onPermissionRequest/onPing
+ * landing in each other's slots). */
+export interface StreamHandlers {
+  onMessage: (content: string) => void
+  onDone: (conversationId: string, messageId: string, title?: string, toolResults?: string | null, searchFailed?: boolean, taskSubmitted?: boolean) => void
+  onError: (error: string) => void
+  onReasoning?: (content: string) => void
+  onToolStatus?: (status: ToolStatus) => void
+  signal?: AbortSignal
+  onSearchProgress?: (progress: SearchProgress) => void
+  onSearchFailed?: (failed: SearchFailed) => void
+  onAgentStep?: (step: AgentStep) => void
+  onTitleUpdate?: (conversationId: string, title: string) => void
+  onSubAgentThinking?: (thinking: SubAgentThinking) => void
+  onFileAttachment?: (attachments: FileAttachment[]) => void
+  onTaskProgress?: (progress: TaskProgress) => void
+  onSubAgentChunk?: (chunk: { subtask_id: string; subtask_name: string; kind: 'content' | 'reasoning'; delta: string }) => void
+  onToolCall?: (toolCall: ToolCallEvent) => void
+  onToolResult?: (toolResult: ToolResultEvent) => void
+  onIteration?: (iteration: IterationEvent) => void
+  onContentSegment?: (content: string) => void
+  onDeathmatchVerdict?: (verdict: any) => void
+  onPermissionRequest?: (request: { request_id: string; tool_name: string; description: string; details: Record<string, any> }) => void
+  onPing?: () => void
+  /** 静默质检（audit_reset）同步：后端打回了已流式展示的草稿并重置其累加器，
+   *  客户端据此丢弃草稿文本（时间线清创+content 重置），否则 done 气泡会包含
+   *  全部被拒草稿（conv 827a6f78 turn-B）。 */
+  onAuditReset?: () => void
+  onPartStarted?: (part: PartStartedEvent) => void
+  onPartDelta?: (part: PartDeltaEvent) => void
+  onPartUpdated?: (part: PartUpdatedEvent) => void
+  /** 每轮请求的上下文 token 用量估算（含系统提示词+历史+工具 schema）。 */
+  onContextInfo?: (info: ContextInfo) => void
+  /** 4.8 session lock: the conversation already has a running agent. */
+  onConversationBusy?: (conversationId?: string) => void
+  /** A newer request took over the conversation while this stream was still
+   *  in its setup phase. The stream must end silently (no error bubble) and
+   *  resync from the DB — the newer run owns the answer. */
+  onConversationSuperseded?: () => void
+  /** 插话 commit-echo：后端在迭代边界把用户插话注入消息列表并落库后广播。
+   *  前端据此把乐观插话气泡替换为服务器确认的用户消息。 */
+  onInterjectionCommitted?: (payload: { id: string | null; conversation_id: string; content: string; created_at: string | null }) => void
+}
+
+export interface ResumeHandlers extends StreamHandlers {
+  onReplay: (replay: ReplayPayload) => void
+  /** 轻提示口（UPSTREAM_TODO_20261006 项 10）：drain 503 瞬时面——不落红硬错。 */
+  onTransient?: (reason: string) => void
+}
+
+/** 外置桩识别（宽松形——懒取回/解析触发用；伪造 ref=404 安全）。
+ * 与 backend `is_externalized_stub` 同构。 */
+export function isExternalizedStub(v: unknown): boolean {
+  if (typeof v !== 'string' || v.length < 2 || !v.startsWith('{')) return false
+  try {
+    return (JSON.parse(v) as { _externalized?: boolean })._externalized === true
+  } catch {
+    return false
+  }
+}
+
+/** 标记信任（评审 A Critical-1，fix-round 1）：徽标/愈合只信后端签发 meta——
+ * `_externalized` + `field` + 64hex `payload_ref` + 数值 `size_bytes`
+ * （build_field_stub_ex 同构）。内容伪造 `_externalized`+标记不得免剥。
+ * 与 backend `stub_markers_trusted` 同构。 */
+export function stubMarkersTrusted(v: unknown): boolean {
+  if (!isExternalizedStub(v)) return false
+  try {
+    const o = JSON.parse(v as string) as Record<string, unknown>
+    const ref = o.payload_ref
+    return typeof o.field === 'string' && o.field.length > 0
+      && typeof ref === 'string' && /^[0-9a-f]{64}$/.test(ref)
+      && typeof o.size_bytes === 'number' && Number.isFinite(o.size_bytes)
+  } catch {
+    return false
+  }
+}
+
+/** drain 门 503+Retry-After 瞬时重试（UPSTREAM_TODO_20261006 项 10，评审 B m6）。
+ * 契约：503 → 按 Retry-After（秒，默认 5s，上限 30s）退避重试，至多
+ * DRAIN_MAX_RETRIES 次；耗尽交轻提示（onTransient），交还有界恢复。
+ * 纯函数 + 注入式 fetch/sleep——Node 直跑测试缝（同模块既有约定）。 */
+export const DRAIN_MAX_RETRIES = 3
+
+const TRANSIENT_STATUSES = new Set([503, 429, 502, 504])
+
+export function nextRetryAfterMs(status: number, retryAfterHeader: string | null, defaultMs = 5000): number | null {
+  // 瞬时面（挂账清理波 criterion 3）：503 排空 / 429 限流 / 502·504 网关瞬断
+  if (!TRANSIENT_STATUSES.has(status)) return null
+  const raw = (retryAfterHeader ?? '').trim()
+  if (raw !== '') {
+    // Number('')===0 会把空头误当 0 秒——空/非法一律回落默认（drain 门=5s）
+    const secs = Number(raw)
+    // 下限 1s（评审 A-5 minor：Retry-After: 0 不得紧打排空中服务）
+    if (Number.isFinite(secs) && secs >= 0) return Math.max(1000, Math.min(secs * 1000, 30000))
+  }
+  return defaultMs
+}
+
+/** 可中断退避睡眠（评审 A-5）：abort 即醒——不睡满、不压住 _resumingSet/watchdog。 */
+export function sleepWithAbort(ms: number, signal?: AbortSignal | null): Promise<void> {
+  return new Promise((resolve) => {
+    if (signal?.aborted) { resolve(); return }
+    const onAbort = () => { clearTimeout(timer); resolve() }
+    const timer = setTimeout(() => { signal?.removeEventListener('abort', onAbort); resolve() }, ms)
+    signal?.addEventListener('abort', onAbort, { once: true })
+  })
+}
+
+/** 瞬时暂态轻提示文案（挂账清理波 criterion 3 / 复审 A Important-3）：按因由三分类
+ * ——纯函数（node 行为腿缝），store 与任何消费端同此一口。 */
+export function transientHintFor(reason: string | null | undefined): string {
+  const hints: Record<string, string> = {
+    'drain': '服务重启排空中，消息未能送达，请稍后重发。',
+    'busy': '服务繁忙（限流），消息未能送达，请稍后重发。',
+    'gateway': '网络波动/网关瞬断，消息未能送达，请稍后重发。',
+  }
+  return hints[reason ?? 'gateway'] ?? hints['gateway']
+}
+
+export type ResumeFailureClass = 'skip' | 'auth-expired' | 'transient-drain' | 'transient-retry' | 'error'
+
+export function classifyResumeFailure(status: number): ResumeFailureClass {
+  if (status === 404) return 'skip'
+  if (status === 401) return 'auth-expired'
+  if (status === 503) return 'transient-drain'
+  if (status === 429 || status === 502 || status === 504) return 'transient-retry'
+  return 'error'
+}
+
+export async function fetchWithDrainRetry<T extends { ok: boolean; status: number; headers: { get(name: string): string | null } }>(
+  fetchFn: (url: string, init?: unknown) => Promise<T>,
+  url: string,
+  init?: unknown,
+  sleepFn: (ms: number) => Promise<void> = (ms) => sleepWithAbort(ms, (init as { signal?: AbortSignal } | undefined)?.signal),
+): Promise<T> {
+  for (let attempt = 0; ; attempt += 1) {
+    const response = await fetchFn(url, init)
+    const waitMs = nextRetryAfterMs(response.status, response.headers.get('retry-after'))
+    if (waitMs === null || attempt >= DRAIN_MAX_RETRIES) return response
+    await sleepFn(waitMs)
+  }
+}
+
+/** Shared SSE payload dispatch. Returns true when the stream must terminate. */
+
+/** Coerce an SSE text channel to string. conv 827a6f78 (2026-09-03): the
+ *  live streaming view degraded to the literal text "true" — any non-string
+ *  slipping into a `content`/`delta` channel is concatenated by the
+ *  accumulators (`'' + true === "true"`), while the DB answer stays clean.
+ *  Single choke point: boolean/null/object values are dropped here so the
+ *  whole class dies at ingest. */
+function asText(v: unknown): string {
+  return typeof v === 'string' ? v : ''
+}
+
+export function dispatchStreamPayload(data: any, h: StreamHandlers): boolean {
+  // A tool_result frame carries a PER-TOOL boolean `error` flag (flattened
+  // wire shape: {call_id, name, result, error}). A failed tool call (e.g. a
+  // gate-blocked workspace write) is not a stream-fatal error — routing it
+  // into the fatal branch coerced `true` to '未知错误', killed the SSE read,
+  // and wiped the whole streaming bubble (2026-10-09). Exclude the shape here;
+  // the router below delivers it to onToolResult.
+  const isToolResult = data.call_id !== undefined && data.name !== undefined && 'result' in data
+  if (data.error && !isToolResult) {
+    if (data.code === 'conversation_busy' && h.onConversationBusy) {
+      h.onConversationBusy(data.conversation_id)
+      return true
+    }
+    if (data.code === 'conversation_superseded' && h.onConversationSuperseded) {
+      h.onConversationSuperseded()
+      return true
+    }
+    h.onError(typeof data.error === 'string' ? data.error : '未知错误')
+    return true
+  }
+
+  if (data.part_started && h.onPartStarted) h.onPartStarted(data.part_started)
+  if (data.part_delta && h.onPartDelta) {
+    // conv 827a6f78: delta channels are string-typed at the wire contract;
+    // a boolean/null delta would render "true"/"null" via string concat.
+    const pd = data.part_delta
+    if (typeof pd.delta === 'string') h.onPartDelta(pd)
+  }
+  if (data.part_updated && h.onPartUpdated) {
+    const pu = data.part_updated
+    if (pu.content !== undefined && pu.content !== null && typeof pu.content !== 'string') delete pu.content
+    if (pu.result !== undefined && pu.result !== null && typeof pu.result !== 'string') delete pu.result
+    h.onPartUpdated(pu)
+  }
+
+  if (data.search_progress && h.onSearchProgress) h.onSearchProgress(data.search_progress)
+  if (data.search_failed && h.onSearchFailed) h.onSearchFailed(data.search_failed)
+  if (data.tool_status && h.onToolStatus) h.onToolStatus(data.tool_status)
+  if (data.agent_step && h.onAgentStep) h.onAgentStep(data.agent_step)
+  if (data.context_info && h.onContextInfo) h.onContextInfo(data.context_info)
+  if (data.sub_agent_thinking && h.onSubAgentThinking) h.onSubAgentThinking(data.sub_agent_thinking)
+  if (data.attachments && h.onFileAttachment) h.onFileAttachment(data.attachments)
+  if (data.task_progress && h.onTaskProgress) h.onTaskProgress(data.task_progress)
+  if (data.sub_agent_chunk && h.onSubAgentChunk) {
+    const sc = data.sub_agent_chunk
+    if (typeof sc.delta === 'string') h.onSubAgentChunk(sc)
+  }
+  if (data.title_update && h.onTitleUpdate) h.onTitleUpdate(data.title_update.conversation_id, data.title_update.title)
+
+  if (data.reasoning_content !== undefined && h.onReasoning) h.onReasoning(asText(data.reasoning_content))
+  if (data.content !== undefined) h.onMessage(asText(data.content))
+
+  if (data.done) {
+    h.onDone(data.conversation_id, data.message_id, data.title, data.tool_results, data.search_failed, !!data.task_submitted)
+    return false
+  }
+
+  if (data.call_id !== undefined && data.name !== undefined && data.arguments !== undefined && h.onToolCall) {
+    h.onToolCall(data as ToolCallEvent)
+  }
+  if (isToolResult && h.onToolResult) {
+    h.onToolResult(data as ToolResultEvent)
+  }
+  if (data.current !== undefined && data.max !== undefined && h.onIteration) {
+    h.onIteration(data as IterationEvent)
+  }
+  if (data.segment_content !== undefined && h.onContentSegment) h.onContentSegment(asText(data.segment_content))
+  if (data.deathmatch_verdict && h.onDeathmatchVerdict) h.onDeathmatchVerdict(data.deathmatch_verdict)
+  if (data.permission_request && h.onPermissionRequest) h.onPermissionRequest(data.permission_request)
+  if (data.interjection_committed && h.onInterjectionCommitted) h.onInterjectionCommitted(data.interjection_committed)
+
+  if (data.audit_reset && h.onAuditReset) {
+    // Silent-QC reset sync (conv 827a6f78 turn-B): the backend rejected the
+    // streamed draft and reset its accumulators — the client drops the draft
+    // text from its timeline/accumulators (handler-side surgery).
+    h.onAuditReset()
+  }
+
+  if (data.ping) {
+    // Keepalive: lets the store's stall watchdog distinguish a healthy
+    // but silent stream (long tool runs) from a dead connection.
+    if (h.onPing) h.onPing()
+  }
+  return false
+}
+
+// Re-exported types so api/chat.ts's public surface stays unchanged.
+export type {
+  Conversation, Message, ChatRequest, ConversationUpdate, BulkDeleteResult,
+  ConversationSearchResult, SearchProgress, SearchFailed, ToolStatus, AgentStep,
+  SubAgentThinking, FileAttachment, TaskProgress, ToolCallEvent, ToolResultEvent,
+  IterationEvent, PartStartedEvent, PartDeltaEvent, PartUpdatedEvent, ContextInfo,
+}

@@ -1,0 +1,261 @@
+# Copyright (c) 2026 Weave Thinker Contributors
+# SPDX-License-Identifier: Apache-2.0
+
+# ════════════════════════════════════════════════════════════════════════
+# config_model.toml.example — 模型与私密配置模板（2026-09-01 归位结构）
+#
+# 结构三区：① 模型端点池（按类型分区，端点信息只定义一次）
+#           ② [routing] 用途路由（purpose → 池中别名）
+#           ③ 采样默认 + [secrets] 密钥（纯行为段住 config.toml）
+# 复制为 config_model.toml 后填入真实 url/key；改 ①② 后 reload 或重启。
+# 各键的完整行为注释见 config_model.toml（生产文件）与 backend/app/core/config.py。
+# ════════════════════════════════════════════════════════════════════════
+
+# ════════════════════════════════════════════════════════════════════════
+# config_model.toml — 模型与私密配置（唯一模型配置文件，2026-09-01 归位重构）
+#
+# 文件即整体，自上而下三区：
+#   ① 模型端点池   —— 按模型类型分区（LLM / VLM / ASR / TTS / Embedding /
+#                      Rerank）；url / api_key / 模型名 / 参数 / 能力在此
+#                      定义且仅定义一次。
+#   ② 用途路由     —— [routing]：purpose → 池中别名；一切功能调用
+#                      （coordinator / judge / voice / memory / aux…）从池中
+#                      选择，绝不携带端点信息。
+#   ③ 采样默认+密钥 —— [defaults] / [default_assistant]（LLM 采样默认）与
+#                      [secrets]（web_search / context7 密钥）。
+# 铁律：端点信息只在 ① 出现；② 只引用别名；③ 不含行为段——纯行为调参
+# （[asr]/[voice]/[deathmatch]/[memory.*]/[agent.*] 等）住 config.toml。
+# 含密钥，切勿提交 git。模板：config_model.toml.example。
+# 改 ①② 后：model_gateway.reload_model_registry() 或重启生效。
+# ════════════════════════════════════════════════════════════════════════
+
+# ────────────────────────────────────────────────────────────────────────
+# ① 模型端点池
+# ────────────────────────────────────────────────────────────────────────
+
+# ── LLM（对话 / 推理）──
+[endpoints.main]
+kind = "llm"
+base_url = "https://api.deepseek.com/v1"
+api_key = ""              # ← 填入 DeepSeek key
+model_name = "deepseek-v4-flash"
+display_name = "默认模型"
+# 自包含（2026-08-31）：采样随端点携带，[api] legacy 兜底不再需要
+is_custom = true
+# F5（2026-09-14）：可选端点级上下文窗口（未声明时压缩/守卫回退全局
+# [agent.compression].context_length，绝不猜小）
+# [endpoints.main.extra]
+# context_window = 128000
+# max_output_tokens = 8192
+
+[endpoints.deepseek]
+kind = "llm"
+base_url = "https://api.deepseek.com/v1"
+api_key = ""              # ← 填入 DeepSeek key
+model_name = "deepseek-v4-flash"
+is_custom = true
+provider_type = "deepseek"
+
+[endpoints.mimo]
+kind = "llm"
+base_url = "https://api.xiaomimimo.com/v1"
+api_key = ""              # ← 填入 MiMo key
+model_name = "mimo-v2.5-pro-ultraspeed"
+is_custom = true
+provider_type = "mimo"
+
+[endpoints."qwen3.8"]
+kind = "llm"
+base_url = "http://YOUR-VLLM-HOST:28000/v1"
+api_key = ""
+model_name = "qwen3.8_27b"
+display_name = "Qwen3.8(Local)"
+is_custom = true
+provider_type = "qwen3.8_vllm"
+
+# Doubao（火山方舟 Ark，OpenAI 兼容）：thinking{type} + 顶层 reasoning_effort
+# （high/medium/low；minimal≡关闭已并入「关闭」开关，2026-10-04）；无 thinking_budget。
+# 模型需先在方舟控制台开通。
+[endpoints.doubao]
+kind = "llm"
+base_url = "https://ark.cn-beijing.volces.com/api/v3"
+api_key = ""              # ← 填入 Ark API Key
+model_name = "doubao-seed-evolving"
+display_name = "Doubao"
+is_custom = true
+provider_type = "doubao"
+
+# ── VLM（视觉语言；purpose "vlm"：agent vision_interpret 工具 + 死磕视觉批评）──
+[endpoints.vlm]
+kind = "llm"
+base_url = ""
+api_key = ""
+model_name = ""
+is_custom = true
+provider_type = "openai"
+
+# ── ASR（语音识别；provider_type 选引擎：dashscope | mimo | general）──
+# dashscope：Fun-ASR/Qwen-ASR 实时 WS（阿里云托管，主机内建无需 base_url）
+# mimo：OpenAI 兼容流式（需 base_url + api_key）
+# general：自建 HTTP POST {base_url}/transcribe（非流式）
+[endpoints.asr]
+kind = "asr"
+provider_type = "dashscope"
+base_url = ""
+api_key = ""              # ← 填入 DashScope key
+model_name = "qwen-audio-3.1-asr-flash-streaming"   # 或 fun-asr-realtime（同 run-task 协议族）
+is_custom = true
+
+[endpoints.asr.extra]
+dashscope_vocabulary_url = "https://dashscope.aliyuncs.com/api/v1/services/audio/asr/customization"
+vocabulary_prefix = ""
+
+# ── TTS（语音合成；音色/风格随端点携带）──
+[endpoints.tts]
+kind = "tts"
+base_url = "https://api.xiaomimimo.com/v1"
+api_key = ""              # ← 填入 MiMo key
+model_name = "mimo-v2.5-tts"
+is_custom = true
+provider_type = "mimo"
+
+[endpoints.tts.extra]
+voice = "冰糖"
+style_instruction = "用自然、亲切、口语化的语气，语速适中，像朋友聊天一样温暖。"
+
+# ── Embedding（向量）──
+[endpoints.embedding]
+kind = "embedding"
+base_url = "http://YOUR-EMBED-HOST:28005/v1"
+api_key = ""
+model_name = "Qwen3-Embedding"
+is_custom = true
+
+[endpoints.embedding.extra]
+dim = 1024
+
+# ── Rerank（重排）──
+[endpoints.rerank]
+kind = "rerank"
+base_url = "http://YOUR-RERANK-HOST:28007/v1"
+api_key = ""
+model_name = "Qwen3-Reranker-0.6B"
+is_custom = true
+
+# ────────────────────────────────────────────────────────────────────────
+# ② 用途路由（purpose → 池中别名；未列出的 purpose 回落 main）
+# ────────────────────────────────────────────────────────────────────────
+[routing]
+main = "main"
+judge = { alias = "main", is_custom = true }
+"deathmatch.judge" = { alias = "deepseek", is_custom = true }
+coordinator = "main"
+# 发送前审计（pre-send audit）独立模型：显式配置才生效（operator opt-in），
+# 缺省不配置 = 继承 coordinator/主模型（P0 助手全链路继承语义不变）。
+# 用途：写入模型弱时（本地小模型零 [N] 引用稿）让强模型审计兜底——
+# 2026-09-15 conv 174182bc 事故（cited=0 ledger=18/20 被同弱模型 accept 两次）。
+# "agent.audit" = { alias = "deepseek", is_custom = true }
+"aux.compression" = "main"
+"aux.search_decision" = "main"
+"aux.title" = "main"
+"aux.classifier" = "main"
+"memory.concept_extraction" = "main"
+"memory.dream" = "main"
+"memory.clarification" = "main"
+"memory.query_expansion" = "main"
+"memory.migration" = "main"
+"memory.consolidation" = "main"
+multimodal = "main"
+tool_digest = "main"
+vlm = "vlm"
+# 语音主模型（语音助理行未显式选别名时生效）
+voice = { alias = "main" }
+# 语音子分类默认继承语音主端点/语音助理助手（助手全链路继承）；
+# 如需某子分类走池中其他模型，在此显式添加，例如：
+# "voice.duplex" = { alias = "mimo" }
+# "voice.intent" = { alias = "main" }
+# "voice.interjection" = { alias = "mimo" }
+# "voice.memory_interjection" = { alias = "main" }
+
+# main 端点默认采样（is_custom=true 自包含）
+[endpoints.main.params]
+temperature = 0.7
+top_p = 0.9
+top_k = ""
+presence_penalty = 1.5
+frequency_penalty = 0.0
+max_tokens = ""
+
+[endpoints."qwen3.8".capabilities]
+supports_reasoning = true
+reasoning_efforts = [ "xhigh", "medium", "low",]
+
+[endpoints."qwen3.8".capabilities.effort_meta.xhigh]
+label = "xhigh"
+desc = "最强推理深度"
+
+[endpoints."qwen3.8".capabilities.effort_meta.medium]
+label = "medium"
+desc = "均衡速度与深度"
+
+[endpoints."qwen3.8".capabilities.effort_meta.low]
+label = "low"
+desc = "轻量快速推理"
+
+[endpoints.doubao.capabilities]
+supports_reasoning = true
+reasoning_efforts = [ "high", "medium", "low",]
+
+[endpoints.doubao.capabilities.effort_meta.high]
+label = "high"
+desc = "深度分析，处理复杂问题"
+
+[endpoints.doubao.capabilities.effort_meta.medium]
+label = "medium"
+desc = "均衡模式，兼顾速度与深度"
+default = true
+
+[endpoints.doubao.capabilities.effort_meta.low]
+label = "low"
+desc = "轻量思考，侧重快速响应"
+
+[endpoints.deepseek.capabilities]
+supports_reasoning = true
+reasoning_efforts = [ "max", "high", "low",]
+
+[endpoints.deepseek.capabilities.effort_meta.max]
+label = "Max"
+desc = "最大深度思考"
+
+[endpoints.deepseek.capabilities.effort_meta.high]
+label = "High"
+desc = "标准深度思考"
+default = true
+
+[endpoints.deepseek.capabilities.effort_meta.low]
+label = "Low"
+desc = "轻量快速推理"
+
+# ────────────────────────────────────────────────────────────────────────
+# ③ 采样默认（LLM 全局/助手默认采样；密钥见文末 [secrets]）
+# ────────────────────────────────────────────────────────────────────────
+
+[defaults]
+temperature = 0.7
+top_p = 0.9
+top_k = ""
+presence_penalty = 1.5
+frequency_penalty = 0.0
+max_tokens = ""
+
+[default_assistant]
+name = "默认助手"
+system_prompt = "你是一个专业、有帮助的AI助手。请根据用户的问题，提供清晰、准确的回答。"
+temperature = 0.7
+top_p = 0.9
+top_k = ""
+presence_penalty = 1.5
+frequency_penalty = 0.0
+max_tokens = ""
+
+# [secrets] 密钥现住 config.toml（用户决策 2026-09-01）——本文件只管端点/路由/采样。

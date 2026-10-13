@@ -1,0 +1,4586 @@
+{
+  "generated_at": "2026-10-07T16:30:01.050Z",
+  "upstream": {
+    "path": "/home/user/Documents/DEV/chatbot",
+    "ref": "b95b55933",
+    "base": "b95b55933f96c3b51373a5869fcbf64383ba2cde",
+    "target": "b95b55933f96c3b51373a5869fcbf64383ba2cde",
+    "status_clean": false
+  },
+  "counts": {
+    "local-mod": 70,
+    "in-sync": 649,
+    "local-only": 27,
+    "excluded": 396
+  },
+  "files": {
+    "frontend/src/App.vue": {
+      "local": "app/src/App.vue",
+      "category": "local-mod"
+    },
+    "frontend/src/api/admin.ts": {
+      "local": "app/src/api/admin.ts",
+      "category": "in-sync"
+    },
+    "frontend/src/api/agentTasks.ts": {
+      "local": "app/src/api/agentTasks.ts",
+      "category": "in-sync"
+    },
+    "frontend/src/api/asr.ts": {
+      "local": "app/src/api/asr.ts",
+      "category": "local-mod"
+    },
+    "frontend/src/api/assistant.ts": {
+      "local": "app/src/api/assistant.ts",
+      "category": "in-sync"
+    },
+    "frontend/src/api/chat.ts": {
+      "local": "app/src/api/chat.ts",
+      "category": "local-mod"
+    },
+    "frontend/src/api/client.ts": {
+      "local": "app/src/api/client.ts",
+      "category": "local-mod"
+    },
+    "frontend/src/api/exportTasks.ts": {
+      "local": "app/src/api/exportTasks.ts",
+      "category": "in-sync"
+    },
+    "frontend/src/api/fileUpload.ts": {
+      "local": "app/src/api/fileUpload.ts",
+      "category": "in-sync"
+    },
+    "frontend/src/api/groups.ts": {
+      "local": "app/src/api/groups.ts",
+      "category": "in-sync"
+    },
+    "frontend/src/api/imageUpload.ts": {
+      "local": "app/src/api/imageUpload.ts",
+      "category": "local-mod"
+    },
+    "frontend/src/api/memory.ts": {
+      "local": "app/src/api/memory.ts",
+      "category": "in-sync"
+    },
+    "frontend/src/api/models.ts": {
+      "local": "app/src/api/models.ts",
+      "category": "in-sync"
+    },
+    "frontend/src/api/notes.ts": {
+      "local": "app/src/api/notes.ts",
+      "category": "in-sync"
+    },
+    "frontend/src/api/sessions.ts": {
+      "local": "app/src/api/sessions.ts",
+      "category": "in-sync"
+    },
+    "frontend/src/api/skills.ts": {
+      "local": "app/src/api/skills.ts",
+      "category": "in-sync"
+    },
+    "frontend/src/api/skins.ts": {
+      "local": "app/src/api/skins.ts",
+      "category": "in-sync"
+    },
+    "frontend/src/api/streamDispatch.ts": {
+      "local": "app/src/api/streamDispatch.ts",
+      "category": "in-sync"
+    },
+    "frontend/src/api/userSettings.ts": {
+      "local": "app/src/api/userSettings.ts",
+      "category": "in-sync"
+    },
+    "frontend/src/api/voice.ts": {
+      "local": "app/src/api/voice.ts",
+      "category": "local-mod"
+    },
+    "frontend/src/api/workspaceFiles.ts": {
+      "local": "app/src/api/workspaceFiles.ts",
+      "category": "local-mod"
+    },
+    "frontend/src/components/AsrHotwordsDialog.vue": {
+      "local": "app/src/components/AsrHotwordsDialog.vue",
+      "category": "in-sync"
+    },
+    "frontend/src/components/AsrHotwordsPanel.vue": {
+      "local": "app/src/components/AsrHotwordsPanel.vue",
+      "category": "in-sync"
+    },
+    "frontend/src/components/AssistantModal.vue": {
+      "local": "app/src/components/AssistantModal.vue",
+      "category": "in-sync"
+    },
+    "frontend/src/components/BackgroundTaskPanel.vue": {
+      "local": "app/src/components/BackgroundTaskPanel.vue",
+      "category": "in-sync"
+    },
+    "frontend/src/components/ChatArea.vue": {
+      "local": "app/src/components/ChatArea.vue",
+      "category": "in-sync"
+    },
+    "frontend/src/components/ChatInput.vue": {
+      "local": "app/src/components/ChatInput.vue",
+      "category": "local-mod"
+    },
+    "frontend/src/components/ChatLayout.vue": {
+      "local": "app/src/components/ChatLayout.vue",
+      "category": "in-sync"
+    },
+    "frontend/src/components/ConfirmDialog.vue": {
+      "local": "app/src/components/ConfirmDialog.vue",
+      "category": "in-sync"
+    },
+    "frontend/src/components/ConversationRow.vue": {
+      "local": "app/src/components/ConversationRow.vue",
+      "category": "in-sync"
+    },
+    "frontend/src/components/ConversationTimeline.vue": {
+      "local": "app/src/components/ConversationTimeline.vue",
+      "category": "in-sync"
+    },
+    "frontend/src/components/DrawerOverlay.vue": {
+      "local": "app/src/components/DrawerOverlay.vue",
+      "category": "in-sync"
+    },
+    "frontend/src/components/ExportProgressDialog.vue": {
+      "local": "app/src/components/ExportProgressDialog.vue",
+      "category": "in-sync"
+    },
+    "frontend/src/components/FileAttachment.vue": {
+      "local": "app/src/components/FileAttachment.vue",
+      "category": "local-mod"
+    },
+    "frontend/src/components/FilePreviewDialog.vue": {
+      "local": "app/src/components/FilePreviewDialog.vue",
+      "category": "local-mod"
+    },
+    "frontend/src/components/FileUploadDialog.vue": {
+      "local": "app/src/components/FileUploadDialog.vue",
+      "category": "in-sync"
+    },
+    "frontend/src/components/FolderAttachment.vue": {
+      "local": "app/src/components/FolderAttachment.vue",
+      "category": "local-mod"
+    },
+    "frontend/src/components/FolderBrowserDialog.vue": {
+      "local": "app/src/components/FolderBrowserDialog.vue",
+      "category": "local-mod"
+    },
+    "frontend/src/components/LoginView.vue": {
+      "local": "app/src/components/LoginView.vue",
+      "category": "local-mod"
+    },
+    "frontend/src/components/LogoIcon.vue": {
+      "local": "app/src/components/LogoIcon.vue",
+      "category": "in-sync"
+    },
+    "frontend/src/components/MediaLightbox.vue": {
+      "local": "app/src/components/MediaLightbox.vue",
+      "category": "in-sync"
+    },
+    "frontend/src/components/MemoryPanel.vue": {
+      "local": "app/src/components/MemoryPanel.vue",
+      "category": "in-sync"
+    },
+    "frontend/src/components/MessageBubble.vue": {
+      "local": "app/src/components/MessageBubble.vue",
+      "category": "local-mod"
+    },
+    "frontend/src/components/ModelProviderPanel.vue": {
+      "local": "app/src/components/ModelProviderPanel.vue",
+      "category": "in-sync"
+    },
+    "frontend/src/components/NoteEditor.vue": {
+      "local": "app/src/components/NoteEditor.vue",
+      "category": "local-mod"
+    },
+    "frontend/src/components/NotePicker.vue": {
+      "local": "app/src/components/NotePicker.vue",
+      "category": "in-sync"
+    },
+    "frontend/src/components/NotebookPicker.vue": {
+      "local": "app/src/components/NotebookPicker.vue",
+      "category": "in-sync"
+    },
+    "frontend/src/components/NotebooksList.vue": {
+      "local": "app/src/components/NotebooksList.vue",
+      "category": "local-mod"
+    },
+    "frontend/src/components/NotesList.vue": {
+      "local": "app/src/components/NotesList.vue",
+      "category": "local-mod"
+    },
+    "frontend/src/components/NotesPanelInline.vue": {
+      "local": "app/src/components/NotesPanelInline.vue",
+      "category": "in-sync"
+    },
+    "frontend/src/components/PdfViewer.vue": {
+      "local": "app/src/components/PdfViewer.vue",
+      "category": "in-sync"
+    },
+    "frontend/src/components/PermissionDialog.vue": {
+      "local": "app/src/components/PermissionDialog.vue",
+      "category": "in-sync"
+    },
+    "frontend/src/components/PermissionSettingsDialog.vue": {
+      "local": "app/src/components/PermissionSettingsDialog.vue",
+      "category": "in-sync"
+    },
+    "frontend/src/components/PermissionSettingsPanel.vue": {
+      "local": "app/src/components/PermissionSettingsPanel.vue",
+      "category": "in-sync"
+    },
+    "frontend/src/components/QuickNoteButton.vue": {
+      "local": "app/src/components/QuickNoteButton.vue",
+      "category": "in-sync"
+    },
+    "frontend/src/components/SearchResults.vue": {
+      "local": "app/src/components/SearchResults.vue",
+      "category": "local-mod"
+    },
+    "frontend/src/components/Sidebar.vue": {
+      "local": "app/src/components/Sidebar.vue",
+      "category": "in-sync"
+    },
+    "frontend/src/components/SkillsDialog.vue": {
+      "local": "app/src/components/SkillsDialog.vue",
+      "category": "in-sync"
+    },
+    "frontend/src/components/SkillsPanel.vue": {
+      "local": "app/src/components/SkillsPanel.vue",
+      "category": "in-sync"
+    },
+    "frontend/src/components/SkinPanel.vue": {
+      "local": "app/src/components/SkinPanel.vue",
+      "category": "in-sync"
+    },
+    "frontend/src/components/SortableList.vue": {
+      "local": "app/src/components/SortableList.vue",
+      "category": "in-sync"
+    },
+    "frontend/src/components/StreamMarkdown.vue": {
+      "local": "app/src/components/StreamMarkdown.vue",
+      "category": "in-sync"
+    },
+    "frontend/src/components/SubAgentStatus.vue": {
+      "local": "app/src/components/SubAgentStatus.vue",
+      "category": "in-sync"
+    },
+    "frontend/src/components/SystemSettingsDialog.vue": {
+      "local": "app/src/components/SystemSettingsDialog.vue",
+      "category": "local-mod"
+    },
+    "frontend/src/components/TaskProgress.vue": {
+      "local": "app/src/components/TaskProgress.vue",
+      "category": "in-sync"
+    },
+    "frontend/src/components/Toast.vue": {
+      "local": "app/src/components/Toast.vue",
+      "category": "in-sync"
+    },
+    "frontend/src/components/ToolPartCard.vue": {
+      "local": "app/src/components/ToolPartCard.vue",
+      "category": "in-sync"
+    },
+    "frontend/src/components/UserInfoPanel.vue": {
+      "local": "app/src/components/UserInfoPanel.vue",
+      "category": "in-sync"
+    },
+    "frontend/src/components/VoiceChat.vue": {
+      "local": "app/src/components/VoiceChat.vue",
+      "category": "local-mod"
+    },
+    "frontend/src/components/WordCountButton.vue": {
+      "local": "app/src/components/WordCountButton.vue",
+      "category": "in-sync"
+    },
+    "frontend/src/components/WysiwygEditor.vue": {
+      "local": "app/src/components/WysiwygEditor.vue",
+      "category": "local-mod"
+    },
+    "frontend/src/components/ZenHistoryDrawer.vue": {
+      "local": "app/src/components/ZenHistoryDrawer.vue",
+      "category": "in-sync"
+    },
+    "frontend/src/components/ZenMode.vue": {
+      "local": "app/src/components/ZenMode.vue",
+      "category": "local-mod"
+    },
+    "frontend/src/components/ZenNotePanel.vue": {
+      "local": "app/src/components/ZenNotePanel.vue",
+      "category": "local-mod"
+    },
+    "frontend/src/components/ZenNotesDrawer.vue": {
+      "local": "app/src/components/ZenNotesDrawer.vue",
+      "category": "in-sync"
+    },
+    "frontend/src/composables/editorFontSize.ts": {
+      "local": "app/src/composables/editorFontSize.ts",
+      "category": "in-sync"
+    },
+    "frontend/src/composables/filePreview.ts": {
+      "local": "app/src/composables/filePreview.ts",
+      "category": "local-mod"
+    },
+    "frontend/src/composables/headingTypography.ts": {
+      "local": "app/src/composables/headingTypography.ts",
+      "category": "in-sync"
+    },
+    "frontend/src/composables/markdownTableRepair.ts": {
+      "local": "app/src/composables/markdownTableRepair.ts",
+      "category": "in-sync"
+    },
+    "frontend/src/composables/pickerAnchoring.ts": {
+      "local": "app/src/composables/pickerAnchoring.ts",
+      "category": "in-sync"
+    },
+    "frontend/src/composables/snippetInsert.ts": {
+      "local": "app/src/composables/snippetInsert.ts",
+      "category": "in-sync"
+    },
+    "frontend/src/composables/streamDomPreserve.ts": {
+      "local": "app/src/composables/streamDomPreserve.ts",
+      "category": "in-sync"
+    },
+    "frontend/src/composables/stringCacheKey.ts": {
+      "local": "app/src/composables/stringCacheKey.ts",
+      "category": "in-sync"
+    },
+    "frontend/src/composables/tabTableConvert.ts": {
+      "local": "app/src/composables/tabTableConvert.ts",
+      "category": "in-sync"
+    },
+    "frontend/src/composables/toolbarTip.ts": {
+      "local": "app/src/composables/toolbarTip.ts",
+      "category": "in-sync"
+    },
+    "frontend/src/composables/useAsrHotwords.ts": {
+      "local": "app/src/composables/useAsrHotwords.ts",
+      "category": "in-sync"
+    },
+    "frontend/src/composables/useAsrStreaming.ts": {
+      "local": "app/src/composables/useAsrStreaming.ts",
+      "category": "local-mod"
+    },
+    "frontend/src/composables/useAuth.ts": {
+      "local": "app/src/composables/useAuth.ts",
+      "category": "local-mod"
+    },
+    "frontend/src/composables/useBackNavigation.ts": {
+      "local": "app/src/composables/useBackNavigation.ts",
+      "category": "in-sync"
+    },
+    "frontend/src/composables/useCodeBlockCopy.ts": {
+      "local": "app/src/composables/useCodeBlockCopy.ts",
+      "category": "in-sync"
+    },
+    "frontend/src/composables/useConfirmDialog.ts": {
+      "local": "app/src/composables/useConfirmDialog.ts",
+      "category": "in-sync"
+    },
+    "frontend/src/composables/useContextTokens.ts": {
+      "local": "app/src/composables/useContextTokens.ts",
+      "category": "in-sync"
+    },
+    "frontend/src/composables/useDownload.ts": {
+      "local": "app/src/composables/useDownload.ts",
+      "category": "local-mod"
+    },
+    "frontend/src/composables/useFindReplace.ts": {
+      "local": "app/src/composables/useFindReplace.ts",
+      "category": "in-sync"
+    },
+    "frontend/src/composables/useInlineImageZoom.ts": {
+      "local": "app/src/composables/useInlineImageZoom.ts",
+      "category": "in-sync"
+    },
+    "frontend/src/composables/useMarkdown.ts": {
+      "local": "app/src/composables/useMarkdown.ts",
+      "category": "local-mod"
+    },
+    "frontend/src/composables/useMediaQuery.ts": {
+      "local": "app/src/composables/useMediaQuery.ts",
+      "category": "in-sync"
+    },
+    "frontend/src/composables/useMobileNavigation.ts": {
+      "local": "app/src/composables/useMobileNavigation.ts",
+      "category": "in-sync"
+    },
+    "frontend/src/composables/useToast.ts": {
+      "local": "app/src/composables/useToast.ts",
+      "category": "in-sync"
+    },
+    "frontend/src/composables/useVoiceDuplex.ts": {
+      "local": "app/src/composables/useVoiceDuplex.ts",
+      "category": "local-mod"
+    },
+    "frontend/src/config/skins.ts": {
+      "local": "app/src/config/skins.ts",
+      "category": "in-sync"
+    },
+    "frontend/src/main.ts": {
+      "local": "app/src/main.ts",
+      "category": "in-sync"
+    },
+    "frontend/src/router/index.ts": {
+      "local": "app/src/router/index.ts",
+      "category": "local-mod"
+    },
+    "frontend/src/stores/assistant.ts": {
+      "local": "app/src/stores/assistant.ts",
+      "category": "in-sync"
+    },
+    "frontend/src/stores/chat.ts": {
+      "local": "app/src/stores/chat.ts",
+      "category": "local-mod"
+    },
+    "frontend/src/stores/chatVisibility.ts": {
+      "local": "app/src/stores/chatVisibility.ts",
+      "category": "in-sync"
+    },
+    "frontend/src/stores/conversationOrder.ts": {
+      "local": "app/src/stores/conversationOrder.ts",
+      "category": "in-sync"
+    },
+    "frontend/src/stores/drafts.ts": {
+      "local": "app/src/stores/drafts.ts",
+      "category": "in-sync"
+    },
+    "frontend/src/stores/editorPrefs.ts": {
+      "local": "app/src/stores/editorPrefs.ts",
+      "category": "in-sync"
+    },
+    "frontend/src/stores/groups.ts": {
+      "local": "app/src/stores/groups.ts",
+      "category": "in-sync"
+    },
+    "frontend/src/stores/mobileUi.ts": {
+      "local": "app/src/stores/mobileUi.ts",
+      "category": "in-sync"
+    },
+    "frontend/src/stores/notes.ts": {
+      "local": "app/src/stores/notes.ts",
+      "category": "in-sync"
+    },
+    "frontend/src/stores/skin.ts": {
+      "local": "app/src/stores/skin.ts",
+      "category": "in-sync"
+    },
+    "frontend/src/stores/streamConnection.ts": {
+      "local": "app/src/stores/streamConnection.ts",
+      "category": "in-sync"
+    },
+    "frontend/src/stores/streamReducer.ts": {
+      "local": "app/src/stores/streamReducer.ts",
+      "category": "in-sync"
+    },
+    "frontend/src/stores/upload.ts": {
+      "local": "app/src/stores/upload.ts",
+      "category": "in-sync"
+    },
+    "frontend/src/stores/zen.ts": {
+      "local": "app/src/stores/zen.ts",
+      "category": "in-sync"
+    },
+    "frontend/src/styles/editor-toolbar-tip.css": {
+      "local": "app/src/styles/editor-toolbar-tip.css",
+      "category": "in-sync"
+    },
+    "frontend/src/styles/main.css": {
+      "local": "app/src/styles/main.css",
+      "category": "in-sync"
+    },
+    "frontend/src/styles/sidebar-panels.css": {
+      "local": "app/src/styles/sidebar-panels.css",
+      "category": "in-sync"
+    },
+    "frontend/src/styles/themes/index.css": {
+      "local": "app/src/styles/themes/index.css",
+      "category": "in-sync"
+    },
+    "frontend/src/styles/themes/ink-paper.css": {
+      "local": "app/src/styles/themes/ink-paper.css",
+      "category": "local-mod"
+    },
+    "frontend/src/styles/themes/mono-brutal.css": {
+      "local": "app/src/styles/themes/mono-brutal.css",
+      "category": "local-mod"
+    },
+    "frontend/src/styles/themes/verdant-flat.css": {
+      "local": "app/src/styles/themes/verdant-flat.css",
+      "category": "local-mod"
+    },
+    "frontend/src/types/index.ts": {
+      "local": "app/src/types/index.ts",
+      "category": "in-sync"
+    },
+    "frontend/src/utils/noteWordCount.ts": {
+      "local": "app/src/utils/noteWordCount.ts",
+      "category": "in-sync"
+    },
+    "frontend/src/vite-env.d.ts": {
+      "local": "app/src/vite-env.d.ts",
+      "category": "local-mod"
+    },
+    "frontend/src/api/base.ts": {
+      "local": "app/src/api/base.ts",
+      "category": "local-only"
+    },
+    "frontend/src/api/sync.ts": {
+      "local": "app/src/api/sync.ts",
+      "category": "local-only"
+    },
+    "frontend/src/components/AppTitleBar.vue": {
+      "local": "app/src/components/AppTitleBar.vue",
+      "category": "local-only"
+    },
+    "frontend/src/components/SyncPanel.vue": {
+      "local": "app/src/components/SyncPanel.vue",
+      "category": "local-only"
+    },
+    "frontend/src/composables/useDataRefresh.ts": {
+      "local": "app/src/composables/useDataRefresh.ts",
+      "category": "local-only"
+    },
+    "frontend/src/native/bridge.ts": {
+      "local": "app/src/native/bridge.ts",
+      "category": "local-only"
+    },
+    "frontend/public/favicon.ico": {
+      "local": "app/public/favicon.ico",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/FONTS_LICENSE.md": {
+      "local": "app/public/fonts/FONTS_LICENSE.md",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/Inter-085cd7907a.woff2": {
+      "local": "app/public/fonts/Inter-085cd7907a.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/Inter-1f53bf00fe.woff2": {
+      "local": "app/public/fonts/Inter-1f53bf00fe.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/Inter-367ba69ac0.woff2": {
+      "local": "app/public/fonts/Inter-367ba69ac0.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/Inter-4609148e1a.woff2": {
+      "local": "app/public/fonts/Inter-4609148e1a.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/Inter-bec94a4daf.woff2": {
+      "local": "app/public/fonts/Inter-bec94a4daf.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/Inter-c428ca13a1.woff2": {
+      "local": "app/public/fonts/Inter-c428ca13a1.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/Inter-ec7f5af97c.woff2": {
+      "local": "app/public/fonts/Inter-ec7f5af97c.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/NotoSansSC-0067591d45.woff2": {
+      "local": "app/public/fonts/NotoSansSC-0067591d45.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/NotoSansSC-0978a14036.woff2": {
+      "local": "app/public/fonts/NotoSansSC-0978a14036.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/NotoSansSC-09d4d23910.woff2": {
+      "local": "app/public/fonts/NotoSansSC-09d4d23910.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/NotoSansSC-0c1df838fc.woff2": {
+      "local": "app/public/fonts/NotoSansSC-0c1df838fc.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/NotoSansSC-0c326e3218.woff2": {
+      "local": "app/public/fonts/NotoSansSC-0c326e3218.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/NotoSansSC-0d10a5893d.woff2": {
+      "local": "app/public/fonts/NotoSansSC-0d10a5893d.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/NotoSansSC-14883416af.woff2": {
+      "local": "app/public/fonts/NotoSansSC-14883416af.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/NotoSansSC-191d819744.woff2": {
+      "local": "app/public/fonts/NotoSansSC-191d819744.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/NotoSansSC-1dc3d52c0d.woff2": {
+      "local": "app/public/fonts/NotoSansSC-1dc3d52c0d.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/NotoSansSC-1f25689f1e.woff2": {
+      "local": "app/public/fonts/NotoSansSC-1f25689f1e.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/NotoSansSC-220b6c8845.woff2": {
+      "local": "app/public/fonts/NotoSansSC-220b6c8845.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/NotoSansSC-231d991de4.woff2": {
+      "local": "app/public/fonts/NotoSansSC-231d991de4.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/NotoSansSC-24e32606e2.woff2": {
+      "local": "app/public/fonts/NotoSansSC-24e32606e2.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/NotoSansSC-257869565b.woff2": {
+      "local": "app/public/fonts/NotoSansSC-257869565b.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/NotoSansSC-263eb02216.woff2": {
+      "local": "app/public/fonts/NotoSansSC-263eb02216.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/NotoSansSC-27083a77fe.woff2": {
+      "local": "app/public/fonts/NotoSansSC-27083a77fe.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/NotoSansSC-272ab9cd07.woff2": {
+      "local": "app/public/fonts/NotoSansSC-272ab9cd07.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/NotoSansSC-27eea0da20.woff2": {
+      "local": "app/public/fonts/NotoSansSC-27eea0da20.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/NotoSansSC-2f4068f6ac.woff2": {
+      "local": "app/public/fonts/NotoSansSC-2f4068f6ac.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/NotoSansSC-35c4cd9462.woff2": {
+      "local": "app/public/fonts/NotoSansSC-35c4cd9462.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/NotoSansSC-36987e2873.woff2": {
+      "local": "app/public/fonts/NotoSansSC-36987e2873.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/NotoSansSC-37e074f214.woff2": {
+      "local": "app/public/fonts/NotoSansSC-37e074f214.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/NotoSansSC-3a77aa4dcd.woff2": {
+      "local": "app/public/fonts/NotoSansSC-3a77aa4dcd.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/NotoSansSC-3c00b2e28a.woff2": {
+      "local": "app/public/fonts/NotoSansSC-3c00b2e28a.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/NotoSansSC-3c23706e89.woff2": {
+      "local": "app/public/fonts/NotoSansSC-3c23706e89.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/NotoSansSC-42e55374ab.woff2": {
+      "local": "app/public/fonts/NotoSansSC-42e55374ab.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/NotoSansSC-42f6ef857a.woff2": {
+      "local": "app/public/fonts/NotoSansSC-42f6ef857a.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/NotoSansSC-4469341b46.woff2": {
+      "local": "app/public/fonts/NotoSansSC-4469341b46.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/NotoSansSC-4656471851.woff2": {
+      "local": "app/public/fonts/NotoSansSC-4656471851.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/NotoSansSC-4a2d3c0ecd.woff2": {
+      "local": "app/public/fonts/NotoSansSC-4a2d3c0ecd.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/NotoSansSC-4d746d733b.woff2": {
+      "local": "app/public/fonts/NotoSansSC-4d746d733b.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/NotoSansSC-4d83e879fb.woff2": {
+      "local": "app/public/fonts/NotoSansSC-4d83e879fb.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/NotoSansSC-4dbb589ded.woff2": {
+      "local": "app/public/fonts/NotoSansSC-4dbb589ded.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/NotoSansSC-507ee213ca.woff2": {
+      "local": "app/public/fonts/NotoSansSC-507ee213ca.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/NotoSansSC-51fa869778.woff2": {
+      "local": "app/public/fonts/NotoSansSC-51fa869778.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/NotoSansSC-5264a752cf.woff2": {
+      "local": "app/public/fonts/NotoSansSC-5264a752cf.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/NotoSansSC-5477b953b2.woff2": {
+      "local": "app/public/fonts/NotoSansSC-5477b953b2.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/NotoSansSC-5d9ffdc57f.woff2": {
+      "local": "app/public/fonts/NotoSansSC-5d9ffdc57f.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/NotoSansSC-5f6419155d.woff2": {
+      "local": "app/public/fonts/NotoSansSC-5f6419155d.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/NotoSansSC-6319d535ca.woff2": {
+      "local": "app/public/fonts/NotoSansSC-6319d535ca.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/NotoSansSC-64fd74ff6c.woff2": {
+      "local": "app/public/fonts/NotoSansSC-64fd74ff6c.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/NotoSansSC-65516c96e4.woff2": {
+      "local": "app/public/fonts/NotoSansSC-65516c96e4.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/NotoSansSC-6674777278.woff2": {
+      "local": "app/public/fonts/NotoSansSC-6674777278.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/NotoSansSC-667c9bb572.woff2": {
+      "local": "app/public/fonts/NotoSansSC-667c9bb572.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/NotoSansSC-69489a7a12.woff2": {
+      "local": "app/public/fonts/NotoSansSC-69489a7a12.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/NotoSansSC-7413b3dc50.woff2": {
+      "local": "app/public/fonts/NotoSansSC-7413b3dc50.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/NotoSansSC-74eed59b39.woff2": {
+      "local": "app/public/fonts/NotoSansSC-74eed59b39.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/NotoSansSC-75e2a19bd0.woff2": {
+      "local": "app/public/fonts/NotoSansSC-75e2a19bd0.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/NotoSansSC-7c4dacdaa2.woff2": {
+      "local": "app/public/fonts/NotoSansSC-7c4dacdaa2.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/NotoSansSC-7ca31c36bb.woff2": {
+      "local": "app/public/fonts/NotoSansSC-7ca31c36bb.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/NotoSansSC-7d640742a9.woff2": {
+      "local": "app/public/fonts/NotoSansSC-7d640742a9.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/NotoSansSC-809f3cd9a1.woff2": {
+      "local": "app/public/fonts/NotoSansSC-809f3cd9a1.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/NotoSansSC-82bd9f3feb.woff2": {
+      "local": "app/public/fonts/NotoSansSC-82bd9f3feb.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/NotoSansSC-82d76c72e7.woff2": {
+      "local": "app/public/fonts/NotoSansSC-82d76c72e7.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/NotoSansSC-839531739a.woff2": {
+      "local": "app/public/fonts/NotoSansSC-839531739a.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/NotoSansSC-83cc7430e0.woff2": {
+      "local": "app/public/fonts/NotoSansSC-83cc7430e0.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/NotoSansSC-847bda0cc9.woff2": {
+      "local": "app/public/fonts/NotoSansSC-847bda0cc9.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/NotoSansSC-855c2c6324.woff2": {
+      "local": "app/public/fonts/NotoSansSC-855c2c6324.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/NotoSansSC-866d9e6bbb.woff2": {
+      "local": "app/public/fonts/NotoSansSC-866d9e6bbb.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/NotoSansSC-8d1503da6f.woff2": {
+      "local": "app/public/fonts/NotoSansSC-8d1503da6f.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/NotoSansSC-8f5995d8cd.woff2": {
+      "local": "app/public/fonts/NotoSansSC-8f5995d8cd.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/NotoSansSC-8fb6342c6f.woff2": {
+      "local": "app/public/fonts/NotoSansSC-8fb6342c6f.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/NotoSansSC-8fc1907e38.woff2": {
+      "local": "app/public/fonts/NotoSansSC-8fc1907e38.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/NotoSansSC-9138d765a1.woff2": {
+      "local": "app/public/fonts/NotoSansSC-9138d765a1.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/NotoSansSC-93a29ac569.woff2": {
+      "local": "app/public/fonts/NotoSansSC-93a29ac569.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/NotoSansSC-93c19e8ac3.woff2": {
+      "local": "app/public/fonts/NotoSansSC-93c19e8ac3.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/NotoSansSC-96e368e4d2.woff2": {
+      "local": "app/public/fonts/NotoSansSC-96e368e4d2.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/NotoSansSC-97331f4306.woff2": {
+      "local": "app/public/fonts/NotoSansSC-97331f4306.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/NotoSansSC-99d1b6f417.woff2": {
+      "local": "app/public/fonts/NotoSansSC-99d1b6f417.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/NotoSansSC-9a619905cb.woff2": {
+      "local": "app/public/fonts/NotoSansSC-9a619905cb.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/NotoSansSC-9df98b1d6c.woff2": {
+      "local": "app/public/fonts/NotoSansSC-9df98b1d6c.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/NotoSansSC-9f7476bef3.woff2": {
+      "local": "app/public/fonts/NotoSansSC-9f7476bef3.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/NotoSansSC-a0a9321803.woff2": {
+      "local": "app/public/fonts/NotoSansSC-a0a9321803.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/NotoSansSC-a1110c62b5.woff2": {
+      "local": "app/public/fonts/NotoSansSC-a1110c62b5.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/NotoSansSC-a212e2a617.woff2": {
+      "local": "app/public/fonts/NotoSansSC-a212e2a617.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/NotoSansSC-a4c35c89b1.woff2": {
+      "local": "app/public/fonts/NotoSansSC-a4c35c89b1.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/NotoSansSC-a76b1d1bb4.woff2": {
+      "local": "app/public/fonts/NotoSansSC-a76b1d1bb4.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/NotoSansSC-ab01bcc843.woff2": {
+      "local": "app/public/fonts/NotoSansSC-ab01bcc843.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/NotoSansSC-b3d4329655.woff2": {
+      "local": "app/public/fonts/NotoSansSC-b3d4329655.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/NotoSansSC-b5163df40c.woff2": {
+      "local": "app/public/fonts/NotoSansSC-b5163df40c.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/NotoSansSC-bd86260cee.woff2": {
+      "local": "app/public/fonts/NotoSansSC-bd86260cee.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/NotoSansSC-c18c66e99b.woff2": {
+      "local": "app/public/fonts/NotoSansSC-c18c66e99b.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/NotoSansSC-c23aa7021f.woff2": {
+      "local": "app/public/fonts/NotoSansSC-c23aa7021f.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/NotoSansSC-c3d3708acd.woff2": {
+      "local": "app/public/fonts/NotoSansSC-c3d3708acd.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/NotoSansSC-c4673ae2b4.woff2": {
+      "local": "app/public/fonts/NotoSansSC-c4673ae2b4.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/NotoSansSC-c4846eef81.woff2": {
+      "local": "app/public/fonts/NotoSansSC-c4846eef81.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/NotoSansSC-c67cbb7390.woff2": {
+      "local": "app/public/fonts/NotoSansSC-c67cbb7390.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/NotoSansSC-ca3bcb70b2.woff2": {
+      "local": "app/public/fonts/NotoSansSC-ca3bcb70b2.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/NotoSansSC-cc64be107d.woff2": {
+      "local": "app/public/fonts/NotoSansSC-cc64be107d.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/NotoSansSC-ce8d788a6a.woff2": {
+      "local": "app/public/fonts/NotoSansSC-ce8d788a6a.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/NotoSansSC-cfd6561926.woff2": {
+      "local": "app/public/fonts/NotoSansSC-cfd6561926.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/NotoSansSC-d6bfe2b4e1.woff2": {
+      "local": "app/public/fonts/NotoSansSC-d6bfe2b4e1.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/NotoSansSC-d855ecb42c.woff2": {
+      "local": "app/public/fonts/NotoSansSC-d855ecb42c.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/NotoSansSC-dc387188ef.woff2": {
+      "local": "app/public/fonts/NotoSansSC-dc387188ef.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/NotoSansSC-e89d35b507.woff2": {
+      "local": "app/public/fonts/NotoSansSC-e89d35b507.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/NotoSansSC-eb70742371.woff2": {
+      "local": "app/public/fonts/NotoSansSC-eb70742371.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/NotoSansSC-ee9b90c5a1.woff2": {
+      "local": "app/public/fonts/NotoSansSC-ee9b90c5a1.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/NotoSansSC-f1b573d526.woff2": {
+      "local": "app/public/fonts/NotoSansSC-f1b573d526.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/NotoSansSC-f803669dca.woff2": {
+      "local": "app/public/fonts/NotoSansSC-f803669dca.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/NotoSansSC-fae6b9789a.woff2": {
+      "local": "app/public/fonts/NotoSansSC-fae6b9789a.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/NotoSansSC-fcc232e033.woff2": {
+      "local": "app/public/fonts/NotoSansSC-fcc232e033.woff2",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/README.md": {
+      "local": "app/public/fonts/README.md",
+      "category": "in-sync"
+    },
+    "frontend/public/fonts/fonts.css": {
+      "local": "app/public/fonts/fonts.css",
+      "category": "in-sync"
+    },
+    "frontend/public/icon.svg": {
+      "local": "app/public/icon.svg",
+      "category": "in-sync"
+    },
+    "frontend/public/logo.png": {
+      "local": "app/public/logo.png",
+      "category": "in-sync"
+    },
+    "backend/app/__init__.py": {
+      "local": "server/app/__init__.py",
+      "category": "in-sync"
+    },
+    "backend/app/api/__init__.py": {
+      "local": "server/app/api/__init__.py",
+      "category": "in-sync"
+    },
+    "backend/app/api/admin.py": {
+      "local": "server/app/api/admin.py",
+      "category": "in-sync"
+    },
+    "backend/app/api/agent_tasks.py": {
+      "local": "server/app/api/agent_tasks.py",
+      "category": "in-sync"
+    },
+    "backend/app/api/asr.py": {
+      "local": "server/app/api/asr.py",
+      "category": "in-sync"
+    },
+    "backend/app/api/assistant.py": {
+      "local": "server/app/api/assistant.py",
+      "category": "in-sync"
+    },
+    "backend/app/api/auth.py": {
+      "local": "server/app/api/auth.py",
+      "category": "in-sync"
+    },
+    "backend/app/api/chat.py": {
+      "local": "server/app/api/chat.py",
+      "category": "in-sync"
+    },
+    "backend/app/api/citations.py": {
+      "local": "server/app/api/citations.py",
+      "category": "in-sync"
+    },
+    "backend/app/api/conversation.py": {
+      "local": "server/app/api/conversation.py",
+      "category": "local-mod"
+    },
+    "backend/app/api/export_tasks.py": {
+      "local": "server/app/api/export_tasks.py",
+      "category": "in-sync"
+    },
+    "backend/app/api/file_upload.py": {
+      "local": "server/app/api/file_upload.py",
+      "category": "in-sync"
+    },
+    "backend/app/api/files.py": {
+      "local": "server/app/api/files.py",
+      "category": "local-mod"
+    },
+    "backend/app/api/image_upload.py": {
+      "local": "server/app/api/image_upload.py",
+      "category": "in-sync"
+    },
+    "backend/app/api/memory.py": {
+      "local": "server/app/api/memory.py",
+      "category": "in-sync"
+    },
+    "backend/app/api/message_payloads.py": {
+      "local": "server/app/api/message_payloads.py",
+      "category": "in-sync"
+    },
+    "backend/app/api/models.py": {
+      "local": "server/app/api/models.py",
+      "category": "in-sync"
+    },
+    "backend/app/api/notes.py": {
+      "local": "server/app/api/notes.py",
+      "category": "in-sync"
+    },
+    "backend/app/api/scheduled_tasks.py": {
+      "local": "server/app/api/scheduled_tasks.py",
+      "category": "in-sync"
+    },
+    "backend/app/api/server_admin.py": {
+      "local": "server/app/api/server_admin.py",
+      "category": "in-sync"
+    },
+    "backend/app/api/sessions.py": {
+      "local": "server/app/api/sessions.py",
+      "category": "in-sync"
+    },
+    "backend/app/api/skills.py": {
+      "local": "server/app/api/skills.py",
+      "category": "in-sync"
+    },
+    "backend/app/api/skins.py": {
+      "local": "server/app/api/skins.py",
+      "category": "in-sync"
+    },
+    "backend/app/api/sync.py": {
+      "local": "server/app/api/sync.py",
+      "category": "local-mod"
+    },
+    "backend/app/api/system.py": {
+      "local": "server/app/api/system.py",
+      "category": "in-sync"
+    },
+    "backend/app/api/user_settings.py": {
+      "local": "server/app/api/user_settings.py",
+      "category": "in-sync"
+    },
+    "backend/app/api/voice.py": {
+      "local": "server/app/api/voice.py",
+      "category": "in-sync"
+    },
+    "backend/app/citation_styles/SOURCES.md": {
+      "local": "server/app/citation_styles/SOURCES.md",
+      "category": "in-sync"
+    },
+    "backend/app/citation_styles/ama.csl": {
+      "local": "server/app/citation_styles/ama.csl",
+      "category": "in-sync"
+    },
+    "backend/app/citation_styles/apa.csl": {
+      "local": "server/app/citation_styles/apa.csl",
+      "category": "in-sync"
+    },
+    "backend/app/citation_styles/chicago-author-date.csl": {
+      "local": "server/app/citation_styles/chicago-author-date.csl",
+      "category": "in-sync"
+    },
+    "backend/app/citation_styles/chicago-notes.csl": {
+      "local": "server/app/citation_styles/chicago-notes.csl",
+      "category": "in-sync"
+    },
+    "backend/app/citation_styles/gb-t-7714-author-date.csl": {
+      "local": "server/app/citation_styles/gb-t-7714-author-date.csl",
+      "category": "in-sync"
+    },
+    "backend/app/citation_styles/gb-t-7714-note.csl": {
+      "local": "server/app/citation_styles/gb-t-7714-note.csl",
+      "category": "in-sync"
+    },
+    "backend/app/citation_styles/gb-t-7714-numeric.csl": {
+      "local": "server/app/citation_styles/gb-t-7714-numeric.csl",
+      "category": "in-sync"
+    },
+    "backend/app/citation_styles/harvard.csl": {
+      "local": "server/app/citation_styles/harvard.csl",
+      "category": "in-sync"
+    },
+    "backend/app/citation_styles/ieee.csl": {
+      "local": "server/app/citation_styles/ieee.csl",
+      "category": "in-sync"
+    },
+    "backend/app/citation_styles/mla.csl": {
+      "local": "server/app/citation_styles/mla.csl",
+      "category": "in-sync"
+    },
+    "backend/app/citation_styles/vancouver.csl": {
+      "local": "server/app/citation_styles/vancouver.csl",
+      "category": "in-sync"
+    },
+    "backend/app/core/__init__.py": {
+      "local": "server/app/core/__init__.py",
+      "category": "in-sync"
+    },
+    "backend/app/core/config.py": {
+      "local": "server/app/core/config.py",
+      "category": "local-mod"
+    },
+    "backend/app/core/deps.py": {
+      "local": "server/app/core/deps.py",
+      "category": "local-mod"
+    },
+    "backend/app/db/__init__.py": {
+      "local": "server/app/db/__init__.py",
+      "category": "in-sync"
+    },
+    "backend/app/db/database.py": {
+      "local": "server/app/db/database.py",
+      "category": "local-mod"
+    },
+    "backend/app/db/migrations.py": {
+      "local": "server/app/db/migrations.py",
+      "category": "in-sync"
+    },
+    "backend/app/model_gateway/__init__.py": {
+      "local": "server/app/model_gateway/__init__.py",
+      "category": "in-sync"
+    },
+    "backend/app/model_gateway/factory.py": {
+      "local": "server/app/model_gateway/factory.py",
+      "category": "in-sync"
+    },
+    "backend/app/model_gateway/gateway.py": {
+      "local": "server/app/model_gateway/gateway.py",
+      "category": "in-sync"
+    },
+    "backend/app/model_gateway/profiles/__init__.py": {
+      "local": "server/app/model_gateway/profiles/__init__.py",
+      "category": "in-sync"
+    },
+    "backend/app/model_gateway/profiles/base.py": {
+      "local": "server/app/model_gateway/profiles/base.py",
+      "category": "in-sync"
+    },
+    "backend/app/model_gateway/profiles/deepseek.py": {
+      "local": "server/app/model_gateway/profiles/deepseek.py",
+      "category": "in-sync"
+    },
+    "backend/app/model_gateway/profiles/doubao.py": {
+      "local": "server/app/model_gateway/profiles/doubao.py",
+      "category": "in-sync"
+    },
+    "backend/app/model_gateway/profiles/qwen3_8_vllm.py": {
+      "local": "server/app/model_gateway/profiles/qwen3_8_vllm.py",
+      "category": "in-sync"
+    },
+    "backend/app/model_gateway/profiles/qwen_dashscope.py": {
+      "local": "server/app/model_gateway/profiles/qwen_dashscope.py",
+      "category": "in-sync"
+    },
+    "backend/app/model_gateway/profiles/vendors.py": {
+      "local": "server/app/model_gateway/profiles/vendors.py",
+      "category": "in-sync"
+    },
+    "backend/app/model_gateway/registry.py": {
+      "local": "server/app/model_gateway/registry.py",
+      "category": "in-sync"
+    },
+    "backend/app/model_gateway/schemas.py": {
+      "local": "server/app/model_gateway/schemas.py",
+      "category": "in-sync"
+    },
+    "backend/app/model_gateway/user_overrides.py": {
+      "local": "server/app/model_gateway/user_overrides.py",
+      "category": "in-sync"
+    },
+    "backend/app/model_gateway/vision_probe.py": {
+      "local": "server/app/model_gateway/vision_probe.py",
+      "category": "in-sync"
+    },
+    "backend/app/schemas/__init__.py": {
+      "local": "server/app/schemas/__init__.py",
+      "category": "in-sync"
+    },
+    "backend/app/schemas/asr.py": {
+      "local": "server/app/schemas/asr.py",
+      "category": "in-sync"
+    },
+    "backend/app/schemas/assistant.py": {
+      "local": "server/app/schemas/assistant.py",
+      "category": "in-sync"
+    },
+    "backend/app/schemas/chat.py": {
+      "local": "server/app/schemas/chat.py",
+      "category": "in-sync"
+    },
+    "backend/app/schemas/file_upload.py": {
+      "local": "server/app/schemas/file_upload.py",
+      "category": "in-sync"
+    },
+    "backend/app/schemas/notes.py": {
+      "local": "server/app/schemas/notes.py",
+      "category": "in-sync"
+    },
+    "backend/app/schemas/skill.py": {
+      "local": "server/app/schemas/skill.py",
+      "category": "in-sync"
+    },
+    "backend/app/schemas/skin.py": {
+      "local": "server/app/schemas/skin.py",
+      "category": "in-sync"
+    },
+    "backend/app/schemas/sync.py": {
+      "local": "server/app/schemas/sync.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/__init__.py": {
+      "local": "server/app/services/__init__.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/active_agent_registry.py": {
+      "local": "server/app/services/active_agent_registry.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/agent_event_bus.py": {
+      "local": "server/app/services/agent_event_bus.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/agent_loop.py": {
+      "local": "server/app/services/agent_loop.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/agent_permissions.py": {
+      "local": "server/app/services/agent_permissions.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/agent_scheduler.py": {
+      "local": "server/app/services/agent_scheduler.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/agent_service.py": {
+      "local": "server/app/services/agent_service.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/agent_worker.py": {
+      "local": "server/app/services/agent_worker.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/agentic_judge.py": {
+      "local": "server/app/services/agentic_judge.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/asr_service.py": {
+      "local": "server/app/services/asr_service.py",
+      "category": "local-mod"
+    },
+    "backend/app/services/asr_vocabulary_service.py": {
+      "local": "server/app/services/asr_vocabulary_service.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/assistant_service.py": {
+      "local": "server/app/services/assistant_service.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/auth_service.py": {
+      "local": "server/app/services/auth_service.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/auxiliary_client.py": {
+      "local": "server/app/services/auxiliary_client.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/browser_service.py": {
+      "local": "server/app/services/browser_service.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/canary_marker.py": {
+      "local": "server/app/services/canary_marker.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/citation_ledger.py": {
+      "local": "server/app/services/citation_ledger.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/citation_style_service.py": {
+      "local": "server/app/services/citation_style_service.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/code_execution_service.py": {
+      "local": "server/app/services/code_execution_service.py",
+      "category": "local-mod"
+    },
+    "backend/app/services/context_compressor.py": {
+      "local": "server/app/services/context_compressor.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/deathmatch_archive.py": {
+      "local": "server/app/services/deathmatch_archive.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/deathmatch_reflection.py": {
+      "local": "server/app/services/deathmatch_reflection.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/deathmatch_service.py": {
+      "local": "server/app/services/deathmatch_service.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/durable_types.py": {
+      "local": "server/app/services/durable_types.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/error_classifier.py": {
+      "local": "server/app/services/error_classifier.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/eval_metrics.py": {
+      "local": "server/app/services/eval_metrics.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/export_registry.py": {
+      "local": "server/app/services/export_registry.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/export_worker.py": {
+      "local": "server/app/services/export_worker.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/file_parser.py": {
+      "local": "server/app/services/file_parser.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/git_binary.py": {
+      "local": "server/app/services/git_binary.py",
+      "category": "local-mod"
+    },
+    "backend/app/services/hook_service.py": {
+      "local": "server/app/services/hook_service.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/http_client.py": {
+      "local": "server/app/services/http_client.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/interactive_browser_service.py": {
+      "local": "server/app/services/interactive_browser_service.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/job_runner_service.py": {
+      "local": "server/app/services/job_runner_service.py",
+      "category": "local-mod"
+    },
+    "backend/app/services/llm_service.py": {
+      "local": "server/app/services/llm_service.py",
+      "category": "local-mod"
+    },
+    "backend/app/services/markdown_sanitizer.py": {
+      "local": "server/app/services/markdown_sanitizer.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/media_localizer.py": {
+      "local": "server/app/services/media_localizer.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/memory_adoption_service.py": {
+      "local": "server/app/services/memory_adoption_service.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/memory_backfill_service.py": {
+      "local": "server/app/services/memory_backfill_service.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/memory_bm25.py": {
+      "local": "server/app/services/memory_bm25.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/memory_clarification_service.py": {
+      "local": "server/app/services/memory_clarification_service.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/memory_cluster_service.py": {
+      "local": "server/app/services/memory_cluster_service.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/memory_concept_service.py": {
+      "local": "server/app/services/memory_concept_service.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/memory_consolidation_service.py": {
+      "local": "server/app/services/memory_consolidation_service.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/memory_cost_governance_service.py": {
+      "local": "server/app/services/memory_cost_governance_service.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/memory_dreaming_service.py": {
+      "local": "server/app/services/memory_dreaming_service.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/memory_embedding_service.py": {
+      "local": "server/app/services/memory_embedding_service.py",
+      "category": "local-mod"
+    },
+    "backend/app/services/memory_episode_service.py": {
+      "local": "server/app/services/memory_episode_service.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/memory_listwise_verifier.py": {
+      "local": "server/app/services/memory_listwise_verifier.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/memory_llm_factory.py": {
+      "local": "server/app/services/memory_llm_factory.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/memory_migration_service.py": {
+      "local": "server/app/services/memory_migration_service.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/memory_multimodal_service.py": {
+      "local": "server/app/services/memory_multimodal_service.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/memory_profile_service.py": {
+      "local": "server/app/services/memory_profile_service.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/memory_recall_log_service.py": {
+      "local": "server/app/services/memory_recall_log_service.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/memory_retrieval_service.py": {
+      "local": "server/app/services/memory_retrieval_service.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/memory_runtime_state.py": {
+      "local": "server/app/services/memory_runtime_state.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/memory_scheduler.py": {
+      "local": "server/app/services/memory_scheduler.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/memory_security.py": {
+      "local": "server/app/services/memory_security.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/memory_service.py": {
+      "local": "server/app/services/memory_service.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/memory_subconscious_service.py": {
+      "local": "server/app/services/memory_subconscious_service.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/memory_task_context.py": {
+      "local": "server/app/services/memory_task_context.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/memory_weight_service.py": {
+      "local": "server/app/services/memory_weight_service.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/message_payload_service.py": {
+      "local": "server/app/services/message_payload_service.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/moa_service.py": {
+      "local": "server/app/services/moa_service.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/model_config_sync.py": {
+      "local": "server/app/services/model_config_sync.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/numeric_provenance_gate.py": {
+      "local": "server/app/services/numeric_provenance_gate.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/office_preview_service.py": {
+      "local": "server/app/services/office_preview_service.py",
+      "category": "local-mod"
+    },
+    "backend/app/services/omml_helper.py": {
+      "local": "server/app/services/omml_helper.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/part_events.py": {
+      "local": "server/app/services/part_events.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/pdf_fonts.py": {
+      "local": "server/app/services/pdf_fonts.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/permission_manager.py": {
+      "local": "server/app/services/permission_manager.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/playwright_thread.py": {
+      "local": "server/app/services/playwright_thread.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/pre_tool_gate.py": {
+      "local": "server/app/services/pre_tool_gate.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/proactive_learning_service.py": {
+      "local": "server/app/services/proactive_learning_service.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/process_session_service.py": {
+      "local": "server/app/services/process_session_service.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/prompt_caching.py": {
+      "local": "server/app/services/prompt_caching.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/provider_router.py": {
+      "local": "server/app/services/provider_router.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/ptc_service.py": {
+      "local": "server/app/services/ptc_service.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/query_sanitizer.py": {
+      "local": "server/app/services/query_sanitizer.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/reasoning_sanitizer.py": {
+      "local": "server/app/services/reasoning_sanitizer.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/retry_utils.py": {
+      "local": "server/app/services/retry_utils.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/rounds_backfill.py": {
+      "local": "server/app/services/rounds_backfill.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/schedule_parser.py": {
+      "local": "server/app/services/schedule_parser.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/search_service.py": {
+      "local": "server/app/services/search_service.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/shared_state.py": {
+      "local": "server/app/services/shared_state.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/side_effect_ledger.py": {
+      "local": "server/app/services/side_effect_ledger.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/skill_evolution_service.py": {
+      "local": "server/app/services/skill_evolution_service.py",
+      "category": "local-mod"
+    },
+    "backend/app/services/sse_heartbeat.py": {
+      "local": "server/app/services/sse_heartbeat.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/stream_buffer.py": {
+      "local": "server/app/services/stream_buffer.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/sync_apply.py": {
+      "local": "server/app/services/sync_apply.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/sync_capture.py": {
+      "local": "server/app/services/sync_capture.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/task_checkpoint.py": {
+      "local": "server/app/services/task_checkpoint.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/think_scrubber.py": {
+      "local": "server/app/services/think_scrubber.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/title_generator.py": {
+      "local": "server/app/services/title_generator.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/tool_guardrails.py": {
+      "local": "server/app/services/tool_guardrails.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/tool_history.py": {
+      "local": "server/app/services/tool_history.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/tool_image_results.py": {
+      "local": "server/app/services/tool_image_results.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/tool_progress.py": {
+      "local": "server/app/services/tool_progress.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/tool_result_budget.py": {
+      "local": "server/app/services/tool_result_budget.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/tool_result_digest.py": {
+      "local": "server/app/services/tool_result_digest.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/tts_service.py": {
+      "local": "server/app/services/tts_service.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/user_model_provider_service.py": {
+      "local": "server/app/services/user_model_provider_service.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/user_profile_service.py": {
+      "local": "server/app/services/user_profile_service.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/vibeweaver_audit_service.py": {
+      "local": "server/app/services/vibeweaver_audit_service.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/vibeweaver_gate_service.py": {
+      "local": "server/app/services/vibeweaver_gate_service.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/visual_critic.py": {
+      "local": "server/app/services/visual_critic.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/voice_service.py": {
+      "local": "server/app/services/voice_service.py",
+      "category": "local-mod"
+    },
+    "backend/app/services/workspace_file_state.py": {
+      "local": "server/app/services/workspace_file_state.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/workspace_files_service.py": {
+      "local": "server/app/services/workspace_files_service.py",
+      "category": "local-mod"
+    },
+    "backend/app/services/workspace_lock_service.py": {
+      "local": "server/app/services/workspace_lock_service.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/workspace_paths.py": {
+      "local": "server/app/services/workspace_paths.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/workspace_scan.py": {
+      "local": "server/app/services/workspace_scan.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/workspace_service.py": {
+      "local": "server/app/services/workspace_service.py",
+      "category": "in-sync"
+    },
+    "backend/app/services/workspace_snapshot_service.py": {
+      "local": "server/app/services/workspace_snapshot_service.py",
+      "category": "in-sync"
+    },
+    "backend/app/tools/__init__.py": {
+      "local": "server/app/tools/__init__.py",
+      "category": "local-mod"
+    },
+    "backend/app/tools/background_task_tool.py": {
+      "local": "server/app/tools/background_task_tool.py",
+      "category": "in-sync"
+    },
+    "backend/app/tools/browser.py": {
+      "local": "server/app/tools/browser.py",
+      "category": "in-sync"
+    },
+    "backend/app/tools/browser_interact.py": {
+      "local": "server/app/tools/browser_interact.py",
+      "category": "in-sync"
+    },
+    "backend/app/tools/calculate.py": {
+      "local": "server/app/tools/calculate.py",
+      "category": "in-sync"
+    },
+    "backend/app/tools/citation_render.py": {
+      "local": "server/app/tools/citation_render.py",
+      "category": "in-sync"
+    },
+    "backend/app/tools/code_execution.py": {
+      "local": "server/app/tools/code_execution.py",
+      "category": "in-sync"
+    },
+    "backend/app/tools/context7.py": {
+      "local": "server/app/tools/context7.py",
+      "category": "in-sync"
+    },
+    "backend/app/tools/delegate_task.py": {
+      "local": "server/app/tools/delegate_task.py",
+      "category": "in-sync"
+    },
+    "backend/app/tools/diff.py": {
+      "local": "server/app/tools/diff.py",
+      "category": "in-sync"
+    },
+    "backend/app/tools/git.py": {
+      "local": "server/app/tools/git.py",
+      "category": "in-sync"
+    },
+    "backend/app/tools/grep.py": {
+      "local": "server/app/tools/grep.py",
+      "category": "in-sync"
+    },
+    "backend/app/tools/job_tools.py": {
+      "local": "server/app/tools/job_tools.py",
+      "category": "in-sync"
+    },
+    "backend/app/tools/mcp_client.py": {
+      "local": "server/app/tools/mcp_client.py",
+      "category": "in-sync"
+    },
+    "backend/app/tools/mcp_search.py": {
+      "local": "server/app/tools/mcp_search.py",
+      "category": "in-sync"
+    },
+    "backend/app/tools/memory.py": {
+      "local": "server/app/tools/memory.py",
+      "category": "in-sync"
+    },
+    "backend/app/tools/mixture_of_agents.py": {
+      "local": "server/app/tools/mixture_of_agents.py",
+      "category": "in-sync"
+    },
+    "backend/app/tools/notes.py": {
+      "local": "server/app/tools/notes.py",
+      "category": "in-sync"
+    },
+    "backend/app/tools/pdf_exporter.py": {
+      "local": "server/app/tools/pdf_exporter.py",
+      "category": "in-sync"
+    },
+    "backend/app/tools/process_tool.py": {
+      "local": "server/app/tools/process_tool.py",
+      "category": "in-sync"
+    },
+    "backend/app/tools/provide_file.py": {
+      "local": "server/app/tools/provide_file.py",
+      "category": "in-sync"
+    },
+    "backend/app/tools/provide_folder.py": {
+      "local": "server/app/tools/provide_folder.py",
+      "category": "in-sync"
+    },
+    "backend/app/tools/registry.py": {
+      "local": "server/app/tools/registry.py",
+      "category": "in-sync"
+    },
+    "backend/app/tools/registry.py.bak": {
+      "local": "server/app/tools/registry.py.bak",
+      "category": "in-sync"
+    },
+    "backend/app/tools/schedule_tool.py": {
+      "local": "server/app/tools/schedule_tool.py",
+      "category": "in-sync"
+    },
+    "backend/app/tools/session_search.py": {
+      "local": "server/app/tools/session_search.py",
+      "category": "in-sync"
+    },
+    "backend/app/tools/skill_tools.py": {
+      "local": "server/app/tools/skill_tools.py",
+      "category": "in-sync"
+    },
+    "backend/app/tools/terminal.py": {
+      "local": "server/app/tools/terminal.py",
+      "category": "local-mod"
+    },
+    "backend/app/tools/vision_interpret.py": {
+      "local": "server/app/tools/vision_interpret.py",
+      "category": "in-sync"
+    },
+    "backend/app/tools/voice_tools.py": {
+      "local": "server/app/tools/voice_tools.py",
+      "category": "in-sync"
+    },
+    "backend/app/tools/web_search.py": {
+      "local": "server/app/tools/web_search.py",
+      "category": "in-sync"
+    },
+    "backend/app/tools/word_count.py": {
+      "local": "server/app/tools/word_count.py",
+      "category": "in-sync"
+    },
+    "backend/app/tools/workspace_glob.py": {
+      "local": "server/app/tools/workspace_glob.py",
+      "category": "in-sync"
+    },
+    "backend/app/tools/workspace_read.py": {
+      "local": "server/app/tools/workspace_read.py",
+      "category": "in-sync"
+    },
+    "backend/app/tools/workspace_snapshot.py": {
+      "local": "server/app/tools/workspace_snapshot.py",
+      "category": "in-sync"
+    },
+    "backend/app/tools/workspace_write.py": {
+      "local": "server/app/tools/workspace_write.py",
+      "category": "in-sync"
+    },
+    "backend/app/vendor_js/echarts.min.js": {
+      "local": "server/app/vendor_js/echarts.min.js",
+      "category": "in-sync"
+    },
+    "backend/app/vendor_js/mermaid.min.js": {
+      "local": "server/app/vendor_js/mermaid.min.js",
+      "category": "in-sync"
+    },
+    "backend/app/vendor_js/tex-svg.js": {
+      "local": "server/app/vendor_js/tex-svg.js",
+      "category": "in-sync"
+    },
+    "backend/app/__pycache__/__init__.cpython-313.pyc": {
+      "local": "server/app/__pycache__/__init__.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/api/__pycache__/__init__.cpython-313.pyc": {
+      "local": "server/app/api/__pycache__/__init__.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/api/__pycache__/admin.cpython-313.pyc": {
+      "local": "server/app/api/__pycache__/admin.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/api/__pycache__/agent_tasks.cpython-313.pyc": {
+      "local": "server/app/api/__pycache__/agent_tasks.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/api/__pycache__/asr.cpython-313.pyc": {
+      "local": "server/app/api/__pycache__/asr.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/api/__pycache__/assistant.cpython-313.pyc": {
+      "local": "server/app/api/__pycache__/assistant.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/api/__pycache__/auth.cpython-313.pyc": {
+      "local": "server/app/api/__pycache__/auth.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/api/__pycache__/chat.cpython-313.pyc": {
+      "local": "server/app/api/__pycache__/chat.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/api/__pycache__/citations.cpython-313.pyc": {
+      "local": "server/app/api/__pycache__/citations.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/api/__pycache__/conversation.cpython-313.pyc": {
+      "local": "server/app/api/__pycache__/conversation.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/api/__pycache__/export_tasks.cpython-313.pyc": {
+      "local": "server/app/api/__pycache__/export_tasks.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/api/__pycache__/file_upload.cpython-313.pyc": {
+      "local": "server/app/api/__pycache__/file_upload.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/api/__pycache__/files.cpython-313.pyc": {
+      "local": "server/app/api/__pycache__/files.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/api/__pycache__/image_upload.cpython-313.pyc": {
+      "local": "server/app/api/__pycache__/image_upload.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/api/__pycache__/memory.cpython-313.pyc": {
+      "local": "server/app/api/__pycache__/memory.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/api/__pycache__/message_payloads.cpython-313.pyc": {
+      "local": "server/app/api/__pycache__/message_payloads.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/api/__pycache__/models.cpython-313.pyc": {
+      "local": "server/app/api/__pycache__/models.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/api/__pycache__/notes.cpython-313.pyc": {
+      "local": "server/app/api/__pycache__/notes.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/api/__pycache__/scheduled_tasks.cpython-313.pyc": {
+      "local": "server/app/api/__pycache__/scheduled_tasks.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/api/__pycache__/server_admin.cpython-313.pyc": {
+      "local": "server/app/api/__pycache__/server_admin.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/api/__pycache__/sessions.cpython-313.pyc": {
+      "local": "server/app/api/__pycache__/sessions.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/api/__pycache__/skills.cpython-313.pyc": {
+      "local": "server/app/api/__pycache__/skills.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/api/__pycache__/skins.cpython-313.pyc": {
+      "local": "server/app/api/__pycache__/skins.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/api/__pycache__/sync.cpython-313.pyc": {
+      "local": "server/app/api/__pycache__/sync.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/api/__pycache__/sync_workspace.cpython-313.pyc": {
+      "local": "server/app/api/__pycache__/sync_workspace.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/api/__pycache__/system.cpython-313.pyc": {
+      "local": "server/app/api/__pycache__/system.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/api/__pycache__/user_settings.cpython-313.pyc": {
+      "local": "server/app/api/__pycache__/user_settings.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/api/__pycache__/voice.cpython-313.pyc": {
+      "local": "server/app/api/__pycache__/voice.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/api/sync_workspace.py": {
+      "local": "server/app/api/sync_workspace.py",
+      "category": "local-only"
+    },
+    "backend/app/core/__pycache__/__init__.cpython-313.pyc": {
+      "local": "server/app/core/__pycache__/__init__.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/core/__pycache__/config.cpython-313.pyc": {
+      "local": "server/app/core/__pycache__/config.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/core/__pycache__/deps.cpython-313.pyc": {
+      "local": "server/app/core/__pycache__/deps.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/db/__pycache__/__init__.cpython-313.pyc": {
+      "local": "server/app/db/__pycache__/__init__.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/db/__pycache__/database.cpython-313.pyc": {
+      "local": "server/app/db/__pycache__/database.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/db/__pycache__/migrations.cpython-313.pyc": {
+      "local": "server/app/db/__pycache__/migrations.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/model_gateway/__pycache__/__init__.cpython-313.pyc": {
+      "local": "server/app/model_gateway/__pycache__/__init__.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/model_gateway/__pycache__/factory.cpython-313.pyc": {
+      "local": "server/app/model_gateway/__pycache__/factory.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/model_gateway/__pycache__/gateway.cpython-313.pyc": {
+      "local": "server/app/model_gateway/__pycache__/gateway.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/model_gateway/__pycache__/registry.cpython-313.pyc": {
+      "local": "server/app/model_gateway/__pycache__/registry.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/model_gateway/__pycache__/schemas.cpython-313.pyc": {
+      "local": "server/app/model_gateway/__pycache__/schemas.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/model_gateway/__pycache__/user_overrides.cpython-313.pyc": {
+      "local": "server/app/model_gateway/__pycache__/user_overrides.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/model_gateway/__pycache__/vision_probe.cpython-313.pyc": {
+      "local": "server/app/model_gateway/__pycache__/vision_probe.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/model_gateway/profiles/__pycache__/__init__.cpython-313.pyc": {
+      "local": "server/app/model_gateway/profiles/__pycache__/__init__.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/model_gateway/profiles/__pycache__/base.cpython-313.pyc": {
+      "local": "server/app/model_gateway/profiles/__pycache__/base.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/model_gateway/profiles/__pycache__/deepseek.cpython-313.pyc": {
+      "local": "server/app/model_gateway/profiles/__pycache__/deepseek.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/model_gateway/profiles/__pycache__/doubao.cpython-313.pyc": {
+      "local": "server/app/model_gateway/profiles/__pycache__/doubao.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/model_gateway/profiles/__pycache__/qwen3_8_vllm.cpython-313.pyc": {
+      "local": "server/app/model_gateway/profiles/__pycache__/qwen3_8_vllm.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/model_gateway/profiles/__pycache__/qwen_dashscope.cpython-313.pyc": {
+      "local": "server/app/model_gateway/profiles/__pycache__/qwen_dashscope.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/model_gateway/profiles/__pycache__/vendors.cpython-313.pyc": {
+      "local": "server/app/model_gateway/profiles/__pycache__/vendors.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/schemas/__pycache__/__init__.cpython-313.pyc": {
+      "local": "server/app/schemas/__pycache__/__init__.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/schemas/__pycache__/asr.cpython-313.pyc": {
+      "local": "server/app/schemas/__pycache__/asr.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/schemas/__pycache__/assistant.cpython-313.pyc": {
+      "local": "server/app/schemas/__pycache__/assistant.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/schemas/__pycache__/chat.cpython-313.pyc": {
+      "local": "server/app/schemas/__pycache__/chat.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/schemas/__pycache__/file_upload.cpython-313.pyc": {
+      "local": "server/app/schemas/__pycache__/file_upload.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/schemas/__pycache__/notes.cpython-313.pyc": {
+      "local": "server/app/schemas/__pycache__/notes.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/schemas/__pycache__/skill.cpython-313.pyc": {
+      "local": "server/app/schemas/__pycache__/skill.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/schemas/__pycache__/skin.cpython-313.pyc": {
+      "local": "server/app/schemas/__pycache__/skin.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/schemas/__pycache__/sync.cpython-313.pyc": {
+      "local": "server/app/schemas/__pycache__/sync.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/__init__.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/__init__.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/active_agent_registry.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/active_agent_registry.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/agent_event_bus.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/agent_event_bus.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/agent_loop.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/agent_loop.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/agent_permissions.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/agent_permissions.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/agent_scheduler.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/agent_scheduler.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/agent_service.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/agent_service.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/agent_worker.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/agent_worker.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/agentic_judge.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/agentic_judge.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/asr_service.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/asr_service.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/asr_vocabulary_service.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/asr_vocabulary_service.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/assistant_service.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/assistant_service.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/auth_service.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/auth_service.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/auxiliary_client.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/auxiliary_client.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/browser_service.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/browser_service.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/canary_marker.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/canary_marker.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/citation_ledger.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/citation_ledger.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/citation_style_service.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/citation_style_service.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/code_execution_service.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/code_execution_service.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/context_compressor.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/context_compressor.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/deathmatch_archive.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/deathmatch_archive.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/deathmatch_reflection.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/deathmatch_reflection.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/deathmatch_service.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/deathmatch_service.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/durable_types.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/durable_types.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/error_classifier.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/error_classifier.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/eval_metrics.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/eval_metrics.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/export_registry.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/export_registry.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/export_worker.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/export_worker.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/file_parser.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/file_parser.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/git_binary.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/git_binary.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/hook_service.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/hook_service.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/http_client.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/http_client.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/interactive_browser_service.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/interactive_browser_service.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/job_runner_service.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/job_runner_service.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/llm_service.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/llm_service.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/markdown_sanitizer.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/markdown_sanitizer.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/media_localizer.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/media_localizer.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/memory_adoption_service.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/memory_adoption_service.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/memory_backfill_service.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/memory_backfill_service.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/memory_bm25.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/memory_bm25.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/memory_clarification_service.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/memory_clarification_service.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/memory_cluster_service.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/memory_cluster_service.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/memory_concept_service.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/memory_concept_service.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/memory_consolidation_service.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/memory_consolidation_service.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/memory_cost_governance_service.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/memory_cost_governance_service.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/memory_dreaming_service.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/memory_dreaming_service.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/memory_embedding_service.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/memory_embedding_service.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/memory_episode_service.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/memory_episode_service.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/memory_listwise_verifier.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/memory_listwise_verifier.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/memory_llm_factory.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/memory_llm_factory.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/memory_migration_service.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/memory_migration_service.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/memory_multimodal_service.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/memory_multimodal_service.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/memory_profile_service.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/memory_profile_service.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/memory_recall_log_service.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/memory_recall_log_service.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/memory_retrieval_service.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/memory_retrieval_service.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/memory_runtime_state.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/memory_runtime_state.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/memory_scheduler.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/memory_scheduler.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/memory_security.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/memory_security.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/memory_service.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/memory_service.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/memory_subconscious_service.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/memory_subconscious_service.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/memory_task_context.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/memory_task_context.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/memory_weight_service.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/memory_weight_service.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/message_payload_service.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/message_payload_service.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/moa_service.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/moa_service.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/model_config_sync.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/model_config_sync.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/numeric_provenance_gate.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/numeric_provenance_gate.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/office_preview_service.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/office_preview_service.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/omml_helper.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/omml_helper.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/part_events.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/part_events.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/pdf_fonts.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/pdf_fonts.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/permission_manager.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/permission_manager.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/playwright_thread.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/playwright_thread.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/pre_tool_gate.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/pre_tool_gate.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/proactive_learning_service.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/proactive_learning_service.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/process_session_service.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/process_session_service.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/prompt_caching.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/prompt_caching.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/provider_router.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/provider_router.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/ptc_service.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/ptc_service.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/query_sanitizer.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/query_sanitizer.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/reasoning_sanitizer.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/reasoning_sanitizer.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/retry_utils.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/retry_utils.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/rounds_backfill.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/rounds_backfill.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/schedule_parser.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/schedule_parser.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/search_service.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/search_service.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/shared_state.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/shared_state.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/side_effect_ledger.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/side_effect_ledger.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/skill_evolution_service.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/skill_evolution_service.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/sse_heartbeat.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/sse_heartbeat.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/stream_buffer.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/stream_buffer.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/sync_apply.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/sync_apply.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/sync_capture.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/sync_capture.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/sync_client.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/sync_client.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/task_checkpoint.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/task_checkpoint.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/think_scrubber.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/think_scrubber.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/title_generator.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/title_generator.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/tool_guardrails.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/tool_guardrails.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/tool_history.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/tool_history.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/tool_image_results.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/tool_image_results.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/tool_progress.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/tool_progress.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/tool_result_budget.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/tool_result_budget.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/tool_result_digest.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/tool_result_digest.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/tts_service.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/tts_service.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/user_model_provider_service.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/user_model_provider_service.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/user_profile_service.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/user_profile_service.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/vibeweaver_audit_service.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/vibeweaver_audit_service.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/vibeweaver_gate_service.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/vibeweaver_gate_service.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/visual_critic.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/visual_critic.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/voice_service.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/voice_service.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/workspace_file_state.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/workspace_file_state.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/workspace_files_service.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/workspace_files_service.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/workspace_lock_service.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/workspace_lock_service.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/workspace_paths.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/workspace_paths.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/workspace_scan.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/workspace_scan.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/workspace_service.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/workspace_service.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/workspace_snapshot_service.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/workspace_snapshot_service.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/__pycache__/workspace_sync_service.cpython-313.pyc": {
+      "local": "server/app/services/__pycache__/workspace_sync_service.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/services/sync_client.py": {
+      "local": "server/app/services/sync_client.py",
+      "category": "local-only"
+    },
+    "backend/app/services/workspace_sync_service.py": {
+      "local": "server/app/services/workspace_sync_service.py",
+      "category": "local-only"
+    },
+    "backend/app/tools/__pycache__/__init__.cpython-313.pyc": {
+      "local": "server/app/tools/__pycache__/__init__.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/tools/__pycache__/background_task_tool.cpython-313.pyc": {
+      "local": "server/app/tools/__pycache__/background_task_tool.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/tools/__pycache__/browser.cpython-313.pyc": {
+      "local": "server/app/tools/__pycache__/browser.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/tools/__pycache__/browser_interact.cpython-313.pyc": {
+      "local": "server/app/tools/__pycache__/browser_interact.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/tools/__pycache__/calculate.cpython-313.pyc": {
+      "local": "server/app/tools/__pycache__/calculate.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/tools/__pycache__/citation_render.cpython-313.pyc": {
+      "local": "server/app/tools/__pycache__/citation_render.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/tools/__pycache__/code_execution.cpython-313.pyc": {
+      "local": "server/app/tools/__pycache__/code_execution.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/tools/__pycache__/context7.cpython-313.pyc": {
+      "local": "server/app/tools/__pycache__/context7.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/tools/__pycache__/delegate_task.cpython-313.pyc": {
+      "local": "server/app/tools/__pycache__/delegate_task.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/tools/__pycache__/diff.cpython-313.pyc": {
+      "local": "server/app/tools/__pycache__/diff.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/tools/__pycache__/git.cpython-313.pyc": {
+      "local": "server/app/tools/__pycache__/git.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/tools/__pycache__/grep.cpython-313.pyc": {
+      "local": "server/app/tools/__pycache__/grep.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/tools/__pycache__/job_tools.cpython-313.pyc": {
+      "local": "server/app/tools/__pycache__/job_tools.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/tools/__pycache__/mcp_client.cpython-313.pyc": {
+      "local": "server/app/tools/__pycache__/mcp_client.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/tools/__pycache__/mcp_search.cpython-313.pyc": {
+      "local": "server/app/tools/__pycache__/mcp_search.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/tools/__pycache__/memory.cpython-313.pyc": {
+      "local": "server/app/tools/__pycache__/memory.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/tools/__pycache__/mixture_of_agents.cpython-313.pyc": {
+      "local": "server/app/tools/__pycache__/mixture_of_agents.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/tools/__pycache__/notes.cpython-313.pyc": {
+      "local": "server/app/tools/__pycache__/notes.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/tools/__pycache__/pdf_exporter.cpython-313.pyc": {
+      "local": "server/app/tools/__pycache__/pdf_exporter.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/tools/__pycache__/process_tool.cpython-313.pyc": {
+      "local": "server/app/tools/__pycache__/process_tool.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/tools/__pycache__/provide_file.cpython-313.pyc": {
+      "local": "server/app/tools/__pycache__/provide_file.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/tools/__pycache__/provide_folder.cpython-313.pyc": {
+      "local": "server/app/tools/__pycache__/provide_folder.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/tools/__pycache__/registry.cpython-313.pyc": {
+      "local": "server/app/tools/__pycache__/registry.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/tools/__pycache__/schedule_tool.cpython-313.pyc": {
+      "local": "server/app/tools/__pycache__/schedule_tool.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/tools/__pycache__/session_search.cpython-313.pyc": {
+      "local": "server/app/tools/__pycache__/session_search.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/tools/__pycache__/skill_tools.cpython-313.pyc": {
+      "local": "server/app/tools/__pycache__/skill_tools.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/tools/__pycache__/terminal.cpython-313.pyc": {
+      "local": "server/app/tools/__pycache__/terminal.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/tools/__pycache__/vision_interpret.cpython-313.pyc": {
+      "local": "server/app/tools/__pycache__/vision_interpret.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/tools/__pycache__/voice_tools.cpython-313.pyc": {
+      "local": "server/app/tools/__pycache__/voice_tools.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/tools/__pycache__/web_search.cpython-313.pyc": {
+      "local": "server/app/tools/__pycache__/web_search.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/tools/__pycache__/word_count.cpython-313.pyc": {
+      "local": "server/app/tools/__pycache__/word_count.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/tools/__pycache__/workspace_glob.cpython-313.pyc": {
+      "local": "server/app/tools/__pycache__/workspace_glob.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/tools/__pycache__/workspace_read.cpython-313.pyc": {
+      "local": "server/app/tools/__pycache__/workspace_read.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/tools/__pycache__/workspace_snapshot.cpython-313.pyc": {
+      "local": "server/app/tools/__pycache__/workspace_snapshot.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/app/tools/__pycache__/workspace_write.cpython-313.pyc": {
+      "local": "server/app/tools/__pycache__/workspace_write.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/skills/browser/SKILL.md": {
+      "local": "server/skills/browser/SKILL.md",
+      "category": "in-sync"
+    },
+    "backend/skills/code_execution/SKILL.md": {
+      "local": "server/skills/code_execution/SKILL.md",
+      "category": "in-sync"
+    },
+    "backend/skills/docx_manipulation/MML2OMML.XSL": {
+      "local": "server/skills/docx_manipulation/MML2OMML.XSL",
+      "category": "local-mod"
+    },
+    "backend/skills/docx_manipulation/SKILL.md": {
+      "local": "server/skills/docx_manipulation/SKILL.md",
+      "category": "local-mod"
+    },
+    "backend/skills/echarts_chart/SKILL.md": {
+      "local": "server/skills/echarts_chart/SKILL.md",
+      "category": "in-sync"
+    },
+    "backend/skills/file_parsing/SKILL.md": {
+      "local": "server/skills/file_parsing/SKILL.md",
+      "category": "in-sync"
+    },
+    "backend/skills/media_playback/SKILL.md": {
+      "local": "server/skills/media_playback/SKILL.md",
+      "category": "in-sync"
+    },
+    "backend/skills/pptx_manipulation/SKILL.md": {
+      "local": "server/skills/pptx_manipulation/SKILL.md",
+      "category": "in-sync"
+    },
+    "backend/skills/rempilot-mcp/SKILL.md": {
+      "local": "server/skills/rempilot-mcp/SKILL.md",
+      "category": "in-sync"
+    },
+    "backend/skills/rempilot-mcp/agents/openai.yaml": {
+      "local": "server/skills/rempilot-mcp/agents/openai.yaml",
+      "category": "in-sync"
+    },
+    "backend/skills/rempilot-mcp/references/discovery.md": {
+      "local": "server/skills/rempilot-mcp/references/discovery.md",
+      "category": "in-sync"
+    },
+    "backend/skills/rempilot-mcp/references/routing.md": {
+      "local": "server/skills/rempilot-mcp/references/routing.md",
+      "category": "in-sync"
+    },
+    "backend/skills/rempilot-mcp/references/safety.md": {
+      "local": "server/skills/rempilot-mcp/references/safety.md",
+      "category": "in-sync"
+    },
+    "backend/skills/vibeweaver/APPENDIX.md": {
+      "local": "server/skills/vibeweaver/APPENDIX.md",
+      "category": "in-sync"
+    },
+    "backend/skills/vibeweaver/CODING_PRINCIPLES.md": {
+      "local": "server/skills/vibeweaver/CODING_PRINCIPLES.md",
+      "category": "in-sync"
+    },
+    "backend/skills/vibeweaver/COMPLETION_GATE.md": {
+      "local": "server/skills/vibeweaver/COMPLETION_GATE.md",
+      "category": "in-sync"
+    },
+    "backend/skills/vibeweaver/ENGINEERING_STD.md": {
+      "local": "server/skills/vibeweaver/ENGINEERING_STD.md",
+      "category": "in-sync"
+    },
+    "backend/skills/vibeweaver/LICENSE": {
+      "local": "server/skills/vibeweaver/LICENSE",
+      "category": "in-sync"
+    },
+    "backend/skills/vibeweaver/MEMORY_RULES.md": {
+      "local": "server/skills/vibeweaver/MEMORY_RULES.md",
+      "category": "in-sync"
+    },
+    "backend/skills/vibeweaver/MEMORY_TEMPLATES.md": {
+      "local": "server/skills/vibeweaver/MEMORY_TEMPLATES.md",
+      "category": "in-sync"
+    },
+    "backend/skills/vibeweaver/REFERENCE.md": {
+      "local": "server/skills/vibeweaver/REFERENCE.md",
+      "category": "in-sync"
+    },
+    "backend/skills/vibeweaver/SKILL.md": {
+      "local": "server/skills/vibeweaver/SKILL.md",
+      "category": "in-sync"
+    },
+    "backend/skills/vibeweaver/TESTING_PROTOCOLS.md": {
+      "local": "server/skills/vibeweaver/TESTING_PROTOCOLS.md",
+      "category": "in-sync"
+    },
+    "backend/skills/vibeweaver/UPSTREAM.md": {
+      "local": "server/skills/vibeweaver/UPSTREAM.md",
+      "category": "in-sync"
+    },
+    "backend/skills/vibeweaver/VERIFICATION_UPGRADES.md": {
+      "local": "server/skills/vibeweaver/VERIFICATION_UPGRADES.md",
+      "category": "in-sync"
+    },
+    "backend/skills/vibeweaver/WORKFLOWS_EXTENDED.md": {
+      "local": "server/skills/vibeweaver/WORKFLOWS_EXTENDED.md",
+      "category": "in-sync"
+    },
+    "backend/skills/vibeweaver/scripts/assert_artifacts.py": {
+      "local": "server/skills/vibeweaver/scripts/assert_artifacts.py",
+      "category": "in-sync"
+    },
+    "backend/skills/vibeweaver/scripts/mm_probe.py": {
+      "local": "server/skills/vibeweaver/scripts/mm_probe.py",
+      "category": "in-sync"
+    },
+    "backend/skills/vibeweaver/scripts/probe_vision.png": {
+      "local": "server/skills/vibeweaver/scripts/probe_vision.png",
+      "category": "in-sync"
+    },
+    "backend/skills/vibeweaver/scripts/scan_secrets.py": {
+      "local": "server/skills/vibeweaver/scripts/scan_secrets.py",
+      "category": "in-sync"
+    },
+    "backend/skills/web_search/SKILL.md": {
+      "local": "server/skills/web_search/SKILL.md",
+      "category": "in-sync"
+    },
+    "backend/skills/xlsx_manipulation/SKILL.md": {
+      "local": "server/skills/xlsx_manipulation/SKILL.md",
+      "category": "in-sync"
+    },
+    "backend/scripts/__init__.py": {
+      "local": "server/scripts/__init__.py",
+      "category": "in-sync"
+    },
+    "backend/scripts/audit_system_prompt.py": {
+      "local": "server/scripts/audit_system_prompt.py",
+      "category": "in-sync"
+    },
+    "backend/scripts/backfill_citation_sanitize.py": {
+      "local": "server/scripts/backfill_citation_sanitize.py",
+      "category": "in-sync"
+    },
+    "backend/scripts/backfill_cluster_embeddings.py": {
+      "local": "server/scripts/backfill_cluster_embeddings.py",
+      "category": "in-sync"
+    },
+    "backend/scripts/backfill_message_payloads.py": {
+      "local": "server/scripts/backfill_message_payloads.py",
+      "category": "in-sync"
+    },
+    "backend/scripts/cleanup_hallucinated_migration.py": {
+      "local": "server/scripts/cleanup_hallucinated_migration.py",
+      "category": "in-sync"
+    },
+    "backend/scripts/d3_merge_shadow.py": {
+      "local": "server/scripts/d3_merge_shadow.py",
+      "category": "in-sync"
+    },
+    "backend/scripts/deathmatch_harness_report.py": {
+      "local": "server/scripts/deathmatch_harness_report.py",
+      "category": "in-sync"
+    },
+    "backend/scripts/e3_listwise_pilot.py": {
+      "local": "server/scripts/e3_listwise_pilot.py",
+      "category": "in-sync"
+    },
+    "backend/scripts/memory_cdef_probe.py": {
+      "local": "server/scripts/memory_cdef_probe.py",
+      "category": "in-sync"
+    },
+    "backend/scripts/memory_recall_probe.py": {
+      "local": "server/scripts/memory_recall_probe.py",
+      "category": "in-sync"
+    },
+    "backend/scripts/migrate_model_registry.py": {
+      "local": "server/scripts/migrate_model_registry.py",
+      "category": "in-sync"
+    },
+    "backend/scripts/repair_conv3b58af5b_rows.py": {
+      "local": "server/scripts/repair_conv3b58af5b_rows.py",
+      "category": "in-sync"
+    },
+    "backend/scripts/repair_conv_a040c24e_citations.py": {
+      "local": "server/scripts/repair_conv_a040c24e_citations.py",
+      "category": "in-sync"
+    },
+    "backend/scripts/repair_dangling_citation_rows_20260910.py": {
+      "local": "server/scripts/repair_dangling_citation_rows_20260910.py",
+      "category": "in-sync"
+    },
+    "backend/scripts/reset_migration.py": {
+      "local": "server/scripts/reset_migration.py",
+      "category": "in-sync"
+    },
+    "backend/scripts/resync_asr_vocabulary.py": {
+      "local": "server/scripts/resync_asr_vocabulary.py",
+      "category": "in-sync"
+    },
+    "backend/scripts/__pycache__/__init__.cpython-313.pyc": {
+      "local": "server/scripts/__pycache__/__init__.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/scripts/__pycache__/backfill_message_payloads.cpython-313.pyc": {
+      "local": "server/scripts/__pycache__/backfill_message_payloads.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/scripts/__pycache__/migrate_model_registry.cpython-313.pyc": {
+      "local": "server/scripts/__pycache__/migrate_model_registry.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/scripts/__pycache__/repair_conv_a040c24e_citations.cpython-313.pyc": {
+      "local": "server/scripts/__pycache__/repair_conv_a040c24e_citations.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/scripts/__pycache__/repair_dangling_citation_rows_20260910.cpython-313.pyc": {
+      "local": "server/scripts/__pycache__/repair_dangling_citation_rows_20260910.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/decisions.md": {
+      "local": "server/tests/decisions.md",
+      "category": "in-sync"
+    },
+    "backend/tests/echarts_ui_01_normal_chat.png": {
+      "local": "server/tests/echarts_ui_01_normal_chat.png",
+      "category": "in-sync"
+    },
+    "backend/tests/echarts_ui_02_zen.png": {
+      "local": "server/tests/echarts_ui_02_zen.png",
+      "category": "in-sync"
+    },
+    "backend/tests/echarts_ui_03_note_editor.png": {
+      "local": "server/tests/echarts_ui_03_note_editor.png",
+      "category": "in-sync"
+    },
+    "backend/tests/fixtures/fake_mcp_stdio_server.py": {
+      "local": "server/tests/fixtures/fake_mcp_stdio_server.py",
+      "category": "in-sync"
+    },
+    "backend/tests/fixtures/voice_truncated_create_note_args.txt": {
+      "local": "server/tests/fixtures/voice_truncated_create_note_args.txt",
+      "category": "in-sync"
+    },
+    "backend/tests/probe_coordinator_new_entity.py": {
+      "local": "server/tests/probe_coordinator_new_entity.py",
+      "category": "in-sync"
+    },
+    "backend/tests/probe_intent_window_20260921.py": {
+      "local": "server/tests/probe_intent_window_20260921.py",
+      "category": "in-sync"
+    },
+    "backend/tests/probe_placeholder_judge_context_20260921.py": {
+      "local": "server/tests/probe_placeholder_judge_context_20260921.py",
+      "category": "in-sync"
+    },
+    "backend/tests/probe_register_audit_20260921.py": {
+      "local": "server/tests/probe_register_audit_20260921.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_agent_loop_internal_args.py": {
+      "local": "server/tests/test_agent_loop_internal_args.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_agent_task_worker_id.py": {
+      "local": "server/tests/test_agent_task_worker_id.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_answer_tool_conflict.py": {
+      "local": "server/tests/test_answer_tool_conflict.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_asr_general_auth.py": {
+      "local": "server/tests/test_asr_general_auth.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_asr_qwen31_migration.py": {
+      "local": "server/tests/test_asr_qwen31_migration.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_async_call_dispatch.py": {
+      "local": "server/tests/test_async_call_dispatch.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_attachment_folder_collection.py": {
+      "local": "server/tests/test_attachment_folder_collection.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_audit_advisory_policy.py": {
+      "local": "server/tests/test_audit_advisory_policy.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_audit_citation_mapping.py": {
+      "local": "server/tests/test_audit_citation_mapping.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_audit_convergence_guard.py": {
+      "local": "server/tests/test_audit_convergence_guard.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_audit_evidence_mcp_grounding.py": {
+      "local": "server/tests/test_audit_evidence_mcp_grounding.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_audit_evidence_window.py": {
+      "local": "server/tests/test_audit_evidence_window.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_audit_full_draft.py": {
+      "local": "server/tests/test_audit_full_draft.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_audit_gate_interaction_conv1a24.py": {
+      "local": "server/tests/test_audit_gate_interaction_conv1a24.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_audit_memory_authority.py": {
+      "local": "server/tests/test_audit_memory_authority.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_audit_model_routing.py": {
+      "local": "server/tests/test_audit_model_routing.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_auth_refresh.py": {
+      "local": "server/tests/test_auth_refresh.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_backfill_message_payloads.py": {
+      "local": "server/tests/test_backfill_message_payloads.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_body_exempt_slim.py": {
+      "local": "server/tests/test_body_exempt_slim.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_browser_image_extraction.py": {
+      "local": "server/tests/test_browser_image_extraction.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_bulk_export_endpoint.py": {
+      "local": "server/tests/test_bulk_export_endpoint.py",
+      "category": "local-mod"
+    },
+    "backend/tests/test_canary_tail_invariant.py": {
+      "local": "server/tests/test_canary_tail_invariant.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_chat_history_window.py": {
+      "local": "server/tests/test_chat_history_window.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_chunked_claim_audit.py": {
+      "local": "server/tests/test_chunked_claim_audit.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_citation_disambiguate_retry.py": {
+      "local": "server/tests/test_citation_disambiguate_retry.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_citation_remand_gate.py": {
+      "local": "server/tests/test_citation_remand_gate.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_citation_style_service.py": {
+      "local": "server/tests/test_citation_style_service.py",
+      "category": "local-mod"
+    },
+    "backend/tests/test_citations_api.py": {
+      "local": "server/tests/test_citations_api.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_compression_keeps_tool_evidence.py": {
+      "local": "server/tests/test_compression_keeps_tool_evidence.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_config_consolidation.py": {
+      "local": "server/tests/test_config_consolidation.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_config_pool_refactor.py": {
+      "local": "server/tests/test_config_pool_refactor.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_consolidation_merge_isolation.py": {
+      "local": "server/tests/test_consolidation_merge_isolation.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_context_compressor_superseded.py": {
+      "local": "server/tests/test_context_compressor_superseded.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_conversation_csv_export.py": {
+      "local": "server/tests/test_conversation_csv_export.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_conversation_import_parse.py": {
+      "local": "server/tests/test_conversation_import_parse.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_coordinator_self_info_neutrality.py": {
+      "local": "server/tests/test_coordinator_self_info_neutrality.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_cors_expose_headers.py": {
+      "local": "server/tests/test_cors_expose_headers.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_cross_turn_citation_guard.py": {
+      "local": "server/tests/test_cross_turn_citation_guard.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_deathmatch_aewm_wave.py": {
+      "local": "server/tests/test_deathmatch_aewm_wave.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_deathmatch_autonomy.py": {
+      "local": "server/tests/test_deathmatch_autonomy.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_deathmatch_contract_v2.py": {
+      "local": "server/tests/test_deathmatch_contract_v2.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_deathmatch_grilling_sota.py": {
+      "local": "server/tests/test_deathmatch_grilling_sota.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_deathmatch_mea_gaps.py": {
+      "local": "server/tests/test_deathmatch_mea_gaps.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_deathmatch_obligations.py": {
+      "local": "server/tests/test_deathmatch_obligations.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_deathmatch_placeholder_gate.py": {
+      "local": "server/tests/test_deathmatch_placeholder_gate.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_docker_bootstrap_config.py": {
+      "local": "server/tests/test_docker_bootstrap_config.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_durable_fixes_round.py": {
+      "local": "server/tests/test_durable_fixes_round.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_durable_foundation.py": {
+      "local": "server/tests/test_durable_foundation.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_durable_minors_wave.py": {
+      "local": "server/tests/test_durable_minors_wave.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_edit_resend_trim.py": {
+      "local": "server/tests/test_edit_resend_trim.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_endnote_export.py": {
+      "local": "server/tests/test_endnote_export.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_explicit_only_attachments.py": {
+      "local": "server/tests/test_explicit_only_attachments.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_export_messages_endnote.py": {
+      "local": "server/tests/test_export_messages_endnote.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_export_registry.py": {
+      "local": "server/tests/test_export_registry.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_factual_grounding_gate.py": {
+      "local": "server/tests/test_factual_grounding_gate.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_funasr_final_tail.py": {
+      "local": "server/tests/test_funasr_final_tail.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_git_tool.py": {
+      "local": "server/tests/test_git_tool.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_history_citation_neutralization.py": {
+      "local": "server/tests/test_history_citation_neutralization.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_identity_repo_fact.py": {
+      "local": "server/tests/test_identity_repo_fact.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_integrity_truncation_fixes.py": {
+      "local": "server/tests/test_integrity_truncation_fixes.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_interest_extract_timeout.py": {
+      "local": "server/tests/test_interest_extract_timeout.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_interject_dead_claim.py": {
+      "local": "server/tests/test_interject_dead_claim.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_interjection.py": {
+      "local": "server/tests/test_interjection.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_job_runner.py": {
+      "local": "server/tests/test_job_runner.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_leading_colon_strip.py": {
+      "local": "server/tests/test_leading_colon_strip.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_license_headers_idempotent.py": {
+      "local": "server/tests/test_license_headers_idempotent.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_mcp_progressive_tools.py": {
+      "local": "server/tests/test_mcp_progressive_tools.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_mcp_search_tool.py": {
+      "local": "server/tests/test_mcp_search_tool.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_mcp_stdio.py": {
+      "local": "server/tests/test_mcp_stdio.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_mcp_tool_name.py": {
+      "local": "server/tests/test_mcp_tool_name.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_memory_adoption_feedback.py": {
+      "local": "server/tests/test_memory_adoption_feedback.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_memory_batch_a_fixes.py": {
+      "local": "server/tests/test_memory_batch_a_fixes.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_memory_batch_b_fixes.py": {
+      "local": "server/tests/test_memory_batch_b_fixes.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_memory_batch_cdef_fixes.py": {
+      "local": "server/tests/test_memory_batch_cdef_fixes.py",
+      "category": "local-mod"
+    },
+    "backend/tests/test_memory_clarification_agentic.py": {
+      "local": "server/tests/test_memory_clarification_agentic.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_memory_concept_link_expansion.py": {
+      "local": "server/tests/test_memory_concept_link_expansion.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_memory_cost_governance_logic.py": {
+      "local": "server/tests/test_memory_cost_governance_logic.py",
+      "category": "local-mod"
+    },
+    "backend/tests/test_memory_dream_window.py": {
+      "local": "server/tests/test_memory_dream_window.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_memory_injection_budget.py": {
+      "local": "server/tests/test_memory_injection_budget.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_memory_profile_source.py": {
+      "local": "server/tests/test_memory_profile_source.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_memory_retrieve_meta.py": {
+      "local": "server/tests/test_memory_retrieve_meta.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_message_context_info.py": {
+      "local": "server/tests/test_message_context_info.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_message_payload_api.py": {
+      "local": "server/tests/test_message_payload_api.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_message_payload_hook.py": {
+      "local": "server/tests/test_message_payload_hook.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_message_payload_route_scoping.py": {
+      "local": "server/tests/test_message_payload_route_scoping.py",
+      "category": "local-mod"
+    },
+    "backend/tests/test_message_payload_service.py": {
+      "local": "server/tests/test_message_payload_service.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_migrate_model_registry.py": {
+      "local": "server/tests/test_migrate_model_registry.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_model_gateway_gateway.py": {
+      "local": "server/tests/test_model_gateway_gateway.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_model_gateway_registry.py": {
+      "local": "server/tests/test_model_gateway_registry.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_models_api.py": {
+      "local": "server/tests/test_models_api.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_new_entity_search_gate.py": {
+      "local": "server/tests/test_new_entity_search_gate.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_no_key_guard.py": {
+      "local": "server/tests/test_no_key_guard.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_note_export_tail.py": {
+      "local": "server/tests/test_note_export_tail.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_notes_append_chunking.py": {
+      "local": "server/tests/test_notes_append_chunking.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_notes_citation_render.py": {
+      "local": "server/tests/test_notes_citation_render.py",
+      "category": "local-mod"
+    },
+    "backend/tests/test_notes_export_fence_regex.py": {
+      "local": "server/tests/test_notes_export_fence_regex.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_notes_export_math_pua.py": {
+      "local": "server/tests/test_notes_export_math_pua.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_npg_no_progress_salvage.py": {
+      "local": "server/tests/test_npg_no_progress_salvage.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_numeric_provenance_gate.py": {
+      "local": "server/tests/test_numeric_provenance_gate.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_office_preview_service.py": {
+      "local": "server/tests/test_office_preview_service.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_pdf_engine_permissive.py": {
+      "local": "server/tests/test_pdf_engine_permissive.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_pdf_export_delivery_attachment.py": {
+      "local": "server/tests/test_pdf_export_delivery_attachment.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_pdf_export_resolve.py": {
+      "local": "server/tests/test_pdf_export_resolve.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_playwright_loop_pollution.py": {
+      "local": "server/tests/test_playwright_loop_pollution.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_pre_tool_streamed_prose_survives.py": {
+      "local": "server/tests/test_pre_tool_streamed_prose_survives.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_process_tool.py": {
+      "local": "server/tests/test_process_tool.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_provide_folder.py": {
+      "local": "server/tests/test_provide_folder.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_reasoning_sanitizer.py": {
+      "local": "server/tests/test_reasoning_sanitizer.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_register_guard.py": {
+      "local": "server/tests/test_register_guard.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_register_guard_residuals.py": {
+      "local": "server/tests/test_register_guard_residuals.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_registry_orphan_release.py": {
+      "local": "server/tests/test_registry_orphan_release.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_reorder_emit_side_ts_bump.py": {
+      "local": "server/tests/test_reorder_emit_side_ts_bump.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_repair_conva040c24e.py": {
+      "local": "server/tests/test_repair_conva040c24e.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_repair_dangling_rows_20260910.py": {
+      "local": "server/tests/test_repair_dangling_rows_20260910.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_search_result_schema_tolerance.py": {
+      "local": "server/tests/test_search_result_schema_tolerance.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_segmented_claim_verify.py": {
+      "local": "server/tests/test_segmented_claim_verify.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_server_drain.py": {
+      "local": "server/tests/test_server_drain.py",
+      "category": "local-mod"
+    },
+    "backend/tests/test_skill_tools_vibeweaver.py": {
+      "local": "server/tests/test_skill_tools_vibeweaver.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_startup_migrations_sql.py": {
+      "local": "server/tests/test_startup_migrations_sql.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_static_cache_headers.py": {
+      "local": "server/tests/test_static_cache_headers.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_stop_cancel_slot_release.py": {
+      "local": "server/tests/test_stop_cancel_slot_release.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_stream_persistence.py": {
+      "local": "server/tests/test_stream_persistence.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_task_resume.py": {
+      "local": "server/tests/test_task_resume.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_temporal_retrieval.py": {
+      "local": "server/tests/test_temporal_retrieval.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_thinking_hygiene.py": {
+      "local": "server/tests/test_thinking_hygiene.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_thinking_parity_golden.py": {
+      "local": "server/tests/test_thinking_parity_golden.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_thinking_profiles.py": {
+      "local": "server/tests/test_thinking_profiles.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_timeout_audit.py": {
+      "local": "server/tests/test_timeout_audit.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_title_closure_capture.py": {
+      "local": "server/tests/test_title_closure_capture.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_tool_image_and_video.py": {
+      "local": "server/tests/test_tool_image_and_video.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_tool_liveness_timeout.py": {
+      "local": "server/tests/test_tool_liveness_timeout.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_truncated_tool_args_guard.py": {
+      "local": "server/tests/test_truncated_tool_args_guard.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_usage_stream_and_rollback.py": {
+      "local": "server/tests/test_usage_stream_and_rollback.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_user_message_fidelity.py": {
+      "local": "server/tests/test_user_message_fidelity.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_user_model_overrides.py": {
+      "local": "server/tests/test_user_model_overrides.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_user_model_provider_service.py": {
+      "local": "server/tests/test_user_model_provider_service.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_user_profile_service.py": {
+      "local": "server/tests/test_user_profile_service.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_vibeweaver_audit.py": {
+      "local": "server/tests/test_vibeweaver_audit.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_vibeweaver_gate_hooks.py": {
+      "local": "server/tests/test_vibeweaver_gate_hooks.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_vision_probe.py": {
+      "local": "server/tests/test_vision_probe.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_vision_tool.py": {
+      "local": "server/tests/test_vision_tool.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_voice_asr_supervisor_retry.py": {
+      "local": "server/tests/test_voice_asr_supervisor_retry.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_voice_aux_speech.py": {
+      "local": "server/tests/test_voice_aux_speech.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_voice_barge_in_failsafe.py": {
+      "local": "server/tests/test_voice_barge_in_failsafe.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_voice_drain_anchor.py": {
+      "local": "server/tests/test_voice_drain_anchor.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_voice_eot_activity_bridge.py": {
+      "local": "server/tests/test_voice_eot_activity_bridge.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_voice_eot_semantic_merge_skip.py": {
+      "local": "server/tests/test_voice_eot_semantic_merge_skip.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_voice_filler_prefetch.py": {
+      "local": "server/tests/test_voice_filler_prefetch.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_voice_filler_ttft_gate.py": {
+      "local": "server/tests/test_voice_filler_ttft_gate.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_voice_generation_guard.py": {
+      "local": "server/tests/test_voice_generation_guard.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_voice_memory_interjection.py": {
+      "local": "server/tests/test_voice_memory_interjection.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_voice_query_time.py": {
+      "local": "server/tests/test_voice_query_time.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_voice_startup_identity.py": {
+      "local": "server/tests/test_voice_startup_identity.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_voice_subagent_json_schema.py": {
+      "local": "server/tests/test_voice_subagent_json_schema.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_voice_system_time.py": {
+      "local": "server/tests/test_voice_system_time.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_voice_tool_access.py": {
+      "local": "server/tests/test_voice_tool_access.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_voice_tool_arg_truncation.py": {
+      "local": "server/tests/test_voice_tool_arg_truncation.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_voice_truncation_dispatch_integration.py": {
+      "local": "server/tests/test_voice_truncation_dispatch_integration.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_voice_turn_progress_cumulative.py": {
+      "local": "server/tests/test_voice_turn_progress_cumulative.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_wave3_hardening.py": {
+      "local": "server/tests/test_wave3_hardening.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_web_search_fallback.py": {
+      "local": "server/tests/test_web_search_fallback.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_workspace_files_service.py": {
+      "local": "server/tests/test_workspace_files_service.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_workspace_paths.py": {
+      "local": "server/tests/test_workspace_paths.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_workspace_snapshot.py": {
+      "local": "server/tests/test_workspace_snapshot.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_workspace_write_edit.py": {
+      "local": "server/tests/test_workspace_write_edit.py",
+      "category": "in-sync"
+    },
+    "backend/tests/test_write_parallel_waves.py": {
+      "local": "server/tests/test_write_parallel_waves.py",
+      "category": "in-sync"
+    },
+    "backend/tests/verification_log.md": {
+      "local": "server/tests/verification_log.md",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_agent_loop_internal_args.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_agent_loop_internal_args.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_agent_task_worker_id.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_agent_task_worker_id.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_answer_tool_conflict.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_answer_tool_conflict.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_asr_dictation_keepalive.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_asr_dictation_keepalive.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_asr_general_auth.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_asr_general_auth.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_asr_qwen31_migration.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_asr_qwen31_migration.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_async_call_dispatch.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_async_call_dispatch.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_attachment_folder_collection.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_attachment_folder_collection.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_audit_advisory_policy.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_audit_advisory_policy.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_audit_citation_mapping.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_audit_citation_mapping.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_audit_convergence_guard.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_audit_convergence_guard.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_audit_evidence_mcp_grounding.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_audit_evidence_mcp_grounding.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_audit_evidence_window.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_audit_evidence_window.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_audit_full_draft.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_audit_full_draft.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_audit_gate_interaction_conv1a24.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_audit_gate_interaction_conv1a24.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_audit_memory_authority.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_audit_memory_authority.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_audit_model_routing.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_audit_model_routing.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_auth_refresh.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_auth_refresh.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_backfill_message_payloads.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_backfill_message_payloads.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_body_exempt_slim.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_body_exempt_slim.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_browser_image_extraction.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_browser_image_extraction.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_bulk_export_endpoint.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_bulk_export_endpoint.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_bundled_tool_path.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_bundled_tool_path.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_canary_tail_invariant.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_canary_tail_invariant.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_chat_history_window.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_chat_history_window.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_chunked_claim_audit.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_chunked_claim_audit.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_citation_disambiguate_retry.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_citation_disambiguate_retry.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_citation_remand_gate.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_citation_remand_gate.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_citation_style_service.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_citation_style_service.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_citations_api.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_citations_api.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_compression_keeps_tool_evidence.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_compression_keeps_tool_evidence.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_config_consolidation.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_config_consolidation.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_config_pool_refactor.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_config_pool_refactor.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_config_resource_resolver.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_config_resource_resolver.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_consolidation_merge_isolation.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_consolidation_merge_isolation.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_context_compressor_superseded.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_context_compressor_superseded.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_conversation_csv_export.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_conversation_csv_export.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_conversation_import_parse.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_conversation_import_parse.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_coordinator_self_info_neutrality.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_coordinator_self_info_neutrality.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_cors_expose_headers.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_cors_expose_headers.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_cross_turn_citation_guard.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_cross_turn_citation_guard.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_deathmatch_aewm_wave.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_deathmatch_aewm_wave.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_deathmatch_autonomy.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_deathmatch_autonomy.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_deathmatch_contract_v2.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_deathmatch_contract_v2.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_deathmatch_grilling_sota.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_deathmatch_grilling_sota.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_deathmatch_mea_gaps.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_deathmatch_mea_gaps.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_deathmatch_obligations.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_deathmatch_obligations.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_deathmatch_placeholder_gate.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_deathmatch_placeholder_gate.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_docker_bootstrap_config.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_docker_bootstrap_config.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_durable_fixes_round.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_durable_fixes_round.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_durable_foundation.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_durable_foundation.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_durable_minors_wave.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_durable_minors_wave.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_edit_resend_trim.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_edit_resend_trim.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_endnote_export.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_endnote_export.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_explicit_only_attachments.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_explicit_only_attachments.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_export_messages_endnote.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_export_messages_endnote.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_export_registry.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_export_registry.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_factual_grounding_gate.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_factual_grounding_gate.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_funasr_final_tail.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_funasr_final_tail.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_git_tool.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_git_tool.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_history_citation_neutralization.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_history_citation_neutralization.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_identity_repo_fact.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_identity_repo_fact.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_integrity_truncation_fixes.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_integrity_truncation_fixes.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_interest_extract_timeout.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_interest_extract_timeout.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_interject_dead_claim.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_interject_dead_claim.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_interjection.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_interjection.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_job_runner.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_job_runner.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_job_runner.cpython-313.pyc": {
+      "local": "server/tests/__pycache__/test_job_runner.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_leading_colon_strip.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_leading_colon_strip.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_license_headers_idempotent.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_license_headers_idempotent.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_main_sync_wiring.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_main_sync_wiring.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_mcp_progressive_tools.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_mcp_progressive_tools.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_mcp_search_tool.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_mcp_search_tool.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_mcp_stdio.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_mcp_stdio.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_mcp_tool_name.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_mcp_tool_name.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_memory_adoption_feedback.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_memory_adoption_feedback.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_memory_batch_a_fixes.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_memory_batch_a_fixes.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_memory_batch_b_fixes.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_memory_batch_b_fixes.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_memory_batch_cdef_fixes.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_memory_batch_cdef_fixes.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_memory_clarification_agentic.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_memory_clarification_agentic.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_memory_concept_link_expansion.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_memory_concept_link_expansion.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_memory_cost_governance_logic.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_memory_cost_governance_logic.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_memory_dream_window.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_memory_dream_window.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_memory_injection_budget.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_memory_injection_budget.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_memory_profile_source.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_memory_profile_source.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_memory_retrieve_meta.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_memory_retrieve_meta.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_message_context_info.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_message_context_info.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_message_payload_api.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_message_payload_api.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_message_payload_hook.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_message_payload_hook.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_message_payload_route_scoping.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_message_payload_route_scoping.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_message_payload_service.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_message_payload_service.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_migrate_model_registry.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_migrate_model_registry.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_model_config_sync.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_model_config_sync.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_model_config_sync.cpython-313.pyc": {
+      "local": "server/tests/__pycache__/test_model_config_sync.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_model_gateway_gateway.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_model_gateway_gateway.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_model_gateway_registry.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_model_gateway_registry.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_models_api.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_models_api.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_new_entity_search_gate.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_new_entity_search_gate.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_no_key_guard.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_no_key_guard.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_note_export_tail.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_note_export_tail.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_notes_append_chunking.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_notes_append_chunking.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_notes_citation_render.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_notes_citation_render.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_notes_export_fence_regex.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_notes_export_fence_regex.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_notes_export_math_pua.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_notes_export_math_pua.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_npg_no_progress_salvage.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_npg_no_progress_salvage.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_numeric_provenance_gate.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_numeric_provenance_gate.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_office_preview_cjk.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_office_preview_cjk.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_office_preview_cjk.cpython-313.pyc": {
+      "local": "server/tests/__pycache__/test_office_preview_cjk.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_office_preview_service.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_office_preview_service.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_pdf_engine_permissive.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_pdf_engine_permissive.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_pdf_export_delivery_attachment.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_pdf_export_delivery_attachment.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_pdf_export_resolve.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_pdf_export_resolve.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_playwright_loop_pollution.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_playwright_loop_pollution.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_pre_tool_streamed_prose_survives.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_pre_tool_streamed_prose_survives.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_process_tool.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_process_tool.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_provide_folder.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_provide_folder.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_reasoning_sanitizer.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_reasoning_sanitizer.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_register_guard.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_register_guard.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_register_guard_residuals.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_register_guard_residuals.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_registry_orphan_release.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_registry_orphan_release.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_reorder_emit_side_ts_bump.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_reorder_emit_side_ts_bump.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_reorder_sync_ts.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_reorder_sync_ts.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_repair_conva040c24e.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_repair_conva040c24e.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_repair_dangling_rows_20260910.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_repair_dangling_rows_20260910.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_resource_resolver.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_resource_resolver.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_search_result_schema_tolerance.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_search_result_schema_tolerance.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_segmented_claim_verify.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_segmented_claim_verify.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_server_drain.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_server_drain.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_skill_tools_vibeweaver.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_skill_tools_vibeweaver.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_sqljobstore_save_id.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_sqljobstore_save_id.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_startup_migrations_sql.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_startup_migrations_sql.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_static_cache_headers.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_static_cache_headers.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_stop_cancel_slot_release.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_stop_cancel_slot_release.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_stream_persistence.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_stream_persistence.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_sync_now.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_sync_now.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_task_resume.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_task_resume.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_temporal_retrieval.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_temporal_retrieval.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_thinking_hygiene.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_thinking_hygiene.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_thinking_parity_golden.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_thinking_parity_golden.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_thinking_profiles.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_thinking_profiles.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_timeout_audit.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_timeout_audit.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_title_closure_capture.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_title_closure_capture.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_tool_discovery.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_tool_discovery.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_tool_image_and_video.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_tool_image_and_video.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_tool_liveness_timeout.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_tool_liveness_timeout.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_truncated_tool_args_guard.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_truncated_tool_args_guard.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_usage_stream_and_rollback.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_usage_stream_and_rollback.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_user_message_fidelity.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_user_message_fidelity.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_user_model_overrides.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_user_model_overrides.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_user_model_provider_service.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_user_model_provider_service.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_user_profile_service.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_user_profile_service.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_vibeweaver_audit.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_vibeweaver_audit.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_vibeweaver_gate_hooks.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_vibeweaver_gate_hooks.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_vision_probe.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_vision_probe.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_vision_tool.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_vision_tool.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_voice_asr_supervisor_retry.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_voice_asr_supervisor_retry.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_voice_aux_speech.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_voice_aux_speech.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_voice_barge_in_failsafe.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_voice_barge_in_failsafe.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_voice_drain_anchor.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_voice_drain_anchor.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_voice_eot_activity_bridge.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_voice_eot_activity_bridge.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_voice_eot_semantic_merge_skip.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_voice_eot_semantic_merge_skip.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_voice_filler_prefetch.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_voice_filler_prefetch.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_voice_filler_ttft_gate.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_voice_filler_ttft_gate.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_voice_generation_guard.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_voice_generation_guard.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_voice_memory_interjection.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_voice_memory_interjection.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_voice_query_time.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_voice_query_time.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_voice_startup_identity.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_voice_startup_identity.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_voice_subagent_json_schema.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_voice_subagent_json_schema.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_voice_system_time.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_voice_system_time.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_voice_tool_access.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_voice_tool_access.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_voice_tool_arg_truncation.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_voice_tool_arg_truncation.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_voice_truncation_dispatch_integration.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_voice_truncation_dispatch_integration.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_voice_turn_progress_cumulative.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_voice_turn_progress_cumulative.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_wave3_hardening.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_wave3_hardening.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_web_search_fallback.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_web_search_fallback.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_workspace_files_service.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_workspace_files_service.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_workspace_paths.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_workspace_paths.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_workspace_snapshot.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_workspace_snapshot.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_workspace_sync_service.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_workspace_sync_service.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_workspace_sync_service.cpython-313.pyc": {
+      "local": "server/tests/__pycache__/test_workspace_sync_service.cpython-313.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_workspace_write_edit.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_workspace_write_edit.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/__pycache__/test_write_parallel_waves.cpython-313-pytest-9.1.1.pyc": {
+      "local": "server/tests/__pycache__/test_write_parallel_waves.cpython-313-pytest-9.1.1.pyc",
+      "category": "excluded"
+    },
+    "backend/tests/test_asr_dictation_keepalive.py": {
+      "local": "server/tests/test_asr_dictation_keepalive.py",
+      "category": "local-only"
+    },
+    "backend/tests/test_bundled_tool_path.py": {
+      "local": "server/tests/test_bundled_tool_path.py",
+      "category": "local-only"
+    },
+    "backend/tests/test_config_resource_resolver.py": {
+      "local": "server/tests/test_config_resource_resolver.py",
+      "category": "local-only"
+    },
+    "backend/tests/test_main_sync_wiring.py": {
+      "local": "server/tests/test_main_sync_wiring.py",
+      "category": "local-only"
+    },
+    "backend/tests/test_model_config_sync.py": {
+      "local": "server/tests/test_model_config_sync.py",
+      "category": "local-only"
+    },
+    "backend/tests/test_office_preview_cjk.py": {
+      "local": "server/tests/test_office_preview_cjk.py",
+      "category": "local-only"
+    },
+    "backend/tests/test_reorder_sync_ts.py": {
+      "local": "server/tests/test_reorder_sync_ts.py",
+      "category": "local-only"
+    },
+    "backend/tests/test_resource_resolver.py": {
+      "local": "server/tests/test_resource_resolver.py",
+      "category": "local-only"
+    },
+    "backend/tests/test_sqljobstore_save_id.py": {
+      "local": "server/tests/test_sqljobstore_save_id.py",
+      "category": "local-only"
+    },
+    "backend/tests/test_sync_now.py": {
+      "local": "server/tests/test_sync_now.py",
+      "category": "local-only"
+    },
+    "backend/tests/test_tool_discovery.py": {
+      "local": "server/tests/test_tool_discovery.py",
+      "category": "local-only"
+    },
+    "backend/tests/test_workspace_sync_service.py": {
+      "local": "server/tests/test_workspace_sync_service.py",
+      "category": "local-only"
+    },
+    "backend/Fonts/NotoSansCJKsc-Bold.otf": {
+      "local": "server/Fonts/NotoSansCJKsc-Bold.otf",
+      "category": "local-only"
+    },
+    "backend/Fonts/NotoSansCJKsc-Regular.otf": {
+      "local": "server/Fonts/NotoSansCJKsc-Regular.otf",
+      "category": "local-only"
+    },
+    "backend/Fonts/NotoSansMonoCJKsc-Regular.otf": {
+      "local": "server/Fonts/NotoSansMonoCJKsc-Regular.otf",
+      "category": "local-only"
+    },
+    "frontend/tests/workflows/test_abort_caughtup_paged.cjs": {
+      "local": "app/tests/workflows/test_abort_caughtup_paged.cjs",
+      "category": "in-sync"
+    },
+    "frontend/tests/workflows/test_body_truncation_ux.cjs": {
+      "local": "app/tests/workflows/test_body_truncation_ux.cjs",
+      "category": "in-sync"
+    },
+    "frontend/tests/workflows/test_context_tokens.cjs": {
+      "local": "app/tests/workflows/test_context_tokens.cjs",
+      "category": "in-sync"
+    },
+    "frontend/tests/workflows/test_conversation_order.cjs": {
+      "local": "app/tests/workflows/test_conversation_order.cjs",
+      "category": "in-sync"
+    },
+    "frontend/tests/workflows/test_endnote_threading.cjs": {
+      "local": "app/tests/workflows/test_endnote_threading.cjs",
+      "category": "in-sync"
+    },
+    "frontend/tests/workflows/test_file_preview_kinds.cjs": {
+      "local": "app/tests/workflows/test_file_preview_kinds.cjs",
+      "category": "in-sync"
+    },
+    "frontend/tests/workflows/test_grilling_wiring.cjs": {
+      "local": "app/tests/workflows/test_grilling_wiring.cjs",
+      "category": "in-sync"
+    },
+    "frontend/tests/workflows/test_heading_typography.cjs": {
+      "local": "app/tests/workflows/test_heading_typography.cjs",
+      "category": "in-sync"
+    },
+    "frontend/tests/workflows/test_interjection_queue.cjs": {
+      "local": "app/tests/workflows/test_interjection_queue.cjs",
+      "category": "in-sync"
+    },
+    "frontend/tests/workflows/test_markdown_table_repair.cjs": {
+      "local": "app/tests/workflows/test_markdown_table_repair.cjs",
+      "category": "in-sync"
+    },
+    "frontend/tests/workflows/test_note_word_count.cjs": {
+      "local": "app/tests/workflows/test_note_word_count.cjs",
+      "category": "in-sync"
+    },
+    "frontend/tests/workflows/test_promote_wiring.cjs": {
+      "local": "app/tests/workflows/test_promote_wiring.cjs",
+      "category": "in-sync"
+    },
+    "frontend/tests/workflows/test_refresh_shrink_guard.cjs": {
+      "local": "app/tests/workflows/test_refresh_shrink_guard.cjs",
+      "category": "in-sync"
+    },
+    "frontend/tests/workflows/test_resume_503_retry.cjs": {
+      "local": "app/tests/workflows/test_resume_503_retry.cjs",
+      "category": "in-sync"
+    },
+    "frontend/tests/workflows/test_snippet_insert.cjs": {
+      "local": "app/tests/workflows/test_snippet_insert.cjs",
+      "category": "local-mod"
+    },
+    "frontend/tests/workflows/test_stream_connection.cjs": {
+      "local": "app/tests/workflows/test_stream_connection.cjs",
+      "category": "in-sync"
+    },
+    "frontend/tests/workflows/test_stream_true_guard.cjs": {
+      "local": "app/tests/workflows/test_stream_true_guard.cjs",
+      "category": "in-sync"
+    },
+    "frontend/tests/workflows/test_string_cache_key.cjs": {
+      "local": "app/tests/workflows/test_string_cache_key.cjs",
+      "category": "in-sync"
+    },
+    "frontend/tests/workflows/test_stub_shape_strict.cjs": {
+      "local": "app/tests/workflows/test_stub_shape_strict.cjs",
+      "category": "in-sync"
+    },
+    "frontend/tests/workflows/test_tab_table_convert.cjs": {
+      "local": "app/tests/workflows/test_tab_table_convert.cjs",
+      "category": "in-sync"
+    },
+    "frontend/tests/workflows/test_voice_toggle_wiring.cjs": {
+      "local": "app/tests/workflows/test_voice_toggle_wiring.cjs",
+      "category": "in-sync"
+    },
+    "frontend/tests/workflows/test_asr_reconnect.cjs": {
+      "local": "app/tests/workflows/test_asr_reconnect.cjs",
+      "category": "local-only"
+    },
+    "frontend/tests/workflows/test_local_patch_imports.cjs": {
+      "local": "app/tests/workflows/test_local_patch_imports.cjs",
+      "category": "local-only"
+    },
+    "frontend/tests/workflows/test_payload_stub_guard.cjs": {
+      "local": "app/tests/workflows/test_payload_stub_guard.cjs",
+      "category": "local-only"
+    },
+    "frontend/package.json": {
+      "local": "app/package.json",
+      "category": "local-mod"
+    },
+    "frontend/vite.config.ts": {
+      "local": "app/vite.config.ts",
+      "category": "local-mod"
+    },
+    "frontend/tsconfig.json": {
+      "local": "app/tsconfig.json",
+      "category": "in-sync"
+    },
+    "frontend/tsconfig.node.json": {
+      "local": "app/tsconfig.node.json",
+      "category": "in-sync"
+    },
+    "frontend/index.html": {
+      "local": "app/index.html",
+      "category": "in-sync"
+    },
+    "backend/main.py": {
+      "local": "server/main.py",
+      "category": "local-mod"
+    },
+    "backend/requirements.txt": {
+      "local": "server/requirements.txt",
+      "category": "in-sync"
+    },
+    "backend/API.md": {
+      "local": "server/API.md",
+      "category": "local-mod"
+    },
+    "backend/config.toml.example": {
+      "local": "server/config.toml.example",
+      "category": "local-mod"
+    },
+    "backend/config_model.toml.example": {
+      "local": "server/config_model.toml.example",
+      "category": "local-mod"
+    },
+    "tests/test_math_tokenizer.cjs": {
+      "local": "tests/test_math_tokenizer.cjs",
+      "category": "local-mod"
+    }
+  }
+}

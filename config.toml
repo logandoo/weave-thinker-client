@@ -1,0 +1,22 @@
+# Weave Thinker Client — 构建/运行配置事实源
+# 修改后由 script/sync_config.mjs 注入 app/.env（VITE_API_BASE）。
+
+[server]
+# 后端 FastAPI 服务 origin。桌面/移动客户端必须指向可达的远端（跨源需后端 CORS 放行）。
+# 留空 = 相对 /api（仅 Web 同源部署适用）。
+# 默认值 = 本机开发后端（与 vite dev proxy 默认一致）；部署/远端请改为实际 origin。
+api_base = "http://127.0.0.1:8159"
+
+[client]
+app_name = "WeaveThinker"
+app_id = "com.weavethinker.client"
+
+[local]
+# 本地全栈（默认开）：Electron 启动时自动拉起本地 PG + 后端。
+enabled = true
+pg_port = 55432
+backend_port = 8159
+
+[desktop]
+window_width = 1280
+window_height = 860

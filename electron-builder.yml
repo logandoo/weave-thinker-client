@@ -1,0 +1,53 @@
+# macOS 安装包配置（本地构建，避免 GitHub 下载：electronDist 指向本地 electron/dist）
+appId: com.weavethinker.client
+productName: WeaveThinker
+copyright: "Weave Thinker"
+directories:
+  output: dist_installer
+  buildResources: build
+  app: .
+electronDist: node_modules/electron/dist
+files:
+  - desktop/**
+  - app/dist/**
+  - package.json
+  - "!desktop/local.config.json"
+  - "!**/node_modules/**"
+npmRebuild: false
+extraResources:
+  - from: dist_sidecar/weave-server
+    to: sidecar/weave-server
+  - from: .cache/ffmpeg/ffmpeg
+    to: bin/ffmpeg
+  - from: .cache/ffmpeg/COPYING.GPL-2.0.txt
+    to: bin/ffmpeg.COPYING.txt
+  - from: .cache/git/bundle/bin
+    to: bin
+  - from: .cache/git/bundle/libexec
+    to: libexec
+  - from: .cache/git/bundle/share
+    to: share
+  - from: .cache/git/bundle/COPYING
+    to: bin/git.COPYING.txt
+  - from: dist_sidecar/browsers
+    to: browsers
+  - from: dist_lo/LibreOffice.app
+    to: LibreOffice.app
+mac:
+  target:
+    - target: dir
+      arch: [arm64]
+    - target: dmg
+      arch: [arm64]
+  category: public.app-category.productivity
+  identity: null           # 未签名（本地/内测）；分发需 Developer ID + 公证
+  hardenedRuntime: false
+dmg:
+  title: WeaveThinker
+  contents:
+    - x: 130
+      y: 220
+    - x: 410
+      y: 220
+      type: link
+      path: /Applications

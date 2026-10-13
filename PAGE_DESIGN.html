@@ -1,0 +1,14 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8"><title>PAGE_DESIGN — weave-thinker-client</title>
+<style>body{font-family:system-ui;max-width:960px;margin:2rem auto;line-height:1.6}table{border-collapse:collapse}td,th{border:1px solid #ddd;padding:.4rem .6rem}</style></head><body>
+<h1>PAGE_DESIGN — 页面与宿主适配</h1>
+<p>页面集继承自源 SPA（vendor 副本），本期不新增业务页面；核心工作=宿主适配。</p>
+<table><tr><th>页面/组件</th><th>桌面（Electron）</th><th>移动（Capacitor）</th></tr>
+<tr><td>LoginView</td><td>窗口居中卡片，无浏览器 chrome；截图证据 tests/screenshots/desktop_login.png</td><td>安全区 padding；键盘避让（后续 W4）</td></tr>
+<tr><td>ChatLayout/ChatArea</td><td>宽屏布局 1280×860；文件下载走 WeaverNoteApp 桥</td><td>窄屏响应式；返回手势/按键（后续 @capacitor/app）</td></tr>
+<tr><td>NotesFamily / ZenMode / VoiceChat</td><td>同 web；voice 走系统麦克风权限（Electron 默认允许）</td><td>麦克风权限 usage string（W4）</td></tr>
+<tr><td>原生新增面（规划）</td><td>目录选择/本地硬件桥（已实现 fs 面）</td><td>能力翼插件页（push/生物识别设置项，W4）；原生导航壳（W5，4.2 视图翼）</td></tr></table>
+<h2>全局适配约定</h2>
+<ul><li>主题/皮肤：localStorage 预引导不变（index.html 内联脚本）。</li><li>字体：public/fonts 自托管，无第三方 CDN（离线可用）。</li><li>窄屏断点=源 SPA 既有响应式；移动特有样式留待 W2/W3 真机校正。</li></ul>
+<h2>自定义标题栏（2026-09-25 topbar 波；darwin hiddenInset）</h2>
+<p><b>形态</b>：VSCode mac 同款——<code>titleBarStyle: 'hiddenInset'</code>（desktop/main.cjs，仅 darwin；Win/Linux 保留原生框并登记 deferred），原生红绿灯保留；标题栏本体=SPA 组件 <code>AppTitleBar.vue</code>（App.vue 顶层，登录页亦显示）。<b>主题契约</b>：栏体仅引用皮肤令牌（--color-bg/--color-text/--skin-line*），随 <code>data-skin</code>/<code>data-theme</code> 自动换色——零主题代码。<b>布局</b>：高 38px；内容左 padding 80px 避让红绿灯；<code>app-region: drag</code> 全区可拖（交互元素须 no-drag）。<b>宿主门控</b>：仅 Electron darwin 渲染（NativeBridge platform.os 判定）；Web/移动宿主无原生框可替换，不渲染。</p>
+</body></html>

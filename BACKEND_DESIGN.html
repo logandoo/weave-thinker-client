@@ -1,0 +1,32 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8"><title>BACKEND_DESIGN — weave-thinker-client</title>
+<style>body{font-family:system-ui;max-width:960px;margin:2rem auto;line-height:1.6}code{background:#f3f4f6;padding:.1rem .3rem;border-radius:4px}table{border-collapse:collapse}td,th{border:1px solid #ddd;padding:.4rem .6rem}</style></head><body>
+<h1>BACKEND_DESIGN — 客户端"后端"面（IPC + 远程 API 契约）</h1>
+<p>本仓无独立 HTTP 后端；全部服务端能力来自 chatbot FastAPI（只读复用）。本仓新增的"后端面"=Electron 主进程 IPC 与 Capacitor 插件桥。</p>
+<h2>IPC 通道（ipcMain.handle，preload 经 contextBridge 暴露）</h2>
+<table><tr><th>通道</th><th>入参</th><th>返回</th><th>安全约束</th></tr>
+<tr><td>bridge:pickDirectory</td><td>—</td><td>string|null</td><td>系统对话框</td></tr>
+<tr><td>bridge:pickFile</td><td>filters?</td><td>string|null</td><td>系统对话框</td></tr>
+<tr><td>bridge:readTextFile</td><td>absPath</td><td>utf8 string</td><td>绝对路径断言</td></tr>
+<tr><td>bridge:writeTextFile</td><td>absPath, content(string)</td><td>true</td><td>绝对路径断言；写失败抛出</td></tr>
+<tr><td>bridge:listDir</td><td>absPath</td><td>{name,isDir}[]</td><td>绝对路径断言</td></tr>
+<tr><td>bridge:reveal</td><td>absPath</td><td>true</td><td>shell.showItemInFolder</td></tr>
+<tr><td>bridge:openExternal</td><td>http(s) url</td><td>true</td><td>scheme 白名单</td></tr>
+<tr><td>bridge:saveFileBase64</td><td>base64, filename</td><td>path</td><td>写系统下载目录；basename 化</td></tr>
+<tr><td>bridge:downloadToFile</td><td>http(s) url, filename</td><td>path</td><td>net.fetch；scheme 白名单；basename 化</td></tr>
+<tr><td>bridge:appInfo</td><td>—</td><td>{name,version,platform,electron}</td><td>—</td></tr></table>
+<h2>渲染侧接口（window.NativeBridge，TS 类型见 app/src/native/bridge.ts）</h2>
+<p><code>{ platform:{os,kind,shell}, fs:{pickDirectory,pickFile,readTextFile,writeTextFile,listDir,reveal}, app:{info,openExternal} }</code></p>
+<h2>兼容桥（window.WeaverNoteApp）</h2>
+<p>继承 Android 壳历史契约：<code>isDownloadSupported</code>=true、<code>saveFile</code>/<code>downloadFile</code>/<code>downloadFileWithProgress</code>（异步落盘、同步返回 true）、<code>onThemeChanged</code> no-op。源 SPA 的 useDownload 自动启用原生路径。</p>
+<h2>远程 API 契约（客户端消费，源=chatbot backend）</h2>
+<ul><li>REST: <code>{api_base}/api/**</code>（axios，Bearer）；SSE: <code>/api/chat/stream[/resume]</code>；WS: <code>/api/voice/ws</code>、<code>/api/asr/ws/transcribe/stream</code>；媒体: <code>/api/files/download?path&token</code>。</li><li><b>后端侧待办（不在 chatbot 仓直接改）</b>：CORS 放行客户端 origin（app://weave · capacitor://localhost · http://localhost）允许 Authorization 头与 credentials。</li></ul>
+<h2>同步端点面（S1 波，2026-09-24；vendored server/ 新增 <code>app/api/sync.py</code>，前缀 <code>/api/sync</code>，JWT Bearer）</h2>
+<table><tr><th>端点</th><th>语义</th><th>关键契约</th></tr>
+<tr><td><code>POST /api/sync/devices</code></td><td>设备注册（幂等按 id）</td><td>body {id?, name, platform}；已存在同 id 设备→更新 last_seen_at 返回；revoked 设备 403</td></tr>
+<tr><td><code>GET /api/sync/delta?cursor=C&limit=N&device_id=D</code></td><td>增量事件流</td><td>seq>cursor 分页（limit 默认 200，≤1000）；窗口内 Joplin 四规则压缩；device_id 抑制 origin 回显；返回 {events:[...], cursor:<最大seq>, has_more}</td></tr>
+<tr><td><code>POST /api/sync/push</code></td><td>批量提交本地变更</td><td>body {device_id, events:[{entity_type, entity_id, op, payload, client_updated_at}]}；服务端 LWW 仲裁（incoming.updated_at>现有→应用；否则 skip）；天然幂等（同 payload 重复应用=同态）；per-event SAVEPOINT 部分失败不连坐；返回 {applied:[], skipped:[]}</td></tr>
+<tr><td><code>PUT /api/sync/blobs/{sha256}</code></td><td>内容寻址上传</td><td>body=原始字节；服务端校验 sha256 实算一致（不符 400）；同 sha 幂等去重；上限 [sync] blob_max_mb</td></tr>
+<tr><td><code>GET /api/sync/blobs/{sha256}</code></td><td>下载</td><td>存在→application/octet-stream；不存在 404</td></tr>
+<tr><td><code>POST /api/sync/resync</code></td><td>全量重建</td><td>游标失效时导出该用户同步域全量当前态 {entities:{type:[rows]}, cursor:<当前最大seq>}（首批全量同步复用导出管线理念，Joplin resyncRequired 同款）</td></tr></table>
+<p>事件捕获=SQLAlchemy mapper 事件（app/services/sync_capture.py，after_insert/update/delete 同事务 connection.execute 写 sync_events + delete 时写 sync_tombstones）；域=conversations/messages/notes/notebooks/assistants。越权一律 404（沿用仓约定）。错误约定同 API.md 通用节。</p>
+</body></html>

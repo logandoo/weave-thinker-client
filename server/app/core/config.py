@@ -1,0 +1,3097 @@
+import os
+import toml
+from pathlib import Path
+from typing import List, Optional
+from functools import lru_cache
+
+
+def _parse_int(value) -> Optional[int]:
+    if value == "" or value is None:
+        return None
+    try:
+        return int(value)
+    except (ValueError, TypeError):
+        return None
+
+
+class Config:
+    def __init__(self, config_path: str = None):
+        if config_path is None:
+            # 配置路径覆盖链：WEAVE_CONFIG_PATH（测试/多实例，sync 波 2026-09-26 上游）
+            # 优先；LOCALSTACK_CONFIG_PATH（冻结/侧车模式用户数据目录）兜底；默认不变。
+            # 两者皆为桌面打包形态所依赖：desktop/local-stack.cjs 向侧车注入
+            # LOCALSTACK_CONFIG_PATH 指向用户数据目录的 config.toml——漏掉它会让
+            # 打包版读仓库默认配置而非用户配置。
+            env_cfg = os.environ.get("WEAVE_CONFIG_PATH") or os.environ.get("LOCALSTACK_CONFIG_PATH")
+            config_path = env_cfg if env_cfg else os.path.join(
+                os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+                "config.toml"
+            )
+
+        self.config_path = Path(config_path).resolve()
+        self._config = toml.load(config_path)
+        # Model config split (2026-09-01 归位重构, wave2): config.toml (tracked)
+        # carries infra + ALL pure-behavior sections + provider keys in
+        # [secrets] (user decision). config_model.toml (gitignored) holds the
+        # model endpoints pool + purpose routing + sampling defaults ONLY —
+        # merged OVER the main file per _MODEL_SECTIONS. When the model file
+        # is absent (legacy deployments) the main file's sections remain
+        # authoritative — every property below is unchanged.
+        self.model_config_path = self._resolve_model_config_path(config_path)
+        self._config = self._merge_model_config(self._config)
+
+    @staticmethod
+    def _resolve_model_config_path(config_path: str) -> Optional[Path]:
+        env_override = os.environ.get("CONFIG_MODEL_PATH")
+        if env_override:
+            return Path(env_override).resolve()
+        main = Path(config_path).resolve()
+        candidate = main.parent / "config_model.toml"
+        return candidate if candidate.exists() else None
+
+    # Sections that belong to config_model.toml. Whole-section moves.
+    # 2026-09-01 归位重构：纯行为段（asr/voice/deathmatch/sub_agent/
+    # title_generation/memory + agent.* 子段）迁回 config.toml——切分轴 =
+    # 端点/路由/采样默认/密钥 vs 行为/基础设施，历史"一大勺"清单退役。
+    _MODEL_SECTIONS = {
+        "endpoints",         # model endpoints (alias → url/key/model/params/capabilities)
+        "routing",           # purpose → alias routing
+        "defaults",          # default LLM sampling params
+        "default_assistant", # assistant-scoped sampling params
+        "secrets",           # web_search / context7 keys — canonical home config.toml (wave2);
+                             # whitelist kept so a legacy model-file [secrets] still merges
+    }
+    # [agent] harness tuning stays in the main file. No agent sub-sections are
+    # taken from the model file any more (2026-09-01 归位重构).
+    _MODEL_AGENT_SUBSECTIONS: set = set()
+
+    def _merge_model_config(self, base: dict) -> dict:
+        if self.model_config_path is None:
+            return base
+        import logging
+        logger = logging.getLogger(__name__)
+        try:
+            model_cfg = toml.load(self.model_config_path)
+        except Exception:
+            logger.exception(
+                "Failed to load %s — falling back to main config sections. "
+                "If this deployment was already split, the server is now "
+                "running with EMPTY/default model config and will fail on "
+                "the first LLM call.",
+                self.model_config_path,
+            )
+            return base
+        merged = dict(base)
+        # 2026-09-01 归位重构守卫：model 文件里出现白名单之外的段 = 部署残留
+        # （如未合并的 legacy [api]/[providers]/[memory]）——这些段会被静默
+        # 忽略，必须喊出来，否则回滚网失效零信号（A4.9 评审 Important-2）。
+        ignored = [s for s in model_cfg if s not in self._MODEL_SECTIONS and s != "agent"]
+        if ignored:
+            logger.warning(
+                "config_model.toml contains sections outside the merge "
+                "whitelist and they are IGNORED: %s (legacy endpoint keys? "
+                "run scripts/consolidate_model_config.py --apply or migrate "
+                "to [endpoints.*]/[routing])", ignored,
+            )
+        for section in self._MODEL_SECTIONS:
+            if section in model_cfg:
+                if section in merged:
+                    # Section-granular replacement: a partial model file
+                    # REPLACES the whole main-file section. Warn so ops can
+                    # spot missing keys (e.g. a hand-crafted model file with
+                    # only [api].model_name would silently drop base_url/key).
+                    logger.warning(
+                        "config_model.toml section [%s] REPLACES the main "
+                        "config.toml section of the same name (whole-section "
+                        "override, not per-key merge)", section,
+                    )
+                merged[section] = model_cfg[section]
+        if "agent" in model_cfg:
+            agent = dict(merged.get("agent") or {})
+            for key, value in (model_cfg.get("agent") or {}).items():
+                if key in self._MODEL_AGENT_SUBSECTIONS:
+                    agent[key] = value
+            merged["agent"] = agent
+        return merged
+
+    def _resolve_project_path(self, value: str, *, default: str) -> Path:
+        raw_value = value or default
+        path = Path(raw_value)
+        if path.is_absolute():
+            return path
+        return (self.project_root / path).resolve()
+
+    @property
+    def database_url(self) -> str:
+        db = self._config.get("database", {})
+        host = db.get("host", "localhost")
+        port = db.get("port", 5432)
+        username = db.get("username", "postgres")
+        password = db.get("password", "")
+        name = db.get("name", "weavethinker")
+        return f"postgresql+asyncpg://{username}:{password}@{host}:{port}/{name}"
+
+    @property
+    def database_pool_size(self) -> int:
+        return int(self._config.get("database", {}).get("pool_size", 20))
+
+    @property
+    def database_max_overflow(self) -> int:
+        return int(self._config.get("database", {}).get("max_overflow", 30))
+
+    @property
+    def database_pool_recycle(self) -> int:
+        return int(self._config.get("database", {}).get("pool_recycle", 1800))
+
+    @property
+    def database_pool_timeout(self) -> int:
+        return int(self._config.get("database", {}).get("pool_timeout", 30))
+
+    def _main_endpoint_attr(self, attr: str) -> str:
+        """[api] 缺失（两文件合并 2026-08-31）时回落主端点属性——保护裸构造
+        路径（llm_service is_custom=false 分支）不静默指向 api.openai.com。
+        懒导入 registry 避免模块级循环（registry 反向懒导入 config）。"""
+        try:
+            from app.model_gateway.registry import get_model_registry
+            return str(getattr(get_model_registry().get("main"), attr, "") or "")
+        except Exception:
+            return ""
+
+    @property
+    def api_base_url(self) -> str:
+        v = str(self._config.get("api", {}).get("base_url", "") or "")
+        if v:
+            return v
+        return self._main_endpoint_attr("base_url")
+
+    @property
+    def api_key(self) -> Optional[str]:
+        key = self._config.get("api", {}).get("api_key", "")
+        if key:
+            return key
+        return self._main_endpoint_attr("api_key") or None
+
+    @property
+    def security(self) -> dict:
+        return self._config.get("security", {})
+
+    @property
+    def security_jwt_secret_key(self) -> Optional[str]:
+        key = self.security.get("jwt_secret_key", "")
+        if key:
+            return key
+        return os.environ.get("JWT_SECRET_KEY") or None
+
+    @property
+    def security_token_expire_days(self) -> int:
+        """JWT lifetime in days (sliding-session window). Was a hardcoded
+        constant (7) in auth_service; configurable since 2026-08-25 wave-3.
+        The frontend auto-refreshes on app start, so users who come back
+        within this window are never re-asked for a password.
+        Clamped to >= 1: a 0/negative window would issue immediately-dead
+        tokens (login succeeds, then a 401 loop with no error surface);
+        non-numeric values fall back to 7."""
+        try:
+            return max(1, int(self.security.get("token_expire_days", 7)))
+        except (TypeError, ValueError, OverflowError):
+            return 7
+
+    @property
+    def security_cors_allow_origins(self) -> list:
+        origins = self.security.get("cors_allow_origins", ["*"])
+        if isinstance(origins, str):
+            return [origins]
+        return list(origins)
+
+    @property
+    def security_cors_allow_credentials(self) -> bool:
+        return bool(self.security.get("cors_allow_credentials", True))
+
+    @property
+    def super_admin_bypass(self) -> bool:
+        return bool(self.security.get("super_admin_bypass", False))
+
+    @property
+    def model_name(self) -> Optional[str]:
+        v = self._config.get("api", {}).get("model_name")
+        if v:
+            return v
+        return self._main_endpoint_attr("model_name") or None
+
+    @property
+    def server_host(self) -> str:
+        return self._config.get("server", {}).get("host", "0.0.0.0")
+
+    @property
+    def server_port(self) -> int:
+        return self._config.get("server", {}).get("port", 8158)
+
+    @property
+    def server_scheme(self) -> str:
+        """Match the SSL auto-detection in scripts/start.sh: when key.pem and
+        cert.pem exist in the backend directory, uvicorn is launched with
+        --ssl-keyfile/--ssl-certfile, so the API is https."""
+        key_pem = self.backend_root / "key.pem"
+        cert_pem = self.backend_root / "cert.pem"
+        return "https" if (key_pem.exists() and cert_pem.exists()) else "http"
+
+    @property
+    def deathmatch_self_eval_username(self) -> str:
+        return str(self.deathmatch.get("self_eval_username", "") or "")
+
+    @property
+    def deathmatch_self_eval_password(self) -> str:
+        return str(self.deathmatch.get("self_eval_password", "") or "")
+
+    @property
+    def project_root(self) -> Path:
+        return self.config_path.parent.parent
+
+    @property
+    def backend_root(self) -> Path:
+        return self.config_path.parent
+
+    @property
+    def resource_root(self) -> Path:
+        """只读打包资源根：PyInstaller 冻结时 = sys._MEIPASS（onedir 的 _internal，
+        --add-data 的目的地根）；否则 = backend_root（开发模式逐字节不回归）。"""
+        import sys
+        meipass = getattr(sys, "_MEIPASS", None)
+        if getattr(sys, "frozen", False) and meipass:
+            return Path(meipass).resolve()
+        return self.backend_root
+
+    def resolve_resource(self, *parts: str, bundled_first: bool = False) -> Path:
+        """只读打包资源解析：默认 backend_root 旁路副本优先（用户覆写/开发语义），
+        其次 resource_root（冻结包内副本）；皆无 → backend_root 派生（保留
+        开发模式的「路径不存在」错误语义）。可写运行时路径不得经此解析。
+        bundled_first=True（可执行资源：注入代码/样式表）→ 包内副本优先，
+        可写目录不具覆写能力（防数据目录投毒注入）。"""
+        for part in parts:
+            p = Path(part)
+            if p.is_absolute() or ".." in p.parts:
+                raise ValueError(f"resolve_resource: illegal part {part!r}")
+        local = (self.backend_root / Path(*parts)).resolve()
+        bundled = (self.resource_root / Path(*parts)).resolve()
+        if bundled_first:
+            if bundled.exists():
+                return bundled
+            if local.exists():
+                return local
+            return bundled
+        if local.exists():
+            return local
+        if bundled.exists():
+            return bundled
+        return local
+
+    @property
+    def defaults(self) -> dict:
+        return self._config.get("defaults", {})
+
+    @property
+    def default_temperature(self) -> float:
+        return self.defaults.get("temperature", 0.7)
+
+    @property
+    def default_top_p(self) -> float:
+        return self.defaults.get("top_p", 1.0)
+
+    @property
+    def default_top_k(self) -> Optional[int]:
+        val = self.defaults.get("top_k")
+        return _parse_int(val)
+
+    @property
+    def default_presence_penalty(self) -> float:
+        return self.defaults.get("presence_penalty", 0.0)
+
+    @property
+    def default_frequency_penalty(self) -> float:
+        return self.defaults.get("frequency_penalty", 0.0)
+
+    @property
+    def default_max_tokens(self) -> Optional[int]:
+        val = self.defaults.get("max_tokens")
+        return _parse_int(val)
+
+    @property
+    def default_assistant(self) -> dict:
+        return self._config.get("default_assistant", {})
+
+    @property
+    def default_assistant_name(self) -> str:
+        return self.default_assistant.get("name", "默认助手")
+
+    @property
+    def default_assistant_system_prompt(self) -> str:
+        return self.default_assistant.get("system_prompt", "")
+
+    @property
+    def default_assistant_temperature(self) -> float:
+        return self.default_assistant.get("temperature", 0.7)
+
+    @property
+    def default_assistant_top_p(self) -> float:
+        return self.default_assistant.get("top_p", 1.0)
+
+    @property
+    def default_assistant_top_k(self) -> Optional[int]:
+        val = self.default_assistant.get("top_k")
+        return _parse_int(val)
+
+    @property
+    def default_assistant_presence_penalty(self) -> float:
+        return self.default_assistant.get("presence_penalty", 0.0)
+
+    @property
+    def default_assistant_frequency_penalty(self) -> float:
+        return self.default_assistant.get("frequency_penalty", 0.0)
+
+    @property
+    def default_assistant_max_tokens(self) -> Optional[int]:
+        val = self.default_assistant.get("max_tokens")
+        return _parse_int(val)
+
+    @property
+    def asr(self) -> dict:
+        return self._config.get("asr", {})
+
+    @property
+    def asr_provider(self) -> str:
+        """[asr] legacy 兜底 provider 选择（2026-08-31 U1）：新配置应在
+        [endpoints.asr] 的 provider_type 声明；本属性仅作为无端点/旧文件的
+        回退链一环（endpoint → asr_provider → 布尔 → dashscope）。"""
+        return str(self.asr.get("asr_provider", "") or "")
+
+    @property
+    def asr_base_url(self) -> str:
+        return self.asr.get("base_url", "")
+
+    @property
+    def asr_model(self) -> str:
+        return self.asr.get("model", "paraformer-zh")
+
+    @property
+    def asr_is_dashscope(self) -> bool:
+        return bool(self.asr.get("is_dashscope", False))
+
+    @property
+    def asr_is_mimo(self) -> bool:
+        return bool(self.asr.get("is_mimo", False))
+
+    @property
+    def asr_api_key(self) -> str:
+        return self.asr.get("api_key", "")
+
+    @property
+    def asr_dashscope_api_key(self) -> str:
+        return self.asr.get("dashscope_api_key", "")
+
+    @property
+    def asr_dashscope_model(self) -> str:
+        return self.asr.get("dashscope_model", "qwen3-asr-flash-realtime-2026-02-10")
+
+    # [asr] 行为调参键（服务端 run-task parameters 直读 asr dict，无独立 property）：
+    # - max_sentence_silence: VAD 断句静音阈值 ms（语音面默认 800；服务端默认 1300）
+    # - vad_model: 仅 qwen-audio-3.1 系下发——near_meeting_16k（近场）/
+    #   far_field_meeting_16k（服务端默认）；空=不下发（2026-09-29 ASR 迁移波）
+    # - keep_dialect: 仅 qwen-audio-3.1 系下发——true=保留方言原文，
+    #   false/缺省=方言转写为普通话（显式 false 也下发）
+    # - ws_open_timeout/ws_ping_interval/ws_ping_timeout/ws_close_timeout: WS 透传参数
+
+    @property
+    def voice(self) -> dict:
+        return self._config.get("voice", {})
+
+    @property
+    def voice_enabled(self) -> bool:
+        return bool(self.voice.get("enabled", False))
+
+    @property
+    def voice_provider(self) -> str:
+        return str(self.voice.get("provider", "default"))
+
+    @property
+    def voice_model_name(self) -> str:
+        return str(self.voice.get("model_name", ""))
+
+    @property
+    def voice_system_prompt(self) -> str:
+        return str(self.voice.get("system_prompt", ""))
+
+    @property
+    def voice_temperature(self) -> float:
+        try:
+            return float(self.voice.get("temperature", 0.7))
+        except (TypeError, ValueError):
+            return 0.7
+
+    @property
+    def voice_max_tokens(self) -> Optional[int]:
+        # 4096 since conv fcb2e60a（2026-09-21）：1024 装不下「整段讨论写入
+        # 一条笔记」这类原子工具调用，模型输出在 arguments JSON 中途被截断。
+        return _parse_int(self.voice.get("max_tokens", 4096))
+
+    @property
+    def voice_max_tokens_ceiling(self) -> Optional[int]:
+        """截断恢复时输出预算的最高上限（有界重试，防长尾延迟失控）。"""
+        return _parse_int(self.voice.get("max_tokens_ceiling", 8192))
+
+    @property
+    def voice_truncation_retry_limit(self) -> int:
+        """每轮允许的截断恢复次数（预算翻倍重试）。"""
+        value = _parse_int(self.voice.get("truncation_retry_limit", 2))
+        return value if value and value > 0 else 2
+
+    @property
+    def voice_duplex_model(self) -> str:
+        return str(self.voice.get("duplex_model", ""))
+
+    @property
+    def voice_intent_model(self) -> str:
+        return str(self.voice.get("intent_model", ""))
+
+    @property
+    def voice_barge_in_enabled(self) -> bool:
+        return bool(self.voice.get("barge_in_enabled", True))
+
+    @property
+    def voice_bg_task_notify_enabled(self) -> bool:
+        """When a background task (submitted from a voice conversation) reaches
+        a terminal state, proactively announce it in the live voice session and
+        let the assistant offer follow-up actions (read result / export / save)."""
+        return bool(self.voice.get("bg_task_notify_enabled", True))
+
+    @property
+    def voice_barge_in_onset_min_chars(self) -> int:
+        """Minimum utterance length (chars, after stripping punctuation) for
+        the acoustic ONSET barge-in pause. Utterances shorter than this
+        (e.g. "对"/"嗯是"/"好") are NOT paused — they are overwhelmingly
+        backchannels or mic false positives (TTS-echo / environment audio
+        misrecognized as a syllable; the echo gate only catches transcripts
+        matching the spoken text, so misrecognitions slip through). They
+        flow through the normal EoT+classify path instead — a backchannel
+        then never interrupts the playback at all. Real interrupts are
+        almost always >= this length and still pause immediately."""
+        try:
+            return int(self.voice.get("barge_in_onset_min_chars", 3))
+        except (TypeError, ValueError):
+            return 3
+
+    @property
+    def voice_barge_in_no_interrupt_seconds(self) -> float:
+        """No-interrupt window (s) after a TTS playback burst starts. Utterances
+        flushed inside the window are deferred (queued + prefetched) instead of
+        cutting playback — the opening instants of a burst are where own-voice
+        echo/reverb most often fools ASR. Explicit stop words bypass this."""
+        try:
+            return float(self.voice.get("barge_in_no_interrupt_seconds", 1.2))
+        except (TypeError, ValueError):
+            return 1.2
+
+    @property
+    def voice_barge_in_cooldown_seconds(self) -> float:
+        """Cooldown (s) after each confirmed interrupt. Prevents a single noisy
+        stretch (echo tail, reverb, the user's own continuing speech) from
+        re-interrupting the resumed playback over and over."""
+        try:
+            return float(self.voice.get("barge_in_cooldown_seconds", 2.0))
+        except (TypeError, ValueError):
+            return 2.0
+
+    @property
+    def voice_barge_in_onset_enabled(self) -> bool:
+        """Acoustic-layer onset barge-in (FireRedChat pVAD pattern): when speech
+        is detected during TTS playback, pause the audio IMMEDIATELY on the
+        first ASR partial (instead of waiting for EoT + LLM classification,
+        ~2s). The barge-in classifier then decides: interrupt -> answer the new
+        turn; backchannel/defer -> resume playback from the breakpoint."""
+        return bool(self.voice.get("barge_in_onset_enabled", True))
+
+    @property
+    def voice_barge_in_proximity_gate(self) -> bool:
+        """Acoustic near-field gate for barge-in: the browser classifies its
+        mic input as near-field (user close to the phone — almost certainly
+        the user's own voice) vs far-field (environment speech — TV/room
+        conversation) and reports it via the audio_proximity WS event. When
+        enabled, far-field speech never pauses playback (onset) and the
+        barge-in classifier receives the near/far evidence. Without the
+        signal (unknown clients) the gate defaults to near — old behavior."""
+        return bool(self.voice.get("barge_in_proximity_gate", True))
+
+    @property
+    def voice_barge_in_proximity_stale_seconds(self) -> float:
+        """Freshness window (s) for the near-field signal: a near report older
+        than this is treated as far (the client stopped reporting — be
+        conservative and never pause on stale evidence)."""
+        try:
+            return float(self.voice.get("barge_in_proximity_stale_seconds", 1.0))
+        except (TypeError, ValueError):
+            return 1.0
+
+    @property
+    def voice_backchannel_recall_seconds(self) -> float:
+        """Window (s) during which a backchannel-classified utterance can
+        recall (skip) a queued copy of itself — the window/cooldown defer
+        path enqueues turns before the barge-in classifier verdict lands, and
+        a late backchannel verdict must prevent the filler from being answered
+        as a real turn (ghost-message fix, conv 689f06ec)."""
+        try:
+            return float(self.voice.get("backchannel_recall_seconds", 30.0))
+        except (TypeError, ValueError):
+            return 30.0
+
+    @property
+    def voice_eot_semantic_enabled(self) -> bool:
+        """Semantic end-of-turn: for utterances WITHOUT terminal punctuation,
+        probe semantic completeness with an LLM judge once silence passes
+        voice_eot_semantic_probe_seconds. "Complete" flushes early (unpunctuated
+        finished speech answers faster than the hard silence threshold);
+        "incomplete"/error waits for the hard threshold (fail-open, no added
+        dead time beyond the current behavior)."""
+        return bool(self.voice.get("eot_semantic_enabled", True))
+
+    @property
+    def voice_eot_semantic_probe_seconds(self) -> float:
+        """Silence (s) after which the semantic EoT judge is consulted for
+        unpunctuated text. Must be below voice_eot_silence_incomplete_seconds
+        (the hard flush threshold) so the judge can beat it."""
+        try:
+            return float(self.voice.get("eot_semantic_probe_seconds", 1.0))
+        except (TypeError, ValueError):
+            return 1.0
+
+    @property
+    def voice_eot_paused_probe_seconds(self) -> float:
+        """Silence (s) after which the semantic EoT judge is consulted while
+        playback is PAUSED (acoustic onset barge-in). The user's reaction is
+        the only speech in that state, so the endpoint can be faster without
+        fragment risk — the flush is still gated by the judge's verdict.
+        Keeps the pause→resume silence inside the user's patience (the
+        classify now runs in parallel via the onset pre-classify)."""
+        try:
+            return float(self.voice.get("eot_paused_probe_seconds", 0.6))
+        except (TypeError, ValueError):
+            return 0.6
+
+    @property
+    def voice_eot_semantic_timeout_seconds(self) -> float:
+        """Hard bound (s) on the semantic EoT judge call (gate wait + LLM call).
+        On timeout the watchdog falls back to the hard silence threshold —
+        never blocks the EoT critical path beyond this bound."""
+        try:
+            return float(self.voice.get("eot_semantic_timeout_seconds", 1.5))
+        except (TypeError, ValueError):
+            return 1.5
+
+    @property
+    def voice_disable_thinking(self) -> bool:
+        """Voice turns force provider reasoning/thinking OFF by default (True),
+        for every provider — qwen/DashScope gets enable_thinking=False, others
+        get thinking.type=disabled (see voice_service._thinking_off_body).
+        Voice latency cannot afford reasoning time; set False only to
+        deliberately experiment with reasoning-capable voice turns."""
+        return bool(self.voice.get("disable_thinking", True))
+
+    @property
+    def voice_tts_enabled(self) -> bool:
+        return bool(self.voice.get("tts_enabled", True))
+
+    @property
+    def voice_tts_base_url(self) -> str:
+        return str(self.voice.get("tts_base_url", ""))
+
+    @property
+    def voice_tts_api_key(self) -> str:
+        return str(self.voice.get("tts_api_key", ""))
+
+    @property
+    def voice_tts_model(self) -> str:
+        return str(self.voice.get("tts_model", "mimo-v2.5-tts"))
+
+    @property
+    def voice_tts_voice(self) -> str:
+        return str(self.voice.get("tts_voice", "冰糖"))
+
+    @property
+    def voice_tts_style_instruction(self) -> str:
+        return str(self.voice.get("tts_style_instruction", ""))
+
+    @property
+    def voice_context_turns(self) -> int:
+        try:
+            return int(self.voice.get("context_turns", 8))
+        except (TypeError, ValueError):
+            return 8
+
+    @property
+    def voice_eot_silence_seconds(self) -> float:
+        """Silence (s) before flushing a turn whose text ends with terminal
+        punctuation (a complete-looking utterance). Shorter = more responsive."""
+        try:
+            return float(self.voice.get("eot_silence_seconds", 0.6))
+        except (TypeError, ValueError):
+            return 0.6
+
+    @property
+    def voice_eot_silence_incomplete_seconds(self) -> float:
+        """Silence (s) before flushing a turn whose text does NOT end with
+        terminal punctuation (likely a mid-sentence pause). Longer = less
+        truncation of long questions spoken with natural pauses. Must cover
+        FunASR's long-sentence finalization latency — observed upstream-result
+        gaps of 1.6s at sentence boundaries (2026-07-21), so values <= 1.5s
+        chop continuous speech at sentence boundaries."""
+        try:
+            return float(self.voice.get("eot_silence_incomplete_seconds", 2.0))
+        except (TypeError, ValueError):
+            return 2.0
+
+    @property
+    def voice_eot_complete_grace_seconds(self) -> float:
+        """Grace period (s) of NO ASR activity after an utterance whose text
+        ends with terminal punctuation before the turn flushes. fun-asr-realtime
+        emits the first partial of a follow-on sentence ~0.5-1.3s after a
+        sentence_end when the user keeps speaking (inter-sentence pause +
+        recognition latency), so ~1.2s distinguishes a real stop from a
+        sentence boundary mid-speech (0.3s faster per turn than 1.5s; a
+        boundary-gap flush is now recovered by the onset barge-in + fragment
+        coalescing)."""
+        try:
+            return float(self.voice.get("eot_complete_grace_seconds", 1.2))
+        except (TypeError, ValueError):
+            return 1.2
+
+    @property
+    def voice_eot_complete_max_seconds(self) -> float:
+        """Hard cap (s) on how long a COMPLETE utterance (ends with terminal
+        punctuation) may wait for the activity-grace before flushing anyway.
+        Bounds the wait in noisy environments where background speech keeps
+        feeding ASR activity (which would otherwise postpone the flush
+        indefinitely). When the user genuinely continues, the next partial
+        removes the terminal punctuation from the tail and resets this timer,
+        so it only fires when the text has sat complete for the whole cap."""
+        try:
+            return float(self.voice.get("eot_complete_max_seconds", 3.0))
+        except (TypeError, ValueError):
+            return 3.0
+
+    @property
+    def voice_eot_activity_bridge(self) -> bool:
+        """Whether the EoT watchdog may hold a would-be flush while the local
+        mic still carries near-field speech (ASR result-gap bridge,
+        2026-09-20). FunASR's realtime result stream can stall for seconds at
+        long-sentence boundaries while the user keeps speaking; without this
+        bridge the watchdog sees stale text + silence and flushes a
+        mid-utterance turn."""
+        return bool(self.voice.get("eot_activity_bridge", True))
+
+    @property
+    def voice_eot_activity_extension_seconds(self) -> float:
+        """Hard cap (s) on how long the activity bridge may postpone a flush.
+        Bounds the extra wait when local audio (e.g. room noise leaking past
+        the near-field gate) keeps the bridge armed; the flush lands as soon
+        as the local speech stops or the cap elapses."""
+        try:
+            return max(0.0, float(self.voice.get("eot_activity_extension_seconds", 8.0)))
+        except (TypeError, ValueError):
+            return 8.0
+
+    @property
+    def voice_fragment_merge_seconds(self) -> float:
+        """Probe window (s) for coalescing chopped ASR turns in the responder.
+        Queued backlog fragments always merge immediately; while the merged
+        text does NOT end with terminal punctuation (evidence the EoT cut a
+        continuous utterance mid-speech) the responder waits up to this long
+        for the next fragment (re-arming on each arrival). Kept short: a
+        single chopped head should be answered quickly and its tail answered
+        as a follow-up turn, not stall the head."""
+        try:
+            return float(self.voice.get("fragment_merge_seconds", 1.0))
+        except (TypeError, ValueError):
+            return 1.0
+
+    @property
+    def voice_fragment_merge_max_seconds(self) -> float:
+        """Total cap (s) on fragment coalescing for a single turn — bounds the
+        added latency when an utterance is chopped into many fragments."""
+        try:
+            return float(self.voice.get("fragment_merge_max_seconds", 10.0))
+        except (TypeError, ValueError):
+            return 10.0
+
+    @property
+    def voice_noise_gate_max_chars(self) -> int:
+        """Only run the agentic ASR-noise (should_respond) gate for utterances
+        of at most this many characters. Longer utterances are always answered
+        so a real (long) question is never swallowed as 'noise'."""
+        try:
+            return int(self.voice.get("noise_gate_max_chars", 3))
+        except (TypeError, ValueError):
+            return 3
+
+    @property
+    def voice_asr_speech_noise_threshold(self) -> float:
+        """Fun-ASR VAD speech/noise decision threshold (range [-1.0, 1.0],
+        adjust in 0.1 steps per upstream docs). Higher values filter MORE
+        audio as noise (less background-voice pickup); values >= 0.5
+        misclassify real user speech as noise (verified 2026-07-21),
+        producing long upstream-result gaps mid-utterance that the EoT then
+        flushes as truncated turns. 0.3 stays the default — the 0.4 bump was
+        reverted for lack of real-audio verification (A4.9 C4); background
+        speech is gated acoustically by the proximity gate instead. Browser-
+        side RNNoise handles denoising."""
+        try:
+            v = float(self.voice.get("asr_speech_noise_threshold", 0.3))
+        except (TypeError, ValueError):
+            return 0.3
+        return max(-1.0, min(1.0, v))
+
+    @property
+    def voice_asr_context_enabled(self) -> bool:
+        """Whether to pass recent conversation turns to fun-asr-realtime as
+        context (raw_input.context) to bias recognition toward the dialogue
+        topic and suppress off-topic background speech."""
+        return bool(self.voice.get("asr_context_enabled", True))
+
+    @property
+    def voice_asr_context_turns(self) -> int:
+        """Number of recent user/assistant turns to include in the fun-asr
+        realtime context (DashScope caps each role at 5 messages; per-turn
+        text is capped at 400 chars by the service)."""
+        try:
+            return max(0, min(5, int(self.voice.get("asr_context_turns", 3))))
+        except (TypeError, ValueError):
+            return 3
+
+    @property
+    def voice_intent_context_turns(self) -> int:
+        """Number of recent turns the intent subagent sees when judging
+        should_respond. More context = better off-topic detection at a small
+        prompt-size cost."""
+        try:
+            return max(0, min(8, int(self.voice.get("intent_context_turns", 4))))
+        except (TypeError, ValueError):
+            return 4
+
+    @property
+    def voice_subagent_timeout_seconds(self) -> float:
+        """Timeout for each voice subagent classifier call (barge-in, intent,
+        interjection). These run on the user's critical path (barge-in blocks
+        turn queuing; a slow interjection check blocks EoT flush), so a long
+        bound can make the assistant appear dead for tens of seconds. 6s
+        covers the normal 1-2s call plus provider hiccups while bounding the
+        worst case; every classifier fail-safes on timeout."""
+        try:
+            return max(2.0, float(self.voice.get("subagent_timeout_seconds", 6.0)))
+        except (TypeError, ValueError):
+            return 6.0
+
+    @property
+    def voice_llm_retry_attempts(self) -> int:
+        """Extra attempts for the voice main LLM stream on provider
+        rate-limit errors (429). xiaomimimo hard-limits when a voice session
+        fires several LLM calls concurrently (interjection + intent + main);
+        without retries the whole turn dies with an error event and the user
+        gets no answer. Retries only while nothing has been generated yet."""
+        try:
+            return max(0, min(4, int(self.voice.get("llm_retry_attempts", 2))))
+        except (TypeError, ValueError):
+            return 2
+
+    @property
+    def voice_llm_ttft_timeout_seconds(self) -> float:
+        """Wall-clock bound (s) on time-to-first-content-token for the voice
+        main LLM stream. The provider can hang without producing any chunk
+        (conv efaf8f9c class: stalled upstream, agent mode got consumer-side
+        guards, voice never did) — without this bound the turn waits forever,
+        the responder stays blocked and every later user turn is swallowed.
+        The consumer sees `_heartbeat_wrapped` sentinels while the upstream is
+        silent, so it can enforce this. 45s covers the worst observed provider
+        prefill (33s, DeepSeek congestion) with margin; 0 disables the guard."""
+        try:
+            return max(0.0, float(self.voice.get("llm_ttft_timeout_seconds", 45.0)))
+        except (TypeError, ValueError):
+            return 45.0
+
+    @property
+    def voice_llm_inactivity_timeout_seconds(self) -> float:
+        """Wall-clock bound (s) between real stream chunks after the first
+        content token arrived. A provider that stalls mid-generation would
+        otherwise hold the voice turn open indefinitely (the user hears
+        nothing and cannot get a word in). Heartbeat sentinels are not real
+        chunks; 30s is far above the normal inter-chunk cadence while still
+        bounding the dead air. 0 disables the guard."""
+        try:
+            return max(0.0, float(self.voice.get("llm_inactivity_timeout_seconds", 30.0)))
+        except (TypeError, ValueError):
+            return 30.0
+
+    # ---- Interjection (插话) mechanism ----
+
+    @property
+    def voice_interjection_enabled(self) -> bool:
+        """Whether the agent can interject brief remarks while the user is
+        still speaking. When enabled, each completed ASR sentence is sent to
+        an interjection subagent that decides whether to make a quick comment."""
+        return bool(self.voice.get("interjection_enabled", True))
+
+    @property
+    def voice_interjection_model(self) -> str:
+        """Model for the interjection subagent. Falls back to the intent model
+        if not specified."""
+        return str(self.voice.get("interjection_model", ""))
+
+    @property
+    def voice_interjection_cooldown_seconds(self) -> float:
+        """Minimum seconds between interjections. Prevents the agent from
+        interjecting on every single sentence."""
+        try:
+            return max(0.5, float(self.voice.get("interjection_cooldown_seconds", 3.0)))
+        except (TypeError, ValueError):
+            return 3.0
+
+    @property
+    def voice_interjection_max_per_turn(self) -> int:
+        """Maximum interjections during a single user speech turn."""
+        try:
+            return max(0, int(self.voice.get("interjection_max_per_turn", 3)))
+        except (TypeError, ValueError):
+            return 3
+
+    @property
+    def voice_emotion_enabled(self) -> bool:
+        """Whether the agent has an emotional state that affects interjection
+        frequency and answer tone. When excited or upset, the agent interjects
+        more actively."""
+        return bool(self.voice.get("emotion_enabled", True))
+
+    # ---- Auxiliary speech: filler prefix (填充词) + backchannel (应和) ----
+
+    @property
+    def voice_filler_enabled(self) -> bool:
+        """Whether a random filler phrase ("我来想想啊"…) is spoken at the start
+        of an answer turn to cover LLM generation time. The phrase is an aux
+        TTS item: the consumer cuts it when the real answer's first audio
+        chunk is ready, so fast answers are not delayed."""
+        return bool(self.voice.get("filler_enabled", True))
+
+    @property
+    def voice_filler_phrases(self) -> list:
+        """Candidate filler phrases; one is picked at random per turn (never
+        the same as recent picks when alternatives exist — 2026-09-05 P5
+        recent-window exclusion). Defaults keep register variety: 全"我想想"
+        近义池会让用户听感恒为同一句。"""
+        default = [
+            "我来看看啊", "我来想想啊", "等下啊，我琢磨一下", "嗯，我想想",
+            "让我捋一捋哈", "稍等，我查查看", "好，我这就看", "嗯，我看下哈",
+        ]
+        val = self.voice.get("filler_phrases")
+        if isinstance(val, list) and any(isinstance(p, str) and p.strip() for p in val):
+            return [p for p in val if isinstance(p, str) and p.strip()] or default
+        return default
+
+    @property
+    def voice_filler_min_gap_seconds(self) -> float:
+        """Minimum gap (s) between two filler utterances. The filler now fires
+        at the EoT flush via a speculative prefetch (arm → convert); this gap
+        keeps a fragment cascade (watchdog chopping one utterance) from
+        speaking two fillers back-to-back, and keeps the `_handle_user_turn`
+        fallback from double-firing behind a flush-converted filler. 3.0s is
+        comfortably above the cascade window (fragment_merge_seconds probe +
+        typical chop gaps) without eating the filler of a fast natural
+        back-and-forth (short answer + quick follow-up)."""
+        try:
+            return float(self.voice.get("filler_min_gap_seconds", 3.0))
+        except (TypeError, ValueError):
+            return 3.0
+
+    @property
+    def voice_filler_ttft_threshold_seconds(self) -> float:
+        """Seconds after the main LLM call starts before the filler may play.
+
+        The filler is a latency cover, not a per-turn ritual: it plays ONLY
+        when the model has not produced its first content token within this
+        window (AND-gate: elapsed >= threshold AND no first content AND not
+        speaking/paused/interrupted AND cooldown passed). A fast turn never
+        hears a filler. 0.7s sits just above the ~600-700ms silent-gap
+        tolerance threshold (Roberts & Francis 2013) and inside the
+        500-1500ms industry band for fixed-time fillers (Agora). 0 = legacy
+        immediate play; negative values are clamped to 0. Config-level
+        rollback net: `[voice] filler_ttft_threshold_seconds = 0`."""
+        try:
+            return max(0.0, float(self.voice.get("filler_ttft_threshold_seconds", 0.7)))
+        except (TypeError, ValueError):
+            return 0.7
+
+    @property
+    def voice_backchannel_enabled(self) -> bool:
+        """Whether the agent utters short listening acks (嗯/哦…) during the
+        user's mid-utterance pauses. Kept intentionally short so the phrase
+        always finishes before the earliest EoT flush of the same utterance."""
+        return bool(self.voice.get("backchannel_enabled", True))
+
+    @property
+    def voice_backchannel_phrases(self) -> list:
+        """Candidate backchannel phrases (must stay ~1-2 chars: a long phrase
+        would stretch its audible window into the flush region and its
+        mic-echo could pass the short-noise gate; runtime enforces <=4 chars)."""
+        default = ["嗯", "嗯嗯", "哦", "对", "嗯哼", "对啊", "好", "明白"]
+        val = self.voice.get("backchannel_phrases")
+        if isinstance(val, list) and any(isinstance(p, str) and p.strip() for p in val):
+            return [p for p in val if isinstance(p, str) and p.strip()] or default
+        return default
+
+    @property
+    def voice_backchannel_pause_seconds(self) -> float:
+        """Minimum user-speech pause (s) before a backchannel may fire. Must be
+        below voice_eot_semantic_probe_seconds so the ack lands in the window
+        where the turn is neither flushing nor being semantically judged.
+        Clamped below the probe so a misconfigured value degrades to a
+        narrower window instead of silently disabling the feature (A4.9 M4)."""
+        try:
+            value = float(self.voice.get("backchannel_pause_seconds", 0.35))
+        except (TypeError, ValueError):
+            value = 0.35
+        probe = self.voice_eot_semantic_probe_seconds
+        return max(0.1, min(value, max(0.1, probe - 0.05)))
+
+    @property
+    def voice_backchannel_cooldown_seconds(self) -> float:
+        """Minimum seconds between backchannels. Human backchannels land every
+        ~5-15s; a shorter cooldown starts to sound mechanical."""
+        try:
+            return max(1.0, float(self.voice.get("backchannel_cooldown_seconds", 8.0)))
+        except (TypeError, ValueError):
+            return 8.0
+
+    @property
+    def voice_backchannel_max_per_turn(self) -> int:
+        """Maximum backchannels within a single user speech turn."""
+        try:
+            return max(0, int(self.voice.get("backchannel_max_per_turn", 2)))
+        except (TypeError, ValueError):
+            return 2
+
+    # ---- 每轮异步记忆召回 + 记忆插话（memory recall & interjection）----
+    @property
+    def voice_memory_recall_enabled(self) -> bool:
+        """Per-turn fire-and-forget v2 memory recall + identity-prompt block
+        injection. Off = legacy behavior (session-start frozen memory)."""
+        return bool(self.voice.get("memory_recall_enabled", True))
+
+    @property
+    def voice_memory_interjection_enabled(self) -> bool:
+        """Master switch for the memory interjection (judge + speak)."""
+        return bool(self.voice.get("memory_interjection_enabled", True))
+
+    @property
+    def voice_memory_correct_enabled(self) -> bool:
+        """Self-correction (correct) memory interjection, incl. draining the
+        in-flight answer tail. Gray-release default: off."""
+        return bool(self.voice.get("memory_correct_enabled", False))
+
+    @property
+    def voice_memory_interjection_max_append(self) -> int:
+        """Per-session budget for append-style memory interjections."""
+        try:
+            return max(0, int(self.voice.get("memory_interjection_max_append", 3)))
+        except (TypeError, ValueError):
+            return 3
+
+    @property
+    def voice_memory_interjection_max_correct(self) -> int:
+        """Per-session budget for correct-style memory interjections."""
+        try:
+            return max(0, int(self.voice.get("memory_interjection_max_correct", 2)))
+        except (TypeError, ValueError):
+            return 2
+
+    @property
+    def voice_memory_interjection_cooldown_seconds(self) -> float:
+        """Minimum seconds between ANY two memory interjections."""
+        try:
+            return max(1.0, float(self.voice.get("memory_interjection_cooldown_seconds", 20.0)))
+        except (TypeError, ValueError):
+            return 20.0
+
+    @property
+    def voice_memory_interjection_min_score(self) -> float:
+        """Top absolute relevance score required before the judge is even
+        asked (aligns with [memory.retrieval] boost_min_relevance)."""
+        try:
+            return max(0.0, float(self.voice.get("memory_interjection_min_score", 0.5)))
+        except (TypeError, ValueError):
+            return 0.5
+
+    @property
+    def voice_memory_interjection_model(self) -> str:
+        """Model override for the memory-interjection judge. Empty string
+        falls back to voice_interjection_model (then the main voice model)."""
+        return str(self.voice.get("memory_interjection_model", ""))
+
+    @property
+    def agent(self) -> dict:
+        return self._config.get("agent", {})
+
+    @property
+    def llm(self) -> dict:
+        """[llm] 段：模型供应商 wire 级行为开关（与端点信息解耦——端点在
+        config_model.toml [endpoints.*]，这里只放纯行为）。"""
+        return self._config.get("llm", {})
+
+    @property
+    def llm_stream_include_usage(self) -> bool:
+        """流式请求是否携带 stream_options.include_usage（P4 徽章真值，
+        2026-09-02）。True（默认）：OpenAI 兼容末块回传 usage.prompt_tokens，
+        AgentLoop 以实测值刷新前端 context_info（measured=true）并记入日志；
+        供应商不支持时自动去掉该参数重试一次。"""
+        return bool(self.llm.get("stream_include_usage", True))
+
+    @property
+    def agent_name(self) -> str:
+        return self.agent.get("name", "共享智能体")
+
+    @property
+    def agent_skills(self) -> dict:
+        """[agent.skills] 段：技能装载行为（vibeweaver 集成 C2）。
+
+        force_inject：skill 名单，其 SKILL.md 全文直接注入 system prompt
+        （基准显示 available 自触发率常为 0，弱/中模型须强制注入）。
+        force_inject_max_chars：注入全文的字符预算（默认 60000）。
+        """
+        return self.agent.get("skills", {})
+
+    @property
+    def agent_skills_force_inject(self) -> List[str]:
+        raw = self.agent_skills.get("force_inject", [])
+        if not isinstance(raw, list):
+            return []
+        return [str(x).strip() for x in raw if str(x).strip()]
+
+    @property
+    def agent_skills_force_inject_max_chars(self) -> int:
+        return int(self.agent_skills.get("force_inject_max_chars", 60000))
+
+    # ---- Hook 运行时 + vibeweaver 执法层（2026-10-01 集成波）----
+
+    @property
+    def hooks(self) -> dict:
+        """[hooks] 段：hook 运行时预算（app/services/hook_service.py）。"""
+        return self._config.get("hooks", {})
+
+    @property
+    def hooks_stop_max_per_turn(self) -> int:
+        return int(self.hooks.get("stop_hook_max_per_turn", 2))
+
+    @property
+    def hooks_stop_max_per_conversation(self) -> int:
+        return int(self.hooks.get("stop_hook_max_per_conversation", 3))
+
+    @property
+    def vibeweaver(self) -> dict:
+        """[vibeweaver] 段：执法层开关与预算。环境变量 VIBEWEAVER_GATE /
+        VIBEWEAVER_AUDIT / VIBEWEAVER_LOOPGUARD = "off" 时对应层强制关闭
+        （对齐 OpenCode 插件的同名逃生口）。"""
+        return self._config.get("vibeweaver", {})
+
+    @staticmethod
+    def _env_off(name: str) -> bool:
+        import os
+        return str(os.environ.get(name, "")).strip().lower() == "off"
+
+    @property
+    def vibeweaver_enabled(self) -> bool:
+        return bool(self.vibeweaver.get("enabled", True))
+
+    @property
+    def vibeweaver_gate_enabled(self) -> bool:
+        if self._env_off("VIBEWEAVER_GATE"):
+            return False
+        return bool(self.vibeweaver.get("gate_enabled", True))
+
+    @property
+    def vibeweaver_audit_enabled(self) -> bool:
+        if self._env_off("VIBEWEAVER_AUDIT"):
+            return False
+        return bool(self.vibeweaver.get("audit_enabled", True))
+
+    @property
+    def vibeweaver_loop_guard_enabled(self) -> bool:
+        if self._env_off("VIBEWEAVER_LOOPGUARD"):
+            return False
+        return bool(self.vibeweaver.get("loop_guard_enabled", True))
+
+    @property
+    def vibeweaver_audit_core_path(self) -> str:
+        import os
+        return str(os.environ.get("VIBEWEAVER_AUDIT_CORE", "") or self.vibeweaver.get("audit_core_path", ""))
+
+    @property
+    def vibeweaver_red_ttl_hours(self) -> float:
+        return float(self.vibeweaver.get("red_ttl_hours", 24))
+
+    @property
+    def agent_inline_tool_images(self) -> bool:
+        """工具结果图片内联（P3/B4）：True 时图像类读取回传 content part
+        （模型原生判图）；False 或上游不支持时降级 vision_interpret。"""
+        return bool(self.agent.get("inline_tool_images", True))
+
+    @property
+    def agent_memory_max_items(self) -> int:
+        return int(self.agent.get("memory_max_items", 12))
+
+    # ── conv-open 性能治理 P1-1（DESIGN_conv_open_performance）──
+    @property
+    def agent_payload_inline_max_chars(self) -> int:
+        """[agent] payload_inline_max_chars：消息字段内联上限（超限外置 message_payloads）。
+        默认 32768。"""
+        return int(self.agent.get("payload_inline_max_chars", 32768))
+
+    @property
+    def agent_payload_preview_chars(self) -> int:
+        """[agent] payload_preview_chars：外置桩内预览长度。默认 2000。"""
+        return int(self.agent.get("payload_preview_chars", 2000))
+
+    @property
+    def agent_note_context_limit(self) -> int:
+        return int(self.agent.get("note_context_limit", 12))
+
+    @property
+    def agent_conversation_context_limit(self) -> int:
+        return int(self.agent.get("conversation_context_limit", 40))
+
+    @property
+    def agent_memory_refresh_note_limit(self) -> int:
+        return int(self.agent.get("memory_refresh_note_limit", 20))
+
+    @property
+    def agent_memory_refresh_message_limit(self) -> int:
+        return int(self.agent.get("memory_refresh_message_limit", 60))
+
+    @property
+    def agent_cross_turn_citation_note_enabled(self) -> bool:
+        """跨轮引用纪律时机注入（2026-09-16，conv f2553c58 生产复发）。
+
+        对话历史含 [N] 引用时，在本轮首次 web_search 结果前注入提醒——历史
+        编号按轮次独立、对本轮无效，禁止沿用；论文细节不在本轮证据中的要么
+        browser 重开原文、要么不写。默认 true；false = 回退纯系统提示约束。
+        """
+        return bool(self.agent.get("cross_turn_citation_note_enabled", True))
+
+    @property
+    def sub_agent(self) -> dict:
+        return self._config.get("sub_agent", {})
+
+    @property
+    def sub_agent_structured_output_attempts(self) -> int:
+        return max(1, int(self.sub_agent.get("structured_output_attempts", 3)))
+
+    @property
+    def sub_agent_retry_delay_seconds(self) -> float:
+        return float(self.sub_agent.get("retry_delay_seconds", 2.0))
+
+    @property
+    def sub_agent_llm_call_timeout_seconds(self) -> float:
+        """Per-attempt hard timeout for sub-agent structured JSON LLM calls.
+        Prevents the SSE stream from hanging indefinitely when the model
+        stalls. 0 or negative disables the timeout."""
+        return float(self.sub_agent.get("llm_call_timeout_seconds", 90.0))
+
+    @property
+    def sub_agent_search_decision_max_tokens(self) -> int:
+        return int(self.sub_agent.get("search_decision_max_tokens", 800))
+
+    @property
+    def sub_agent_search_decision_repair_max_tokens(self) -> int:
+        return int(self.sub_agent.get("search_decision_repair_max_tokens", 1200))
+
+    @property
+    def sub_agent_keyword_generation_max_tokens(self) -> int:
+        return int(self.sub_agent.get("keyword_generation_max_tokens", 2000))
+
+    @property
+    def sub_agent_keyword_generation_repair_max_tokens(self) -> int:
+        return int(self.sub_agent.get("keyword_generation_repair_max_tokens", 2600))
+
+    @property
+    def title_generation(self) -> dict:
+        return self._config.get("title_generation", {})
+
+    @property
+    def title_generation_structured_output_attempts(self) -> int:
+        return max(
+            1,
+            int(
+                self.title_generation.get(
+                    "structured_output_attempts",
+                    self.sub_agent_structured_output_attempts,
+                )
+            ),
+        )
+
+    @property
+    def title_generation_retry_delay_seconds(self) -> float:
+        return float(
+            self.title_generation.get(
+                "retry_delay_seconds",
+                self.sub_agent_retry_delay_seconds,
+            )
+        )
+
+    @property
+    def title_generation_max_tokens(self) -> Optional[int]:
+        v = self.title_generation.get("max_tokens")
+        return int(v) if v not in (None, "", 0) else None
+
+    @property
+    def title_generation_repair_max_tokens(self) -> Optional[int]:
+        v = self.title_generation.get("repair_max_tokens")
+        return int(v) if v not in (None, "", 0) else None
+
+    @property
+    def web_search(self) -> dict:
+        return self._config.get("web_search", {})
+
+    @property
+    def web_search_enabled(self) -> bool:
+        return bool(self.web_search.get("enabled", False))
+
+    @property
+    def web_search_provider(self) -> str:
+        return str(self.web_search.get("provider", "tavily")).strip().lower()
+
+    @property
+    def web_search_fallback_providers(self) -> list:
+        """Ordered list of providers tried when the primary fails (config key `fallback_providers`)."""
+        value = self.web_search.get("fallback_providers")
+        if value is None:
+            # DuckDuckGo was removed (2026-08-16, unstable); old configs
+            # without fallback_providers get no fallback rather than a
+            # provider that no longer exists.
+            return []
+        if isinstance(value, str):
+            value = [v.strip() for v in value.split(",") if v.strip()]
+        return [str(v).strip().lower() for v in value if str(v).strip()]
+
+    @property
+    def web_search_api_url(self) -> Optional[str]:
+        value = self.web_search.get("api_url", "")
+        return value or None
+
+    def _secret(self, name: str) -> str:
+        """[secrets] 查询（canonical 位置 = config.toml；历史部署若留在
+        config_model.toml 也兼容——两文件合并后同键即生效）。"""
+        return str(self._config.get("secrets", {}).get(name, "") or "").strip()
+
+    @property
+    def web_search_api_key(self) -> Optional[str]:
+        value = self.web_search.get("api_key", "") or self._secret("tavily_api_key")
+        return value or None
+
+    @property
+    def web_search_bocha_api_key(self) -> Optional[str]:
+        value = self.web_search.get("bocha_api_key", "") or self._secret("bocha_api_key")
+        return value or None
+
+    @property
+    def web_search_firecrawl_api_key(self) -> Optional[str]:
+        value = self.web_search.get("firecrawl_api_key", "") or self._secret("firecrawl_api_key")
+        return value or None
+
+    @property
+    def web_search_exa_api_key(self) -> Optional[str]:
+        """Exa's own key slot — distinct from the shared `api_key` (Tavily/Serper)
+        so a Tavily key is never forwarded to mcp.exa.ai."""
+        value = self.web_search.get("exa_api_key", "") or self._secret("exa_api_key")
+        return value or None
+
+    @property
+    def web_search_max_results(self) -> int:
+        return int(self.web_search.get("max_results", 5))
+
+    @property
+    def web_search_timeout_seconds(self) -> float:
+        return float(self.web_search.get("timeout_seconds", 12.0))
+
+    @property
+    def web_search_max_rounds(self) -> int:
+        return int(self.web_search.get("max_search_rounds", 5))
+
+    @property
+    def web_search_min_qualified_rounds(self) -> int:
+        return int(self.web_search.get("min_qualified_rounds", 2))
+
+    @property
+    def web_search_blocked_domains(self) -> list:
+        return list(self.web_search.get("blocked_domains", []))
+
+    @property
+    def context7_api_key(self) -> Optional[str]:
+        value = self._config.get("context7", {}).get("api_key", "") or self._secret("context7_api_key")
+        return value or None
+
+    @property
+    def scheduler(self) -> dict:
+        return self._config.get("scheduler", {})
+
+    # [mcp] MCP server registry. Loaded once at startup by
+    # app/tools/mcp_client.load_mcp_servers_from_config(). Each entry under
+    # [mcp.servers.<name>] selects its transport by shape:
+    #   stdio: command = "npx" (str) or ["npx", "-y", "pkg"] (list),
+    #          optional args = [...], env = {VAR: "value"} (merged over
+    #          os.environ). The subprocess speaks newline-delimited JSON-RPC
+    #          on stdin/stdout (MCP 2024-11-05 stdio binding); the process is
+    #          reused across tool calls, reaped after 300s idle, and respawned
+    #          if it dies or if used from a different event loop.
+    #   http:  url = "https://…/mcp", optional api_key (Bearer). Streamable
+    #          HTTP POST transport with the session cache (unchanged).
+    # Registered tools are exposed to the agent as mcp_<name>_<tool> in the
+    # "mcp-<name>" toolset regardless of transport.
+    @property
+    def mcp(self) -> dict:
+        return self._config.get("mcp", {})
+
+    @property
+    def scheduler_enabled(self) -> bool:
+        return bool(self.scheduler.get("enabled", True))
+
+    @property
+    def scheduler_poll_interval_minutes(self) -> int:
+        return int(self.scheduler.get("poll_interval_minutes", 15))
+
+    @property
+    def scheduler_run_on_startup(self) -> bool:
+        return bool(self.scheduler.get("run_on_startup", True))
+
+    @property
+    def workspace(self) -> dict:
+        return self._config.get("workspace", {})
+
+    @property
+    def sync(self) -> dict:
+        return self._config.get("sync", {})
+
+    @property
+    def sync_enabled(self) -> bool:
+        return bool(self.sync.get("enabled", True))
+
+    @property
+    def sync_memory_enabled(self) -> bool:
+        """记忆域（memory_episodes/memory_concepts）纳入同步（默认 true，可配置关闭）。"""
+        # 全量保真波默认 true（用户原则：同账户所有数据一致；向量各端本地重算）
+        return bool(self.sync.get("memory_enabled", True))
+
+    @property
+    def sync_model_config_enabled(self) -> bool:
+        """模型池配置随同步（D-21；默认 true=自托管主形态）。多租户/开放注册部署
+        可在 [sync] model_config_enabled=false 关闭（防注册用户拿到部署级 key）。"""
+        return bool(self.sync.get("model_config_enabled", True))
+
+    @property
+    def sync_model_config_include_keys(self) -> bool:
+        """模型池载荷是否携带 api_key（默认 true=D-16 威胁模型：自托管+TLS）。
+        置 false → 只同步端点结构（url/model 名），key 由各端本地配置/用户覆写提供。"""
+        return bool(self.sync.get("model_config_include_keys", True))
+
+    @property
+    def sync_blob_max_mb(self) -> int:
+        return int(self.sync.get("blob_max_mb", 100))
+
+    @property
+    def sync_blob_dir(self) -> Path:
+        raw = self.sync.get("blob_dir", "sync_blobs")
+        path = Path(raw)
+        if path.is_absolute():
+            return path
+        return (self.backend_root / path).resolve()
+
+    @property
+    def sync_workspace_enabled(self) -> bool:
+        """workspace 文件随全量同步物化开关（2026-09-29 波）。"""
+        return bool(self.sync.get("workspace_enabled", True))
+
+    @property
+    def sync_workspace_auto_max_mb(self) -> int:
+        """全量同步自动拉取的单文件上限（MB，默认 10；更大走按需同步）。"""
+        try:
+            return max(1, int(self.sync.get("workspace_auto_max_mb", 10)))
+        except (TypeError, ValueError):
+            return 10
+
+    @property
+    def sync_workspace_max_mb(self) -> int:
+        """按需单文件同步上限（MB，默认 1024；对齐上传 MAX_FILE_SIZE）。"""
+        try:
+            return max(1, int(self.sync.get("workspace_max_mb", 1024)))
+        except (TypeError, ValueError):
+            return 1024
+
+    @property
+    def sync_workspace_pull_cap(self) -> int:
+        """单周期自动拉取文件数上限（默认 200；剩余跨周期续拉直至全量）。"""
+        try:
+            return max(1, int(self.sync.get("workspace_pull_cap", 200)))
+        except (TypeError, ValueError):
+            return 200
+
+    @property
+    def sync_workspace_pull_budget_seconds(self) -> int:
+        """单周期 workspace 拉取时间预算（秒，默认 300；0=不限）。
+
+        评审 Important（R2）：逐文件顺序下载若远端慢速涓流会无限占用周期、
+        饿死其它绑定的同步——超预算即让出，剩余候选由 pending 下周期续拉。"""
+        try:
+            return max(0, int(self.sync.get("workspace_pull_budget_seconds", 300)))
+        except (TypeError, ValueError):
+            return 300
+
+    @property
+    def sync_client(self) -> dict:
+        return self.sync.get("client", {})
+
+    @property
+    def sync_client_enabled(self) -> bool:
+        return bool(self.sync_client.get("enabled", False))
+
+    @property
+    def sync_client_server_url(self) -> str:
+        return str(self.sync_client.get("server_url", "")).rstrip("/")
+
+    @property
+    def sync_client_username(self) -> str:
+        return str(self.sync_client.get("username", ""))
+
+    @property
+    def sync_client_password(self) -> str:
+        return str(self.sync_client.get("password", ""))
+
+    @property
+    def sync_client_interval(self) -> int:
+        return int(self.sync_client.get("interval_seconds", 30))
+
+    @property
+    def sync_client_batch(self) -> int:
+        return int(self.sync_client.get("batch", 200))
+
+
+    @property
+    def sync_client_batch_max_bytes(self) -> int:
+        """[sync.client] batch_max_bytes：单次 push 请求事件体字节预算（默认 2 MiB；
+        W9 尺寸闸——全文解析后事件可达 MB 级，防单请求头阻塞）。下限 4 KiB。"""
+        try:
+            return max(4096, int(self.sync_client.get("batch_max_bytes", 2 * 1024 * 1024)))
+        except (TypeError, ValueError):
+            return 2 * 1024 * 1024
+
+    # ---- [client_exec]（设备执行器，PLAN_device_executor §4；键拼写=主方案 §6.5）----
+    @property
+    def client_exec(self) -> dict:
+        return self._config.get("client_exec", {})
+
+    @property
+    def client_exec_enabled(self) -> bool:
+        return bool(self.client_exec.get("enabled", True))
+
+    @property
+    def client_exec_cloud_url(self) -> str:
+        """独立云端 origin；留空=复用 sync 绑定的 server_url。"""
+        return str(self.client_exec.get("cloud_url", "")).rstrip("/")
+
+    @property
+    def client_exec_heartbeat_seconds(self) -> int:
+        try:
+            return max(5, int(self.client_exec.get("heartbeat_seconds", 30)))
+        except (TypeError, ValueError):
+            return 30
+
+    @property
+    def client_exec_call_timeout_seconds(self) -> int:
+        """tools/call 等待下限；实际 = max(本值, 请求 timeout_seconds)。"""
+        try:
+            return max(5, int(self.client_exec.get("call_timeout_seconds", 120)))
+        except (TypeError, ValueError):
+            return 120
+
+    @property
+    def client_exec_call_max_extension_seconds(self) -> float:
+        """progress 续期硬上限镜像（自调用开始的总时长上限；0=不限制）。
+
+        下游任务单 DOWNSTREAM_TODO_20261011（2026-10-11）：云端按 progress 续期等待，
+        绝对上限 `[client_exec] call_max_extension_seconds`（缺省 3600）。本仓同键同义用作
+        RPC 生产预算（fs/zip 打包·office 转换）——否则本地 120s 自裁与云端续期相抵。
+        非法值（非数/NaN/inf/负）不得静默关硬界：回落 3600；显式 0 才是「不限制」。
+        """
+        import math as _math
+
+        try:
+            value = float(self.client_exec.get("call_max_extension_seconds", 3600))
+        except (TypeError, ValueError):
+            return 3600.0
+        if not _math.isfinite(value) or value < 0:
+            return 3600.0
+        return value
+
+    @property
+    def client_exec_max_payload_mb(self) -> int:
+        try:
+            return max(1, int(self.client_exec.get("max_payload_mb", 10)))
+        except (TypeError, ValueError):
+            return 10
+
+    @property
+    def client_exec_allowed_tools(self) -> list:
+        """设备侧白名单镜像（fail-closed；与主方案 §7「走设备」矩阵同源）。"""
+        default = [
+            "workspace_read", "workspace_write", "workspace_edit", "workspace_glob",
+            "grep", "diff", "word_count", "terminal", "process", "git",
+            "execute_code", "skill_run_script", "provide_file", "provide_folder",
+            "citation_render", "pdf_export",
+        ]
+        raw = self.client_exec.get("allowed_tools", None)
+        if raw is None or not isinstance(raw, list):
+            return default
+        # 显式空表 = deny-all（评审 B#9：空表不得回退全集=fail-open）
+        return [str(x) for x in raw]
+
+    @property
+    def workspace_root(self) -> Path:
+        return self._resolve_project_path(
+            self.workspace.get("root_dir", "user_workspaces"),
+            default="user_workspaces",
+        )
+
+    @property
+    def workspace_use_project_venv(self) -> bool:
+        return bool(self.workspace.get("use_project_venv", True))
+
+    @property
+    def workspace_create_readme(self) -> bool:
+        return bool(self.workspace.get("create_readme", True))
+
+    # 2026-09-19：Office 预览（/api/files/office-pdf，soffice 服务端转 PDF）。
+    # enabled=false 或探测不到 soffice → 端点 501，前端自动回退客户端渲染器；
+    # cache_dir 缺省用系统临时目录（不放入 git 树）。全部有代码默认值。
+    @property
+    def office_preview(self) -> dict:
+        return self._config.get("office_preview", {})
+
+    @property
+    def office_preview_enabled(self) -> bool:
+        return bool(self.office_preview.get("enabled", True))
+
+    @property
+    def office_preview_html_enabled(self) -> bool:
+        # 2026-09-21：表格类 office 文件优先服务端转 HTML（长文本换行 / 宽表
+        # 横向滚动，替代打印分页）。false 时 /office-html 返回 501，前端回退
+        # PDF→客户端链路；转换失败同样自动回退。
+        return bool(self.office_preview.get("html_enabled", True))
+
+    @property
+    def office_preview_soffice_path(self) -> str:
+        return str(self.office_preview.get("soffice_path", "soffice") or "soffice")
+
+    @property
+    def office_preview_timeout_seconds(self) -> int:
+        return int(self.office_preview.get("timeout_seconds", 60))
+
+    @property
+    def office_preview_cache_max_mb(self) -> int:
+        return int(self.office_preview.get("cache_max_mb", 512))
+
+    @property
+    def office_preview_cache_dir(self) -> Path:
+        raw = str(self.office_preview.get("cache_dir", "") or "").strip()
+        if raw:
+            return self._resolve_project_path(raw, default="output_files/office_preview")
+        import tempfile
+
+        return Path(tempfile.gettempdir()) / "weave_thinker_office_preview"
+
+    # P1a（2026-09-19）：工作区影子 git 快照。默认开启；`snapshots_max_file_mb`
+    # 以上的文件不进入快照（列入 skipped_large_files）；retention 为保留快照数。
+    @property
+    def workspace_snapshots_enabled(self) -> bool:
+        return bool(self.workspace.get("snapshots_enabled", True))
+
+    @property
+    def workspace_snapshots_max_file_mb(self) -> int:
+        return int(self.workspace.get("snapshots_max_file_mb", 10))
+
+    @property
+    def workspace_snapshots_retention(self) -> int:
+        return int(self.workspace.get("snapshots_retention", 50))
+
+    # P1b（2026-09-19）：持久进程会话（process 工具）。每用户并发会话上限、
+    # 空闲回收秒数、每流环形缓冲字节上限、单次 read 返回字符上限。
+    @property
+    def agent_process(self) -> dict:
+        return self.agent.get("process", {})
+
+    @property
+    def agent_process_max_sessions(self) -> int:
+        return int(self.agent_process.get("max_sessions_per_user", 4))
+
+    @property
+    def agent_process_idle_timeout_seconds(self) -> int:
+        return int(self.agent_process.get("idle_timeout_seconds", 1800))
+
+    @property
+    def agent_process_max_buffer_bytes(self) -> int:
+        return int(self.agent_process.get("max_buffer_bytes", 262144))
+
+    @property
+    def agent_process_max_read_chars(self) -> int:
+        return int(self.agent_process.get("max_read_chars", 20000))
+
+    # ---- Browser skill ----
+
+    @property
+    def browser(self) -> dict:
+        return self._config.get("browser", {})
+
+    @property
+    def browser_enabled(self) -> bool:
+        return bool(self.browser.get("enabled", True))
+
+    @property
+    def browser_max_content_length(self) -> int:
+        return int(self.browser.get("max_content_length", 30000))
+
+    @property
+    def browser_max_pages(self) -> int:
+        return int(self.browser.get("max_pages", 5))
+
+    @property
+    def browser_max_images_per_page(self) -> int:
+        """每页图片直址抽取上限（og:image 优先；图片能力缺口修复 2026-10-05）。"""
+        return int(self.browser.get("max_images_per_page", 12))
+
+    @property
+    def browser_interaction(self) -> dict:
+        return self.browser.get("interaction", {})
+
+    @property
+    def browser_interaction_enabled(self) -> bool:
+        return bool(self.browser_interaction.get("enabled", False))
+
+    @property
+    def browser_interaction_session_timeout(self) -> int:
+        return int(self.browser_interaction.get("session_timeout_seconds", 300))
+
+    @property
+    def browser_interaction_max_concurrent(self) -> int:
+        return int(self.browser_interaction.get("max_concurrent_sessions", 5))
+
+    @property
+    def terminal(self) -> dict:
+        return self._config.get("terminal", {})
+
+    @property
+    def terminal_enabled(self) -> bool:
+        return bool(self.terminal.get("enabled", False))
+
+    @property
+    def terminal_timeout(self) -> float:
+        return float(self.terminal.get("timeout_seconds", 30))
+
+    @property
+    def terminal_max_timeout(self) -> float:
+        return float(self.terminal.get("max_timeout_seconds", 120))
+
+    # terminal_max_output 已删除（2026-09-20 审计完整性）：旧实现用它做静默
+    # 字符截断且无存档指针，审计回读无法恢复。输出现为全量返回 + 单流超
+    # 阈值存档（tool_results/，无损可回读）+ 5MB OOM 硬顶显式标注。
+    # 兼容：旧配置里的 [terminal] max_output_chars 被忽略，不影响启动。
+
+    # ---- Git tool（vibeweaver 集成 P0：受控 git 子命令 + 共享 git 定位）----
+
+    @property
+    def git_tool(self) -> dict:
+        return self._config.get("git_tool", {})
+
+    @property
+    def git_tool_enabled(self) -> bool:
+        return bool(self.git_tool.get("enabled", True))
+
+    @property
+    def git_tool_path(self) -> str:
+        # 含路径分隔符 → 必须是可执行文件；否则按名字 shutil.which。
+        # 回退顺序见 app/services/git_binary.resolve_git_path。
+        return str(self.git_tool.get("path", "git") or "git")
+
+    @property
+    def git_tool_timeout(self) -> float:
+        return float(self.git_tool.get("timeout_seconds", 30))
+
+    @property
+    def git_tool_max_output(self) -> int:
+        return int(self.git_tool.get("max_output_chars", 20000))
+
+    # ---- Code execution skill ----
+
+    @property
+    def code_execution(self) -> dict:
+        return self._config.get("code_execution", {})
+
+    @property
+    def code_execution_enabled(self) -> bool:
+        return bool(self.code_execution.get("enabled", True))
+
+    @property
+    def code_execution_timeout(self) -> float:
+        return float(self.code_execution.get("timeout_seconds", 30.0))
+
+    @property
+    def code_execution_max_output(self) -> int:
+        return int(self.code_execution.get("max_output_chars", 10000))
+
+    @property
+    def code_execution_gen_max_tokens(self) -> int:
+        return int(self.code_execution.get("gen_max_tokens", 2000))
+
+    @property
+    def code_execution_max_retries(self) -> int:
+        """Max repair-and-retry attempts when generated code fails at runtime."""
+        return int(self.code_execution.get("max_retries", 3))
+
+    @property
+    def code_execution_total_timeout_seconds(self) -> float:
+        """Overall ceiling for the whole code-execution skill (generation +
+        subprocess exec + repair loop). Prevents SSE stream hangs. 0 or
+        negative disables the ceiling."""
+        return float(self.code_execution.get("total_timeout_seconds", 240.0))
+
+    # ---- Agent tool loop ----
+
+    @property
+    def agent_tool_loop(self) -> dict:
+        return self.agent.get("tool_loop", {})
+
+    @property
+    def agent_background_tasks(self) -> dict:
+        return self.agent.get("background_tasks", {})
+
+    @property
+    def agent_background_tasks_enabled(self) -> bool:
+        return bool(self.agent_background_tasks.get("enabled", True))
+
+    @property
+    def agent_background_tasks_max_concurrent(self) -> int:
+        # 并发钳制 [1,8]（0/负数→1、99→8）
+        from app.services.durable_types import clamp_concurrency
+        return clamp_concurrency(self.agent_background_tasks.get("max_concurrent_tasks", 3))
+
+    # ---- Durable jobs：5h+ 重作业持久执行 ----
+
+    @property
+    def agent_durable_jobs(self) -> dict:
+        return self.agent.get("durable_jobs", {})
+
+    @property
+    def agent_durable_jobs_enabled(self) -> bool:
+        return bool(self.agent_durable_jobs.get("enabled", True))
+
+    @property
+    def agent_durable_jobs_max_concurrent(self) -> int:
+        from app.services.durable_types import clamp_concurrency
+        return clamp_concurrency(self.agent_durable_jobs.get("max_concurrent_jobs", 4))
+
+    @property
+    def agent_durable_jobs_lease_seconds(self) -> float:
+        return float(self.agent_durable_jobs.get("lease_seconds", 120))
+
+    @property
+    def agent_durable_jobs_poll_interval(self) -> float:
+        return float(self.agent_durable_jobs.get("poll_interval_seconds", 3))
+
+    @property
+    def agent_durable_jobs_total_timeout(self) -> float:
+        """作业总时长上限（秒）；0=不限——5h+ 重作业的真实需求即靠 0 值脱出 5h 截断。"""
+        return float(self.agent_durable_jobs.get("total_timeout_seconds", 0))
+
+    @property
+    def agent_durable_jobs_root(self) -> str:
+        return str(self.agent_durable_jobs.get("jobs_root", "output_files/jobs"))
+
+    @property
+    def agent_background_tasks_poll_interval(self) -> int:
+        return int(self.agent_background_tasks.get("poll_interval_seconds", 3))
+
+    @property
+    def agent_background_tasks_total_timeout(self) -> float:
+        return float(self.agent_background_tasks.get("total_timeout_seconds", 3600))
+
+    @property
+    def agent_background_tasks_progress_update_interval(self) -> int:
+        return int(self.agent_background_tasks.get("progress_update_interval_seconds", 2))
+
+    @property
+    def agent_tool_loop_conversation_timeout(self) -> float:
+        """Maximum seconds without activity (content/tool output) before an
+        online conversation turn is considered stuck and terminated gracefully.
+        Continuously outputting (but slow) text keeps resetting the timer.
+        0 or negative disables.  Default: 300 (5 min)."""
+        return float(self.agent_tool_loop.get("inactivity_timeout_seconds", 300))
+
+    @property
+    def agent_tool_loop_max_iterations(self) -> int:
+        return int(self.agent_tool_loop.get("max_iterations", 50))
+
+    @property
+    def agent_tool_loop_max_consecutive_iterations(self) -> int:
+        return int(self.agent_tool_loop.get("max_consecutive_iterations", 999))
+
+    @property
+    def agent_tool_loop_max_empty_answer_retries(self) -> int:
+        """Max consecutive EMPTY final answers the loop retries before
+        persisting a visible failure message. A silent empty LLM response
+        (no content, no tools, no error — e.g. reasoning budget burn on a
+        huge context, conv 517140ca 2026-08-08) previously fell through the
+        non-deathmatch else-branch and yielded done-empty with ZERO retries,
+        producing "回答生成失败" bubbles after successful tool work. Each
+        retry injects a directive + runs with thinking disabled (smaller,
+        safer request). Default: 2 (so up to 3 total attempts)."""
+        return int(self.agent_tool_loop.get("max_empty_answer_retries", 2))
+
+    @property
+    def agent_tool_loop_max_force_stage_rounds(self) -> int:
+        """Hard cap on tool-calling rounds AFTER the force-final-answer guard
+        fires (A4.9 I1): execute_code rounds refund the iteration budget, so
+        without this         cap the forced phase could theoretically run for
+        ~max_consecutive_iterations×N rounds (net-zero budget consumption).
+        Once the cap is reached, execute_code is no longer offered and the
+        model MUST answer in text (empty answers then hit the bounded
+        empty-answer retry). Default: 50 — must exceed legit long force
+        phases (conv 517140ca novel needed ~25 force rounds to finish
+        chapter 5; a 20 default re-stranded the same task)."""
+        return int(self.agent_tool_loop.get("max_force_stage_rounds", 50))
+
+    @property
+    def agent_tool_loop_parallel_tool_calls(self) -> bool:
+        return bool(self.agent_tool_loop.get("parallel_tool_calls", True))
+
+    @property
+    def agent_tool_loop_memory_read_dedup(self) -> bool:
+        """Per-turn memory-read dedup (conv dfc40619 2026-08-09): the
+        coordinator turn-focus directive persists across all iterations and
+        the mandatory_tool_use system rule forces fresh tool calls, so the
+        model re-issues the SAME ``memory read`` every iteration (35KB changelog.md
+        re-injected per read). When enabled, a second identical read of the
+        same target within one turn returns a short "already read" note
+        instead of re-reading the file. Default: True."""
+        return bool(self.agent_tool_loop.get("memory_read_dedup", True))
+
+    @property
+    def agent_tool_loop_answer_conflict_arbitration(self) -> bool:
+        """Answer/tool conflict arbitration (conv a8290d37 2026-08-28): when a
+        response carries BOTH an answer-sized content AND tool calls that are
+        ALL objectively redundant (exact duplicate of a call that already
+        succeeded this turn, or a non-paginated browser fetch whose URLs were
+        all fetched this turn), the redundant calls are dropped and the
+        content proceeds down the normal final-answer path (pre-send audit
+        included) — the decision layer wins over the action layer. The old
+        rule "tool calls present → content is transient pre-tool prose"
+        silently discarded 11 complete answers while the loop re-fetched
+        already-fetched pages. Default: True."""
+        return bool(self.agent_tool_loop.get("answer_conflict_arbitration", True))
+
+    @property
+    def agent_tool_loop_answer_conflict_min_chars(self) -> int:
+        """Minimum content length for the answer/tool conflict arbitration to
+        consider the co-emitted content an answer candidate. The system
+        prompt requires pre-tool transitional prose to be short and clearly
+        unlike a final answer, so ≥800 chars is definitionally answer-like.
+        Default: 800."""
+        return int(self.agent_tool_loop.get("answer_conflict_min_chars", 800))
+
+    @property
+    def agent_tool_loop_doom_force_final(self) -> bool:
+        """Doom-loop circuit breaker (conv a8290d37 2026-08-28): when the
+        windowed doom detector (same tool+args ≥3× in the last 6 calls)
+        triggers, also set force_final_answer so the next iteration offers
+        execute_code only and the model must answer with what it has. The old
+        abort-and-continue verdict was toothless — the model re-issued the
+        identical call 4 more times after the error. Deathmatch mode is
+        exempt (its own judge governs). Default: True."""
+        return bool(self.agent_tool_loop.get("doom_force_final", True))
+
+    @property
+    def agent_tool_loop_tool_call_timeout(self) -> float:
+        return float(self.agent_tool_loop.get("tool_call_timeout_seconds", 60))
+
+    @property
+    def agent_tool_loop_tool_timeout_overrides(self) -> dict:
+        """Per-tool hard wall-clock caps (tool_name → seconds), overriding
+        ``tool_call_timeout_seconds`` for that tool only (2026-09-03:
+        vision_interpret large-image VLM calls need hours, not minutes)."""
+        raw = self.agent_tool_loop.get("tool_call_timeout_overrides", {}) or {}
+        return {str(k): float(v) for k, v in raw.items()}
+
+    @property
+    def agent_tool_loop_stall_timeout_overrides(self) -> dict:
+        """Per-tool STALL thresholds (tool_name → seconds, 0=disabled).
+        Opt-in per ADR D-2: uninstrumented tools have no honest liveness
+        signal, so a global stall threshold would false-kill them. A tool
+        with a stall override must report progress via
+        ``app.services.tool_progress.report_tool_progress``."""
+        raw = self.agent_tool_loop.get("tool_call_stall_timeout_overrides", {}) or {}
+        return {str(k): float(v) for k, v in raw.items()}
+
+    @property
+    def agent_tool_loop_progress_check_interval_seconds(self) -> float:
+        """Poll interval for the tool liveness watchdog (seconds)."""
+        return float(self.agent_tool_loop.get("tool_call_progress_check_interval_seconds", 10))
+
+    @property
+    def agent_tool_loop_judge_timeout(self) -> float:
+        """Outer deathmatch judge+verifier+replan evaluation budget.
+        Prevents the judge from hanging the entire agent loop. 0 = disabled.
+        Default 300s: judge ≤30s + verifier ≤120s + replan ≤120s worst case —
+        must exceed the sum or the wrapper cancels mid-replan and the stall
+        counter climbs on LLM slowness rather than failure (conv 6b0faf81)."""
+        return float(self.agent_tool_loop.get("judge_timeout_seconds", 300))
+
+    @property
+    def agent_tool_loop_grace_timeout(self) -> float:
+        """Timeout for grace call and final-thinking LLM calls.
+        Prevents the summary phase from hanging. 0 = disabled."""
+        return float(self.agent_tool_loop.get("grace_timeout_seconds", 120))
+
+    @property
+    def agent_tool_loop_max_tool_retry_attempts(self) -> int:
+        return int(self.agent_tool_loop.get("max_tool_retry_attempts", 2))
+
+    @property
+    def agent_subtask_reasoning_char_cap(self) -> int:
+        """PHASE 4: maximum cumulative reasoning_content characters tolerated
+        during a single tool-calling iteration. When exceeded the iteration
+        aborts and falls through, preventing thinking-by-default models
+        (qwen3-thinking, deepseek-reasoner) from blowing up the sub-task
+        context window. ``0`` disables the cap.
+        """
+        return int(self.agent_tool_loop.get("subtask_reasoning_char_cap", 8000))
+
+    @property
+    def agent_tool_loop_live_thinking(self) -> bool:
+        """Stream iteration reasoning+content live (opencode-style) instead of
+        suppressing middle iterations and regenerating the answer in a second
+        full pass. Eliminates the draft+synthesis double generation (TTFT was
+        76-92s on search turns) and gives users immediate visible feedback.
+
+        Tradeoffs (A4.9 review I2/I3, accepted): every tool-calling iteration
+        now pays thinking tokens (total token usage and per-iteration latency
+        rise vs the legacy thinking-free iterations; TTFT and perceived
+        responsiveness improve dramatically). The subtask reasoning char cap
+        is bypassed in this mode — cutting the reasoning stream mid-answer
+        would truncate the final response itself; runaway CoT is instead
+        bounded by the per-iteration timeout and the provider thinking budget.
+
+        Default True; set False to restore the legacy suppress+regenerate flow.
+        """
+        return bool(self.agent_tool_loop.get("live_thinking", True))
+
+    @property
+    def agent_subtask_iteration_timeout(self) -> float:
+        """PHASE 4: per-iteration wall-clock timeout (seconds). Iterations
+        exceeding this abort and let the outer loop continue to the next
+        round (or grace-call). ``0`` disables the timeout.
+
+        用户决定（2026-09-15）：默认 600 → **1800**（30 分钟）——长研究型
+        子任务（delegate_task 子代理的整轮上限与主循环单迭代上限共用此键）
+        在 10 分钟口径下频繁触顶；1800 与生产 config 现值对齐。
+        """
+        return float(self.agent_tool_loop.get("subtask_iteration_timeout_seconds", 1800))
+
+    # ──────────────────────────────────────────────────────────────────
+    # Deathmatch (死磕) mode — typed properties for [deathmatch] section.
+    # Previously all reads went through config._config.get("deathmatch", {})
+    # which is error-prone. See loop_improve.md Phase 3.2.
+    # ──────────────────────────────────────────────────────────────────
+    @property
+    def deathmatch(self) -> dict:
+        return self._config.get("deathmatch", {})
+
+    @property
+    def deathmatch_enabled(self) -> bool:
+        return bool(self.deathmatch.get("enabled", True))
+
+    @property
+    def deathmatch_max_turns(self) -> int:
+        """Autonomous goal-loop turn budget before the human gate.
+        0 = unlimited (default since the 2026-08-31 autonomy wave): the loop
+        runs until the judge says done or the user stops the round."""
+        return int(self.deathmatch.get("max_turns", 0))
+
+    @property
+    def deathmatch_max_consecutive_failures(self) -> int:
+        return int(self.deathmatch.get("max_consecutive_failures", 5))
+
+    @property
+    def deathmatch_tool_loop_max_iterations(self) -> int:
+        """Independent AgentLoop iteration budget for deathmatch goal loop.
+        Overrides the normal tool-loop cap so deep loops aren't truncated."""
+        return int(self.deathmatch.get("tool_loop_max_iterations", 999))
+
+    @property
+    def deathmatch_max_wall_time_seconds(self) -> int:
+        """Wall-clock budget (seconds) for the goal loop. 0 = unlimited
+        (default since the 2026-08-31 autonomy wave). Parked time (pause /
+        WAIT / gates) never counts against the budget."""
+        return int(self.deathmatch.get("max_wall_time_seconds", 0))
+
+    @property
+    def deathmatch_autonomy_enabled(self) -> bool:
+        """Autonomy mode (default ON, 2026-08-31): the goal loop never
+        auto-interrupts for human intervention — wall/turn budgets default
+        to unlimited, stall tiers auto-replan and continue, the spin guard
+        and inactivity cycles keep pushing, judge WAIT becomes a bounded
+        in-loop backoff. Only an explicit user stop, a judge infra/parse
+        failure streak, or a done verdict ends the loop. Set false to
+        restore the legacy stall-tier gates (partial_complete/human_gate);
+        note the wall/turn gates independently require POSITIVE configured
+        max_turns / max_wall_time_seconds (both default 0 = unlimited)."""
+        return bool(self.deathmatch.get("autonomy_enabled", True))
+
+    @property
+    def deathmatch_verify_enabled(self) -> bool:
+        return bool(self.deathmatch.get("verify_enabled", False))
+
+    @property
+    def deathmatch_grilling_research_enabled(self) -> bool:
+        """盘问前置事实自查（facts-before-ask，2026-09-25 SOTA 波）：出题前用
+        有界联网检索核实事实类问题，结论注入出题提示词（只问决策）。默认开；
+        检索不可用/失败一律 fail-open，不影响出题。"""
+        return bool(self.deathmatch.get("grilling_research_enabled", True))
+
+    @property
+    def deathmatch_grilling_research_max_queries(self) -> int:
+        """每轮盘问前置事实检索的问题上限（默认 3）。"""
+        return int(self.deathmatch.get("grilling_research_max_queries", 3))
+
+    @property
+    def deathmatch_completion_memory_write_enabled(self) -> bool:
+        """死磕收束时把目标+验收要点+关键决策写回用户记忆（file memory +
+        subconscious 钩子），供后续任务检索（ScienceBuddy 持续学习启发）。
+        默认开；写入失败 fail-open，不阻断收束。"""
+        return bool(self.deathmatch.get("completion_memory_write_enabled", True))
+
+    @property
+    def deathmatch_stall_triage_enabled(self) -> bool:
+        """停滞动作分诊（AEWM 2609.28416 Action Judge 启发）：停滞现场由 LLM
+        把最近行动分诊为 critical/exploratory/noisy 并分流——noisy=状态修订
+        （撤回断言+改写步骤）、critical=重规划、exploratory=探索贷记不计惩罚。
+        默认开；分诊失败 fail-open 走既有 repair→replan 路径。"""
+        return bool(self.deathmatch.get("stall_triage_enabled", True))
+
+    @property
+    def deathmatch_verify_max_retries(self) -> int:
+        return int(self.deathmatch.get("verify_max_retries", 20))
+
+    @property
+    def deathmatch_stall_partial_threshold(self) -> int:
+        """After N consecutive stalls, offer partial completion with deliverables.
+
+        Raised 3→8 for long-horizon autonomy (conv 6b0faf81): a 100k-char
+        novel goal hit 3 stalls in 4 turns and stopped. Deathmatch should
+        keep working through direction changes like opencode goal mode;
+        partial_complete is now reserved for genuinely persistent no-progress."""
+        return int(self.deathmatch.get("stall_partial_threshold", 8))
+
+    @property
+    def deathmatch_stall_hard_threshold(self) -> int:
+        """After N consecutive stalls, force human gate (absolute backstop).
+
+        Raised 6→16 alongside partial threshold — with "plan complete but
+        goal unmet" no longer counting as a stall, the remaining stall paths
+        (verifier blocked / no-progress partial) need room to self-correct
+        via replanning before interrupting the user."""
+        return int(self.deathmatch.get("stall_hard_threshold", 16))
+
+    @property
+    def deathmatch_verify_interval(self) -> int:
+        """Run the verifier every N outer turns (not every turn)."""
+        return int(self.deathmatch.get("verify_interval", 3))
+
+    @property
+    def deathmatch_verify_model(self) -> str:
+        return str(self.deathmatch.get("verify_model", "") or "")
+
+    @property
+    def deathmatch_bible_enabled(self) -> bool:
+        """Story-bible spec files for creative goals: on goal-loop start,
+        generate workspace/bible/{characters,relationships,world,outline,
+        style}.md so the agent works against a file-based spec (user-editable,
+        compression-proof) instead of free-text goal only."""
+        return bool(self.deathmatch.get("bible_enabled", True))
+
+    @property
+    def deathmatch_verify_moa_enabled(self) -> bool:
+        """A5: route the verifier through MoA (multi-model aggregation) when
+        [agent.moa] is enabled and reference providers are configured. The
+        aggregate verdict reduces single-model bias at extra cost."""
+        return bool(self.deathmatch.get("verify_moa_enabled", False))
+
+    @property
+    def deathmatch_verify_command_gate_enabled(self) -> bool:
+        """A1b: deterministic verification commands — a step's
+        verification_method starting with 'gate: <shell command>' runs inside
+        the code-execution sandbox BEFORE the LLM verifier; non-zero exit
+        short-circuits to partial with the gate output as the issue.
+        OFF by default (shell execution in the sandbox is opt-in)."""
+        return bool(self.deathmatch.get("verify_command_gate_enabled", False))
+
+    @property
+    def deathmatch_obligation_criteria_enabled(self) -> bool:
+        """W1a (2026-09-21, conv a104fbc5 fix): deterministic obligation
+        baseline — empirical/quantified deliverables automatically get a
+        blocking no-unexecuted-markers criterion (+ file-existence checks for
+        numeric-result steps). Pure Python, no shell. Default ON; kill switch."""
+        return bool(self.deathmatch.get("obligation_criteria_enabled", True))
+
+    @property
+    def deathmatch_criteria_enabled(self) -> bool:
+        """W1a (DAG wave): synthesize first-class acceptance criteria after
+        grilling (id/type/source/check), freeze them append-only, and inject
+        into judge/verifier/continuation/handoff. Fail-open: synthesis failure
+        degrades to the legacy prose-goal behavior. Default ON."""
+        return bool(self.deathmatch.get("criteria_enabled", True))
+
+    @property
+    def deathmatch_plan_audit_enabled(self) -> bool:
+        """W1d: independent plan-core audit after plan generation — checks
+        coverage/fidelity/scope/dependency soundness against goal+criteria+Q&A
+        before the goal loop starts (Prove2Me captain-audit analogue).
+        One extra non-hot-path LLM call per goal. Default ON; fail-open."""
+        return bool(self.deathmatch.get("plan_audit_enabled", True))
+
+    @property
+    def deathmatch_plan_audit_model(self) -> str:
+        """Optional independent model alias for the plan-core audit (empty =
+        assistant's main model via _make_llm). Logged for visibility."""
+        return str(self.deathmatch.get("plan_audit_model", "") or "")
+
+    @property
+    def deathmatch_goal_comparator_enabled(self) -> bool:
+        """W1e: deterministic goal comparator — mechanical acceptance criteria
+        (file existence/size, optional gate commands) are executed before a
+        judge=done finalize is accepted. File checks always run; gate checks
+        additionally require verify_command_gate_enabled. Default ON."""
+        return bool(self.deathmatch.get("goal_comparator_enabled", True))
+
+    @property
+    def deathmatch_node_recovery_max_retries(self) -> int:
+        """W2a: per-node local retries (same step, diagnosis-carrying) before
+        a local_patch (single-step rewrite) and then the legacy stall ladder."""
+        return int(self.deathmatch.get("node_recovery_max_retries", 2))
+
+    @property
+    def deathmatch_failed_direction_forbidden_threshold(self) -> int:
+        """W2b: after N recordings of the same failed direction family, the
+        direction becomes forbidden for this goal (retry requires new
+        insight)."""
+        return int(self.deathmatch.get("failed_direction_forbidden_threshold", 3))
+
+    @property
+    def deathmatch_no_progress_replan_cap(self) -> int:
+        """W2b: consecutive no-progress replans before a resumable human_gate
+        (global convergence circuit breaker). 0 = disabled."""
+        return int(self.deathmatch.get("no_progress_replan_cap", 3))
+
+    @property
+    def deathmatch_events_cap(self) -> int:
+        """W2c: append-only deathmatch event log cap per conversation."""
+        return int(self.deathmatch.get("events_cap", 50))
+
+    @property
+    def deathmatch_reflection_memory_max_items(self) -> int:
+        return int(self.deathmatch.get("reflection_memory_max_items", 10))
+
+    @property
+    def deathmatch_continuity_anchor_enabled(self) -> bool:
+        """Continuity anchoring: the verifier emits a distilled per-turn
+        continuity_brief injected into the next continuation prompt, and the
+        verifier reads head+tail of this-turn/prior files to catch long-content
+        drift (style/plot/setting deviation). Default on."""
+        return bool(self.deathmatch.get("continuity_anchor_enabled", True))
+
+    @property
+    def deathmatch_judge(self) -> dict:
+        return self.deathmatch.get("judge", {})
+
+    @property
+    def deathmatch_judge_evidence_enabled(self) -> bool:
+        """B1 (AJ-Bench 2604.18240): share the verifier's environment evidence
+        (workspace snapshot / settled steps / last verification / tool trace)
+        with the completion judge. Default on — judge+evidence beats a blind
+        judge on the same base model."""
+        return bool(self.deathmatch.get("judge_evidence_enabled", True))
+
+    @property
+    def deathmatch_visual_critic_enabled(self) -> bool:
+        """B4c (AutoDesign visual critic): let the verifier run a VLM layout
+        check on visual deliverables (.html/.svg) when a multimodal endpoint
+        is configured (config_model.toml `[endpoints.vlm]`, purpose "vlm"). Default OFF —
+        admin/developer opt-in."""
+        return bool(self.deathmatch.get("visual_critic_enabled", False))
+
+    @property
+    def deathmatch_rubric_compression_enabled(self) -> bool:
+        """P2-11 (SELFCOMPACT light): when enabled, the judge's compact=yes
+        signal lets the deathmatch forced compression fire early (len>40)
+        instead of only at the fixed len>80 message rule. Default OFF —
+        premature compression has a real token/fidelity cost."""
+        return bool(self.deathmatch.get("rubric_compression_enabled", False))
+
+    @property
+    def agent_auxiliary(self) -> dict:
+        return self.agent.get("auxiliary", {})
+
+    @property
+    def agent_auxiliary_compression_model(self) -> str:
+        return str(self.agent_auxiliary.get("compression_model", "") or "")
+
+    @property
+    def agent_auxiliary_search_decision_model(self) -> str:
+        return str(self.agent_auxiliary.get("search_decision_model", "") or "")
+
+    @property
+    def agent_auxiliary_title_model(self) -> str:
+        return str(self.agent_auxiliary.get("title_model", "") or "")
+
+    @property
+    def agent_auxiliary_coordinator_model(self) -> str:
+        """P2-1: Separate model for coordinator routing/classification.
+        When non-empty, coordinator calls use this lighter model instead of
+        the main LLM. Reduces coordinator TTFT from 1-3s → 0.3-0.8s (Flash-class)."""
+        return str(self.agent_auxiliary.get("coordinator_model", "") or "")
+
+    @property
+    def agent_auxiliary_classifier_model(self) -> str:
+        """Model for agentic judgment calls (error classification, triviality,
+        interest extraction, skill assessment, identity facts, citation
+        disambiguation, schedule parsing, creative-goal detection, completion
+        reconciliation). Empty → main LLM."""
+        return str(self.agent_auxiliary.get("classifier_model", "") or "")
+
+    @property
+    def agent_auxiliary_judge_default_timeout(self) -> float:
+        """Default timeout (seconds) for LLM judgment calls (judge_json) when
+        the caller does not pass an explicit timeout. User ruling 2026-09-10:
+        LLM-based judgments must NOT be time-boxed tightly — a timed-out judge
+        returns the default and silently degrades a decision (conv a040c24e
+        citation judge 20s incident). Background judgments default to 120s."""
+        return float(self.agent_auxiliary.get("judge_default_timeout_seconds", 120.0))
+
+    @property
+    def agent_cache(self) -> dict:
+        return self.agent.get("cache", {})
+
+    @property
+    def agent_cache_enabled(self) -> bool:
+        return bool(self.agent_cache.get("enabled", False))
+
+    @property
+    def agent_cache_ttl_minutes(self) -> int:
+        return int(self.agent_cache.get("cache_ttl_minutes", 5))
+
+    @property
+    def agent_compression(self) -> dict:
+        return self.agent.get("compression", {})
+
+    @property
+    def agent_compression_enabled(self) -> bool:
+        return bool(self.agent_compression.get("enabled", False))
+
+    @property
+    def agent_compression_context_length(self) -> int:
+        """The model's actual context window size in tokens.
+        Used by ContextCompressor to calculate compression thresholds."""
+        return int(self.agent_compression.get("context_length", 65536))
+
+    @property
+    def agent_compression_spike_guard_ratio(self) -> float:
+        """P0-2 (round-4 eval): pre-iteration spike guard. When the rough
+        token estimate of the next request exceeds ratio × context_length,
+        the agent loop compresses BEFORE the iteration instead of waiting
+        for the provider 400. 0 disables. Default 0.75."""
+        return float(self.agent_compression.get("spike_guard_ratio", 0.75))
+
+    # ---- Canary marker (遵循词) ----
+
+    @property
+    def agent_canary(self) -> dict:
+        return self.agent.get("canary", {})
+
+    @property
+    def agent_canary_enabled(self) -> bool:
+        """遵循词 (canary marker) context-rot detection. When enabled the
+        system prompt asks the model to end every final reply with a
+        per-conversation marker; two consecutive misses trigger one context
+        compression (see app/services/canary_marker.py)."""
+        return bool(self.agent_canary.get("enabled", False))
+
+    @property
+    def agent_canary_miss_threshold(self) -> int:
+        return int(self.agent_canary.get("miss_threshold", 2))
+
+    @property
+    def agent_canary_auto_disable_after(self) -> int:
+        return int(self.agent_canary.get("auto_disable_after", 3))
+
+    @property
+    def agent_canary_compress_min_ratio(self) -> float:
+        """P0/A3 (2026-08-21): canary trip compresses only when the estimated
+        context occupies >= this ratio of the model window. Below it, the
+        miss is not context rot — re-assert the marker directive and re-answer
+        instead. 0 = legacy always-compress behavior."""
+        return float(self.agent_canary.get("compress_min_ratio", 0.6))
+
+    # ---- Citation ledger (引用台账) ----
+
+    @property
+    def agent_citation(self) -> dict:
+        return self.agent.get("citation", {})
+
+    @property
+    def agent_citation_disambiguate_timeout(self) -> float:
+        """Timeout (seconds) for the citation-disambiguate judge call on the
+        persist path. conv a040c24e (2026-09-10): the hardcoded 20s timed out
+        under production provider congestion → fail-open kept a dangling [11].
+        Default 30.0."""
+        return float(self.agent_citation.get("disambiguate_timeout_seconds", 60.0))
+
+    @property
+    def agent_citation_disambiguate_retries(self) -> int:
+        """Extra attempts for the citation-disambiguate judge after a failed
+        (timeout/unparseable) call. 0 = single attempt (legacy behavior).
+        Default 1. Total failure stays fail-open (markers kept, documented)."""
+        return int(self.agent_citation.get("disambiguate_retries", 1))
+
+    @property
+    def agent_citation_remand_min_chars(self) -> int:
+        """Deterministic zero-citation remand gate (2026-09-15, conv 174182bc):
+        minimum draft length (chars) before the auditor's mechanical
+        「台账非空 + 零有效 [N]」打回 fires. Shorter drafts (a brief follow-up
+        after a search) are left to the LLM auditor's clause. 0 or negative
+        DISABLES the gate (consistent with sibling knobs where 0 = off —
+        A4.9 R2 Minor)."""
+        return int(self.agent_citation.get("remand_min_chars", 200))
+
+    @property
+    def agent_citation_remand_max_per_turn(self) -> int:
+        """零引用 remand 每轮上限（2026-09-25，conv 1a24a04a A4.9 R1
+        Important-1）。默认 2：修复稿仍零 [N] 时第二次 remand 拦截静默出货；
+        第三次起放行给 LLM 审计员（有界，不烧预算循环）。1 = 旧 one-shot 行为。
+        最小 1。"""
+        return max(1, int(self.agent_citation.get("remand_max_per_turn", 2)))
+
+    @property
+    def agent_citation_style(self) -> str:
+        """存档汇点（保存笔记/导出）默认引用样式逻辑 id（设计 §4.1-B）。论文/文件
+        产物路径应在规划期解析并显式传入，不依赖此默认。默认 gb-t-7714-numeric。"""
+        return str(self.agent_citation.get("style", "gb-t-7714-numeric"))
+
+    @property
+    def agent_citation_styles_dir(self) -> str:
+        """vendored CSL 样式目录（空=使用内置 app/citation_styles/）。"""
+        return str(self.agent_citation.get("styles_dir", ""))
+
+    # ---- Response auditor (发送前质量审计) ----
+
+    @property
+    def agent_audit(self) -> dict:
+        return self.agent.get("audit", {})
+
+    @property
+    def agent_audit_history_grounding_max_items(self) -> int:
+        """审计证据域历史窗——grounding 类（web_search/browser/MCP）工具结果的
+        独立窗口（2026-09-25，conv 1a24a04a）。旧实现 6 条混排，被更近轮次的
+        notes/memory/execute_code 占满后历史检索证据零入选 → NPG 跨轮假阳性。
+        0 = 不纳入历史 grounding 证据。"""
+        return int(self.agent_audit.get("history_grounding_max_items", 20))
+
+    @property
+    def agent_audit_history_other_max_items(self) -> int:
+        """审计证据域历史窗——非 grounding 类历史工具结果窗口（默认 6，即
+        2026-09-25 前的混排窗口语义）。0 = 不纳入。"""
+        return int(self.agent_audit.get("history_other_max_items", 6))
+
+    @property
+    def agent_audit_policy(self) -> str:
+        """审计判决处置策略（2026-09-18 结构性重构，conv f831486f）。
+
+        "advisory"（默认）：LLM 软判决（unverifiable / needs_evidence，source=llm）
+        只作建议——不触发重生成、不消耗预算、不进入 salvage/selection/警示语；
+        确定性可行动判决（source ∈ {npg, citation}）与硬 reject 至多触发一次
+        定向修复；存在未通过判决时以低置信说明透明标注后出货。
+        依据：20+ 波次补丁后警示语仍复发（生产 49 条）+ SOTA（VRR-Stop /
+        judge-not-oracle / GAUGE）+ opencode/codex/hermes 均无阻塞式语义质检
+        （research: memory/eval_audit_architecture_20260918.md）。
+
+        "legacy"：旧行为（软/硬预算 + 同族 stall + salvage + selection +
+        确定性兜底警示语）原样保留，一键热回滚阀；Phase 2（生产 soak 后）删除。
+        非法值一律回退 "advisory"。
+        """
+        value = str(self.agent_audit.get("policy", "advisory")).strip().lower()
+        return value if value in ("advisory", "legacy") else "advisory"
+
+    @property
+    def agent_audit_reject_budget(self) -> int:
+        """发送前审计的拒绝预算：一轮内审计员最多打回几稿。打回次数超过预算
+        后停止重写，走有界 salvage（去毒上下文再生成一次，再审一次，仍不过
+        则 ship 诚实失败文本）。普通轮次默认 2。"""
+        return int(self.agent_audit.get("reject_budget", 2))
+
+    @property
+    def agent_audit_numeric_gate_enabled(self) -> bool:
+        """A1 (2026-08-21): deterministic backstop for numeric audit verdicts.
+        A reject whose asserted correction value appears nowhere in the
+        evidence ledger is the auditor's own arithmetic (the template's
+        mental-math ban) — downgrade to needs_evidence instead of looping."""
+        return bool(self.agent_audit.get("numeric_gate_enabled", True))
+
+    @property
+    def agent_audit_numeric_provenance_mode(self) -> str:
+        """NPG（2026-09-02，conv 83d97ede 容积事故）：写手侧数值溯源闸门。
+        确定性、零 LLM——草稿高风险推导数值必须可引用（台账/用户消息，单位族
+        感知）或有回执（本轮 execute_code/terminal 输出 + 参数溯源，
+        print(40000) 裸字面量不构成回执）。shadow=只记录不拦截（默认，
+        B10 灰度）；enforce=无回执推导值打回 needs_evidence（软拒计数，
+        不烧 reject 预算）；off=关闭。"""
+        return str(self.agent_audit.get("numeric_provenance_gate_mode", "shadow"))
+
+    @property
+    def agent_audit_numeric_gate_tolerance(self) -> float:
+        """NPG 数值接地相对容差（0.01=1%——回执四舍五入匹配，如
+        186466.6mm³ ≈ 186.5ml）。"""
+        return float(self.agent_audit.get("numeric_gate_tolerance", 0.01))
+
+    @property
+    def agent_audit_retry_reasoning_keep_chars(self) -> int:
+        """A2 (2026-08-21): char cap of the rejected draft's reasoning_content
+        re-attached on audit-retry for preserve-thinking providers.
+        0 = disabled."""
+        return int(self.agent_audit.get("retry_reasoning_keep_chars", 6000))
+
+    @property
+    def agent_audit_revision_thinking_enabled(self) -> bool:
+        """用户要求（2026-08-21）：审核打回后的修正轮不开思考。
+        False（默认）= 打回后的修正轮 thinking 关闭（更快、上游挂死面更小）；
+        True = 显式保持思考（操作者可覆写）。"""
+        return bool(self.agent_audit.get("revision_thinking_enabled", False))
+
+    @property
+    def agent_audit_salvage_thinking_enabled(self) -> bool:
+        """salvage/best-of selection 兜底生成阶段是否保持思考（conv 3a216a51,
+        2026-09-02）。False（默认）= 关思考——生产实证 salvage 以 xhigh
+        全量缓冲生成 ~120s（SSE 零事件，用户观感=卡死后取消 SSE）；关思考
+        后与打回修正轮（revision_thinking_enabled=false，2026-08-21 用户
+        决定）同口径，~12-13s 量级出稿。True = 显式保持思考（240s
+        salvage_timeout 上限仍生效）。"""
+        return bool(self.agent_audit.get("salvage_thinking_enabled", False))
+
+    @property
+    def agent_audit_call_timeout_seconds(self) -> float:
+        """审计 LLM 非流式调用硬超时（防审计挂死阻塞整个轮次）。
+        超时走既有 fail-open 契约（审计器故障不得阻塞好答案）。0 = 不设限。"""
+        return float(self.agent_audit.get("call_timeout_seconds", 600))
+
+    @property
+    def agent_audit_revision_min_similarity(self) -> float:
+        """用户要求（2026-08-21）：修正轮仅修改点名部分，不整篇重写。
+        修正稿与被拒稿的 difflib 相似度低于该阈值 → 判定整篇重写，
+        不送审计、注入重改指令一次。0 = 关闭闸门。"""
+        return float(self.agent_audit.get("revision_min_similarity", 0.45))
+
+    @property
+    def agent_audit_reject_budget_search(self) -> int:
+        """search_required=True（用户明确要求联网检索）轮次的拒绝预算，
+        默认 4 —— 检索轮次上下文更大、模型更易跑偏，多给两次修正机会。"""
+        return int(self.agent_audit.get("reject_budget_search", 4))
+
+    @property
+    def agent_audit_max_evidence_tokens(self) -> int:
+        """审计器可用的证据 token 预算（estimate_text_tokens_rough，CJK 感知）。
+        用户原则（2026-08-14）：信息完整性永远高于节省 token——预算只做
+        「模型上下文装不下」的物理上限，不做省钱上限。grounding 类工具结果
+        （memory/workspace_read/web_search/browser）优先读回磁盘全文（digest/
+        budget 的【全文存档】指针），超预算才退到压缩信封/头尾片段并显式标注，
+        截断导致的"看不到"走 unverifiable 出口，禁止按"凭空编造"误杀
+        （conv a67faa04）。2026-08-18 用户决定 60000→128000：证据全量读回
+        优先，截断只留给真正的物理极限。"""
+        return int(self.agent_audit.get("max_evidence_tokens", 128000))
+
+    @property
+    def agent_audit_soft_reject_limit(self) -> int:
+        """unverifiable/needs_evidence（非编造类打回）的每轮独立计数上限。
+        这类打回不消耗 reject_budget（conv a67faa04：截断导致的误判不应把
+        拒绝预算烧光导致失败文本）；达到本上限后同样走有界 salvage。默认 3。"""
+        return int(self.agent_audit.get("soft_reject_limit", 3))
+
+    @property
+    def agent_audit_stall_cut_family_repeats(self) -> int:
+        """同族审计失败 stall cut 阈值（2026-09-15，conv f2553c58）：连续 N 次
+        同族（agent_loop._audit_problem_family 确定性分类：截断/矛盾/无依据/
+        悬空/citation/…；npg 与 other 豁免）审计失败 → 视同预算耗尽直接进入
+        salvage，不再整稿重发。生产实证：截断族 4 连拒 + salvage + selection
+        共 18 分钟 7 次生成仍兜底发货（SOTA：迭代精修 2-3 轮后收益饱和甚至
+        倒退）。默认 2；0 = 关闭（回退纯预算行为，与兄弟开关 0=off 一致）。"""
+        return int(self.agent_audit.get("stall_cut_family_repeats", 2))
+
+    @property
+    def agent_audit_visibility_accept_enabled(self) -> bool:
+        """可见性接收闸门开关（2026-09-15，conv f2553c58；A4.9 R1 Important-4）。
+
+        开启时：审计判决为 unverifiable / 可见性族 needs_evidence，且本轮台账
+        存在「截断」条目，且审计点名 token 全部存在于全量语料 → 接收草稿
+        （审计盲区而非草稿缺陷，不再重生成）。默认 true；false = 回退旧行为
+        （4 连软拒 + salvage + selection 链），作为线上误接收的一键回滚阀
+        （与 numeric_provenance_gate_mode 等兄弟开关同哲学）。"""
+        return bool(self.agent_audit.get("visibility_accept_enabled", True))
+
+    @property
+    def agent_audit_segmented_verify_enabled(self) -> bool:
+        """分段声称核对开关（2026-09-15，用户拍板；SOTA：AgentAuditor 局部
+        证据包 / 验证优先双代理 / MAVEN 解耦）。
+
+        开启时：可见性族判决（截断证据「看不到」）→ 确定性 claim→span 对齐 +
+        并行轻量验证调用（每包只带声称 + 相关证据切片，独立上下文）→ 任一
+        fail（span 直接矛盾）软拒点名；无 fail 接收。默认 true；
+        false = 回退既有可见性存在性闸门（旧行为，一键回滚阀）。"""
+        return bool(self.agent_audit.get("segmented_verify_enabled", True))
+
+    @property
+    def agent_audit_segmented_verify_max_packs(self) -> int:
+        """分段核对最大验证包数（并行验证调用上限；生产草稿的不可见声称
+        通常 ≤8 条）。默认 8。"""
+        return int(self.agent_audit.get("segmented_verify_max_packs", 8))
+
+    @property
+    def agent_audit_segmented_verify_pack_tokens(self) -> int:
+        """单个验证包的证据切片 token 预算（claim→span 窗口拼接，默认 4000）。"""
+        return int(self.agent_audit.get("segmented_verify_pack_tokens", 4000))
+
+    @property
+    def agent_audit_segmented_verify_max_concurrency(self) -> int:
+        """分段核对并行度（验证调用并发上限，默认 4）。"""
+        return int(self.agent_audit.get("segmented_verify_max_concurrency", 4))
+
+    @property
+    def agent_audit_segmented_verify_timeout_seconds(self) -> float:
+        """分段核对**聚合总超时**（秒；默认 120，0=不设限）。
+
+        A4.9 R1 Important-5：并发 4 × 每调用 600s 的最坏墙钟 1200s 不可接受
+        ——超过该预算即放弃分段核对并回退存在性闸门（fail-open，不阻塞轮次）。
+        """
+        return float(self.agent_audit.get("segmented_verify_timeout_seconds", 120))
+
+    @property
+    def agent_audit_segmented_verify_max_claims(self) -> int:
+        """分段核对候选声称上限（句子级，默认 40）。
+
+        超出上限的声称只做存在性核对并计入 uncovered（出货附低置信说明，
+        C4 评估残余风险②）；0 = 关闭分段核对（与兄弟开关 0=off 一致）。
+        """
+        return int(self.agent_audit.get("segmented_verify_max_claims", 40))
+
+    @property
+    def agent_audit_segmented_verify_retry_window_chars(self) -> int:
+        """unverifiable 包宽窗重试的证据窗口（字符，默认 1500；0=关闭重试）。
+
+        C4 评估残余风险③（2026-09-16）：首轮 ±600 窗口对错段落/上下文不足
+        时验证器只能判 unverifiable（查了等于没查）——以更宽窗口重试一次
+        转为真实 pass/fail；重试仍在聚合总超时内（超时 → degraded 回退 +
+        低置信说明）。
+        """
+        return int(self.agent_audit.get("segmented_verify_retry_window_chars", 1500))
+
+    @property
+    def agent_audit_low_confidence_note_enabled(self) -> bool:
+        """低置信出货说明开关（2026-09-16，C4 评估残余风险①②）。
+
+        分段核对 degraded（核对服务异常/超时回退存在性闸门）或 uncovered
+        （声称超出逐条核对覆盖上限）的接收，不再静默——在回答末尾追加一句
+        透明说明（引用数值/名称已确认存在于来源资料，逐条复核未全部完成）。
+        默认 true；false = 旧静默行为（与兄弟开关同哲学的一键回滚阀）。
+        """
+        return bool(self.agent_audit.get("low_confidence_note_enabled", True))
+
+    @property
+    def agent_audit_citation_map_gate_enabled(self) -> bool:
+        """对照表假判词确定性闸门（2026-09-16，conv f2553c58 生产复发）。
+
+        审计判词声称「无对照表/对照表未列出」而台账非空且草稿全部编号合法
+        → 前提可证伪（对照表已渲染进审计上下文，大上下文稀释是审计盲区）：
+        纯假判词 → 直接接收；混合判词 → 剔除「修编号」无效指令、保留其余
+        真问题。默认 true；false = 一键回退旧行为（假判词照原样烧预算）。
+        """
+        return bool(self.agent_audit.get("citation_map_gate_enabled", True))
+
+    @property
+    def agent_audit_draft_selection_enabled(self) -> bool:
+        """审计耗尽 best-of 选优兜底开关（conv 7dc7a0d5，2026-08-18）。
+        开启时：salvage 仍失败（被拒/空/异常/超时）后，由独立选优调用综合
+        全部被拒草稿与各自审计意见产出最终回答；选优也失败时按确定性规则
+        （软拒优先→最早草稿）出货带警示前缀的草稿——最终回答不再显示
+        「回答生成失败」。关闭时完全回退旧行为（失败文本）。"""
+        return bool(self.agent_audit.get("draft_selection_enabled", True))
+
+    @property
+    def agent_audit_selection_timeout_seconds(self) -> float:
+        """选优调用的生成超时（秒）。conv 7dc7a0d5 的直接死因是 salvage 复用
+        120s grace 超时且首个 content 事件未及到达——选优是同类长文再生成，
+        默认给更宽的 240s；0 = 复用 [agent.tool_loop] grace_timeout_seconds。
+        conv efaf8f9c（2026-08-20 回放实证）：xhigh 思考模式下选优 240s 产出
+        <200 字符即被截断，浪费最后一次 LLM 修复机会 → 默认 480s。"""
+        return float(self.agent_audit.get("selection_timeout_seconds", 480.0))
+
+    @property
+    def agent_audit_salvage_timeout_seconds(self) -> float:
+        """审计预算耗尽后 salvage 重整生成的超时（秒）。conv efaf8f9c
+        （2026-08-20）：salvage 复用了 120s grace 超时，而开启思考模式的
+        迭代 LLM（qwen3.8_27b xhigh）首 content token 延迟可超过 120s →
+        salvage 每次零内容必死、白耗 2 分钟才进入选优。默认 240s（与选优
+        同级）；0 = 复用 [agent.tool_loop] grace_timeout_seconds。"""
+        return float(self.agent_audit.get("salvage_timeout_seconds", 240.0))
+
+    @property
+    def agent_audit_selection_draft_budget_tokens(self) -> int:
+        """选优 prompt 中「历史草稿块」的 token 预算（CJK 感知估算，A4.9 M7）。
+        超预算时先按 selection_draft_window_chars 头尾窗口化每份草稿（显式标注），
+        仍超则丢弃最旧草稿（显式标注）。信息完整性优先：预算只防 provider
+        上下文物理溢出，不做省钱上限。"""
+        return int(self.agent_audit.get("selection_draft_budget_tokens", 60000))
+
+    @property
+    def agent_audit_selection_draft_window_chars(self) -> int:
+        """选优 prompt 草稿超预算时的每份头尾窗口（字符，A4.9 M7）。"""
+        return int(self.agent_audit.get("selection_draft_window_chars", 6000))
+
+    @property
+    def agent_audit_evidence_context_ceiling_tokens(self) -> int:
+        """审计 prompt 总量（模板+上下文+证据+输出预留）的 provider 上下文
+        天花板（A4.9 M8，默认 128000 ≈ DeepSeek 上下文）。运行时证据预算 =
+        min(max_evidence_tokens, 本值 − 非证据预留 10000)——防止 128k 证据
+        在 128k 上下文 provider 上整体超限 400 → fail-open 绕过
+        「截断→unverifiable」优雅路径。provider 上下文更大时可调高。"""
+        return int(self.agent_audit.get("evidence_context_ceiling_tokens", 128000))
+
+    @property
+    def agent_audit_full_evidence_max_tokens(self) -> int:
+        """确定性全量语料（full_text）的可选预算上限（tokens；≤0=不限，默认 0）。
+
+        残余①（2026-09-13，A4.9 R1 修复版语义）：M1 修复后确定性闸门消费未
+        裁剪全量语料——默认必须保持无上限（信息完整性 > token；任何上限都
+        可能重建「证据在窗外→不可满足」类）。本键仅给受约束部署（内存/延迟
+        预算）一个显式的、有标注的降级阀：按**条目粒度 token 预算**执行
+        （同一估算器，整块保留；首块即超限时二分头部前缀），超限追加无数字
+        标注（标注文本会进确定性闸门，数字可能被误当锚点），绝不静默。
+        生产默认 0。
+        """
+        return int(self.agent_audit.get("full_evidence_max_tokens", 0))
+
+    # ---- chunked draft-claim audit (2026-09-20 SOTA wave) ----
+    # 审计窗口不再加宽：长稿按段落语义分块，逐块提取原子声称+局部风险标记，
+    # 汇总为有界「全稿声称清单」（带确定性证据在场标注与覆盖率），交给全局
+    # 审计员/闸门；未覆盖段显式降级为低置信，绝不静默合格。
+    @property
+    def agent_audit_chunked_claim_audit_enabled(self) -> bool:
+        """[agent.audit] 分块声称清单（SOTA wave，2026-09-20）参数。"""
+        return bool(self.agent_audit.get("chunked_claim_audit_enabled", True))
+
+    @property
+    def agent_audit_chunked_claim_target_tokens(self) -> int:
+        """[agent.audit] 分块声称清单（SOTA wave，2026-09-20）参数。"""
+        return int(self.agent_audit.get("chunked_claim_target_tokens", 3000))
+
+    @property
+    def agent_audit_chunked_claim_max_chunks(self) -> int:
+        """[agent.audit] 分块声称清单（SOTA wave，2026-09-20）参数。"""
+        return int(self.agent_audit.get("chunked_claim_max_chunks", 16))
+
+    @property
+    def agent_audit_chunked_claim_max_concurrency(self) -> int:
+        """[agent.audit] 分块声称清单（SOTA wave，2026-09-20）参数。"""
+        return int(self.agent_audit.get("chunked_claim_max_concurrency", 3))
+
+    @property
+    def agent_audit_chunked_claim_timeout_seconds(self) -> float:
+        """[agent.audit] 分块声称清单（SOTA wave，2026-09-20）参数。"""
+        return float(self.agent_audit.get("chunked_claim_timeout_seconds", 90))
+
+    # ---- PTC (Programmatic Tool Calling) ----
+
+    @property
+    def agent_ptc(self) -> dict:
+        return self.agent.get("ptc", {})
+
+    @property
+    def agent_ptc_enabled(self) -> bool:
+        return bool(self.agent_ptc.get("enabled", False))
+
+    @property
+    def agent_ptc_allowed_tools(self) -> list:
+        return list(self.agent_ptc.get("allowed_tools", ["web_search", "browser", "memory"]))
+
+    # ---- Tool catalog visibility (P2-2) ----
+
+    @property
+    def agent_tools(self) -> dict:
+        return self.agent.get("tools", {})
+
+    @property
+    def agent_tools_visible(self) -> list:
+        """Global visible-tools allowlist (opencode visibleTools analogue).
+
+        Empty list (default) = all registered tools are offered to the model.
+        When non-empty, AgentLoop only injects schemas for the listed names and
+        registry.dispatch fail-closes on anything outside the set — reducing
+        per-turn prefill tokens and tool-catalog attention dilution.
+        """
+        return list(self.agent_tools.get("visible_tools", []) or [])
+
+    @property
+    def agent_tools_mcp_progressive_enabled(self) -> bool:
+        """MCP 工具渐进发现（progressive discovery, 2026-09-02）。
+
+        True（默认）：MCP server（[mcp.servers.*]，toolset 前缀 "mcp-"）的工具
+        schema 不进入每轮 LLM 请求；模型用常驻元工具 search_tools 按需检索，
+        AgentLoop 把命中的 schema 追加进后续迭代（只增不减），跨轮粘性由会话
+        历史预载承担。设为 False 恢复旧行为（全量 schema 注入）。单个 server
+        可用 [mcp.servers.<name>] eager = true 逃生（schema 常驻）。"""
+        return bool(self.agent_tools.get("mcp_progressive_enabled", True))
+
+    # ---- Synthetic system directives (4.8) ----
+
+    @property
+    def agent_synthetic_directives_enabled(self) -> bool:
+        """When True (default), internal agent directives (turn focus, audit
+        guidance, nudges, deathmatch continuations, grace prompts) are injected
+        as role="system" messages flagged synthetic=True instead of polluting
+        the user role. Set False to restore the legacy role="user" behavior."""
+        return bool(self.agent.get("synthetic_directives_enabled", True))
+
+    # ---- Session search ----
+
+    @property
+    def agent_session_search(self) -> dict:
+        return self.agent.get("session_search", {})
+
+    @property
+    def agent_session_search_enabled(self) -> bool:
+        return bool(self.agent_session_search.get("enabled", True))
+
+    # ---- Error recovery ----
+
+    @property
+    def agent_error_recovery(self) -> dict:
+        return self.agent.get("error_recovery", {})
+
+    @property
+    def agent_error_recovery_enabled(self) -> bool:
+        return bool(self.agent_error_recovery.get("enabled", True))
+
+    @property
+    def agent_error_recovery_max_retries(self) -> int:
+        return int(self.agent_error_recovery.get("max_retries", 2))
+
+    # ---- Delegation ----
+
+    @property
+    def agent_delegation(self) -> dict:
+        return self.agent.get("delegation", {})
+
+    @property
+    def agent_delegation_max_depth(self) -> int:
+        return int(self.agent_delegation.get("max_depth", 2))
+
+    @property
+    def agent_delegation_default_child_max_iterations(self) -> int:
+        return int(self.agent_delegation.get("default_child_max_iterations", 999))
+
+    @property
+    def agent_delegation_default_child_timeout(self) -> int:
+        return int(self.agent_delegation.get("default_child_timeout", 300))
+
+    # ---- Tool digest (subagent near-lossless reduction of large results) ----
+
+    @property
+    def agent_tool_digest(self) -> dict:
+        return self.agent.get("tool_digest", {})
+
+    @property
+    def agent_tool_digest_enabled(self) -> bool:
+        # Default OFF in code: upgrades without a [agent.tool_digest] section
+        # must not silently start paying for parallel subagent calls. The
+        # shipped config.toml enables it explicitly.
+        return bool(self.agent_tool_digest.get("enabled", False))
+
+    @property
+    def agent_tool_digest_min_chars(self) -> int:
+        return int(self.agent_tool_digest.get("min_digest_chars", 8000))
+
+    @property
+    def agent_tool_digest_max_chars(self) -> int:
+        return int(self.agent_tool_digest.get("max_digest_chars", 6000))
+
+    @property
+    def agent_tool_digest_max_concurrent(self) -> int:
+        return int(self.agent_tool_digest.get("max_concurrent", 5))
+
+    @property
+    def agent_tool_digest_max_tokens(self) -> Optional[int]:
+        """不设 == provider 默认最大输出（用户指令 2026-08-18）。"""
+        v = self.agent_tool_digest.get("max_tokens")
+        return int(v) if v not in (None, "", 0) else None
+
+    @property
+    def agent_tool_digest_timeout_seconds(self) -> float:
+        return float(self.agent_tool_digest.get("timeout_seconds", 120))
+
+    @property
+    def agent_tool_digest_batch_timeout_seconds(self) -> float:
+        """Aggregate deadline for one digest batch (parallel path). Kept at or
+        below the conversation inactivity timeout (300s) so the loop can never
+        stall past its own watchdog. 0 disables."""
+        return float(self.agent_tool_digest.get("batch_timeout_seconds", 300))
+
+    @property
+    def agent_tool_digest_temperature(self) -> float:
+        return float(self.agent_tool_digest.get("temperature", 0.3))
+
+    @property
+    def agent_tool_digest_verify(self) -> bool:
+        """Fact-check pass: one extra LLM call re-checks the digest against
+        the original and appends corrections (hardens the near-lossless
+        guarantee)."""
+        return bool(self.agent_tool_digest.get("verify", True))
+
+    @property
+    def agent_tool_digest_model(self) -> str:
+        return str(self.agent_tool_digest.get("model", "") or "")
+
+    @property
+    def agent_tool_digest_tools(self) -> list:
+        from app.services.tool_result_digest import DEFAULT_DIGEST_TOOLS
+        return [str(t) for t in self.agent_tool_digest.get("digest_tools", DEFAULT_DIGEST_TOOLS)]
+
+    # ---- MoA (Mixture of Agents) ----
+
+    @property
+    def agent_moa(self) -> dict:
+        return self.agent.get("moa", {})
+
+    @property
+    def agent_moa_enabled(self) -> bool:
+        return bool(self.agent_moa.get("enabled", False))
+
+    @property
+    def agent_moa_reference_providers(self) -> list:
+        return list(self.agent_moa.get("reference_providers", []))
+
+    @property
+    def agent_moa_aggregator_provider(self) -> str:
+        return str(self.agent_moa.get("aggregator_provider", "default"))
+
+    @property
+    def agent_moa_max_reference_models(self) -> int:
+        return int(self.agent_moa.get("max_reference_models", 3))
+
+    @property
+    def agent_moa_timeout_seconds(self) -> float:
+        return float(self.agent_moa.get("timeout_seconds", 120))
+
+    # ---- Skill Evolution ----
+
+    @property
+    def agent_skill_evolution(self) -> dict:
+        return self.agent.get("skill_evolution", {})
+
+    @property
+    def agent_skill_evolution_enabled(self) -> bool:
+        return bool(self.agent_skill_evolution.get("enabled", True))
+
+    @property
+    def agent_skill_evolution_auto_suggest_threshold(self) -> int:
+        return int(self.agent_skill_evolution.get("auto_suggest_threshold", 5))
+
+    # ---- Proactive Learning ----
+
+    @property
+    def agent_proactive_learning(self) -> dict:
+        return self.agent.get("proactive_learning", {})
+
+    @property
+    def agent_proactive_learning_enabled(self) -> bool:
+        return bool(self.agent_proactive_learning.get("enabled", True))
+
+    @property
+    def agent_proactive_learning_user_modeling_enabled(self) -> bool:
+        return bool(self.agent_proactive_learning.get("user_modeling_enabled", True))
+
+    # ---- Sub-agent ----
+
+    @property
+    def agent_sub_agent(self) -> dict:
+        return self.agent.get("sub_agent", {})
+
+    # ---- Agent memory ----
+
+    @property
+    def agent_memory(self) -> dict:
+        return self.agent.get("memory", {})
+
+    # ---- Agent media localization ----
+
+    @property
+    def agent_media_localize(self) -> dict:
+        """[agent.media_localize] — download remote media the agent displays into
+        the user's workspace (content-addressed sha256) and rewrite answer URLs.
+        Keys: enabled, max_per_message, timeout_seconds,
+        max_image_bytes, max_audio_bytes, max_video_bytes,
+        allow_private_hosts, total_timeout_seconds,
+        max_dir_bytes, neg_cache_ttl_seconds."""
+        return self.agent.get("media_localize", {})
+
+    # ---- Memory & Dreaming v2 ----
+
+    @property
+    def memory(self) -> dict:
+        return self._config.get("memory", {})
+
+    @property
+    def memory_interest_extract_timeout_seconds(self) -> float:
+        """兴趣画像提取（proactive_learning extract_interests → judge_json
+        interest_extract）的 LLM 判定超时秒数。默认 40：DeepSeek 拥塞时
+        prefill 11-33s 波动（TTFT 诊断），25s 预算贴线导致画像降级为纯结构
+        统计（60 服务器 2026-09-02 两次实测超时）。2026-09-10 超时审核 wave：
+        用户裁决 LLM 判断类超时不应过短（40→120）。超时兜底=topics/preferences
+        空壳+结构计数保留，下一轮画像构建自愈。"""
+        try:
+            return float(self.memory.get("interest_extract_timeout_seconds", 120.0))
+        except (TypeError, ValueError):
+            return 120.0
+
+    @property
+    def memory_concept(self) -> dict:
+        return self.memory.get("concept", {})
+
+    @property
+    def memory_retrieval(self) -> dict:
+        """[memory.retrieval] —— 检索/注入行为开关。注入预算键：
+        injection_total_token_budget（默认 2000）· injection_monopoly_share
+        （默认 0.7，Proteus 2608.16844 启发的单段垄断钳制：单段超预算时最多
+        占 share 份额，为后续段保留新鲜容量）· injection_min_relevance* ·
+        injection_max_episodic/concept/subconscious。
+        链接扩展键（WFM 2609.18182，代码默认关）：concept_link_expansion_enabled
+        · concept_link_expansion_max（每轮并入上限，默认 3）·
+        concept_link_expansion_units（unit 种子窗，默认 5）·
+        concept_link_expansion_score（链接候选基础分，默认 0.45）——
+        unit→concept 拓扑召回 + concept→unit 源条目摘录并置。
+        P0-P2 键（2026-10-04，MLSys'26 论文评估落地）：
+        consistency_enabled（默认 true，P1-② 图-密集一致性加权——只作用
+        近期被采纳（verified）候选，增量落 calibrated_score；
+        bonus/damp/rank_gap 可配）·
+        strategy_route_enabled（**默认 false**，P2 配置级策略路由——显式开启
+        即授权 profile 参数覆盖同名 stage2 配置；各档可经
+        [memory.retrieval.strategy.<profile>] 覆盖，默认档
+        entity_dense（关键词密度≥0.4：关系扩展加深）/narrative（收紧））。"""
+        return self.memory.get("retrieval", {})
+
+    @property
+    def memory_subconscious(self) -> dict:
+        return self.memory.get("subconscious", {})
+
+    @property
+    def memory_episodic(self) -> dict:
+        return self.memory.get("episodic", {})
+
+    @property
+    def memory_multimodal(self) -> dict:
+        return self.memory.get("multimodal", {})
+
+    @property
+    def memory_cost_governance(self) -> dict:
+        return self.memory.get("cost_governance", {})
+
+    @property
+    def memory_fatigue(self) -> dict:
+        return self.memory_concept.get("fatigue", {})
+
+    @property
+    def memory_timezone(self) -> str:
+        return self.memory.get("timezone", "Asia/Shanghai")
+
+    # ---- Providers ----
+
+    @property
+    def providers(self) -> dict:
+        return self._config.get("providers", {})
+
+    @property
+    def provider_configs(self) -> dict:
+        """Return provider configs keyed by provider type.
+        Example structure from config.toml:
+        [providers.deepseek]
+        base_url = "https://api.deepseek.com/v1"
+        api_key = "sk-..."
+        model_name = "deepseek-v4-flash"
+
+        [providers.zhipu]
+        base_url = "https://api.zhipu.ai/v1"
+
+        [providers.qwen]
+        base_url = "https://api.qwen.ai/v1"
+        """
+        providers = {}
+        raw = self._config.get("providers", {})
+        if not isinstance(raw, dict):
+            return providers
+        for key, value in raw.items():
+            if isinstance(value, dict):
+                providers[key] = {
+                    "base_url": str(value.get("base_url", "")).strip(),
+                    "api_key": str(value.get("api_key", "")).strip(),
+                    "model_name": str(value.get("model_name", "")).strip(),
+                }
+        # Always ensure deepseek falls back to [api] section if not explicitly configured
+        if "deepseek" not in providers:
+            providers["deepseek"] = {
+                "base_url": self.api_base_url,
+                "api_key": self.api_key or "",
+                "model_name": self.model_name or "",
+            }
+        else:
+            pd = providers["deepseek"]
+            if not pd["base_url"]:
+                pd["base_url"] = self.api_base_url
+            if not pd["api_key"]:
+                pd["api_key"] = self.api_key or ""
+            if not pd["model_name"]:
+                pd["model_name"] = self.model_name or ""
+        return providers
+
+    # Assistant provider_type → actual [providers.*] config key. The
+    # Qwen3.8(VLLM) UI type maps to the qwen3.8_27b vLLM deployment.
+    _PROVIDER_TYPE_ALIASES = {"qwen3.8_vllm": "qwen3.8_27b"}
+
+    def get_provider_config(self, provider_type: str) -> dict:
+        """Get config for a specific provider type."""
+        cfg = self.provider_configs.get(provider_type, {}) or self.provider_configs.get(
+            self._PROVIDER_TYPE_ALIASES.get(provider_type, ""), {}
+        )
+        return {
+            "base_url": cfg.get("base_url", ""),
+            "api_key": cfg.get("api_key", ""),
+            "model_name": cfg.get("model_name", ""),
+        }
+
+
+@lru_cache()
+def get_config() -> Config:
+    return Config()
+
+
+def clear_config_cache() -> None:
+    get_config.cache_clear()

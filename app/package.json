@@ -1,0 +1,44 @@
+{
+  "name": "weave-thinker-client-app",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test:unit": "node tests/workflows/test_stream_connection.cjs && node tests/workflows/test_context_tokens.cjs && node tests/workflows/test_note_word_count.cjs && node tests/workflows/test_markdown_table_repair.cjs && node tests/workflows/test_conversation_order.cjs && node tests/workflows/test_promote_wiring.cjs && node tests/workflows/test_grilling_wiring.cjs && node tests/workflows/test_file_preview_kinds.cjs && node tests/workflows/test_tab_table_convert.cjs && node tests/workflows/test_heading_typography.cjs && node tests/workflows/test_interjection_queue.cjs && node tests/workflows/test_voice_toggle_wiring.cjs && node tests/workflows/test_snippet_insert.cjs && node tests/workflows/test_split_ol_headings_wiring.cjs && node --experimental-strip-types tests/workflows/test_body_truncation_ux.cjs && node --experimental-strip-types tests/workflows/test_abort_caughtup_paged.cjs && node --experimental-strip-types tests/workflows/test_string_cache_key.cjs && node --experimental-strip-types tests/workflows/test_resume_503_retry.cjs && node --experimental-strip-types tests/workflows/test_stub_shape_strict.cjs && node --experimental-strip-types tests/workflows/test_endnote_threading.cjs && node ../tests/test_math_tokenizer.cjs && node --experimental-strip-types tests/workflows/test_stream_true_guard.cjs && node --experimental-strip-types tests/workflows/test_edit_file_ref_restore.cjs && node --experimental-strip-types tests/workflows/test_citation_source_heuristic.cjs && node tests/workflows/test_asr_reconnect.cjs && node tests/workflows/test_payload_stub_guard.cjs && node tests/workflows/test_local_patch_imports.cjs && node tests/workflows/test_workspace_root_setting_wiring.cjs"
+  },
+  "dependencies": {
+    "@capacitor/app": "^8.1.1",
+    "@capacitor/core": "^8.5.2",
+    "@capacitor/preferences": "^8.0.1",
+    "@tanstack/vue-virtual": "^3.13.31",
+    "@vue-office/docx": "^1.6.3",
+    "@vue-office/excel": "^1.7.14",
+    "@vue-office/pptx": "^1.0.1",
+    "axios": "^1.6.5",
+    "dompurify": "^3.2.5",
+    "echarts": "^6.1.0",
+    "highlight.js": "^11.11.1",
+    "katex": "^0.16.45",
+    "marked": "^17.0.5",
+    "mermaid": "^11.14.0",
+    "pdfjs-dist": "^6.3.289",
+    "pinia": "^2.1.7",
+    "simple-rnnoise-wasm": "^1.1.0",
+    "vue": "^3.4.15",
+    "vue-demi": "^0.14.6",
+    "vue-router": "^4.6.4",
+    "vuedraggable": "^4.1.0"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.5.2",
+    "@types/dompurify": "^3.0.5",
+    "@vitejs/plugin-vue": "^5.0.3",
+    "typescript": "^5.3.3",
+    "vite": "^5.0.11",
+    "vue-tsc": "^1.8.27"
+  },
+  "description": "Weave Thinker client SPA (shared by Electron desktop & Capacitor mobile)"
+}

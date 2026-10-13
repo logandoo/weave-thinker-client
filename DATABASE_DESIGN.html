@@ -1,0 +1,27 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8"><title>DATABASE_DESIGN — weave-thinker-client</title>
+<style>body{font-family:system-ui;max-width:960px;margin:2rem auto;line-height:1.6}code{background:#f3f4f6;padding:.1rem .3rem;border-radius:4px}table{border-collapse:collapse}td,th{border:1px solid #ddd;padding:.4rem .6rem}</style></head><body>
+<h1>DATABASE_DESIGN — 客户端本地存储</h1>
+<p><b>本仓无本地数据库，无 schema</b>——业务数据（会话/笔记/记忆/工作区）全部由 chatbot FastAPI + PostgreSQL 持有，客户端仅缓存。此文档登记客户端侧的键值存储面（无表结构变更面）。</p>
+<table><tr><th>存储</th><th>键/内容</th><th>宿主</th><th>状态</th></tr>
+<tr><td>localStorage</td><td><code>chatllm_token</code>（Bearer）· <code>wt-skin</code> · <code>theme</code> · 草稿/会话缓存等（源 SPA 既有键全保留）</td><td>Web / Electron / Capacitor(WKWebView·Android WebView)</td><td>✅ 可用（Electron app:// 下已实证持久）</td></tr>
+<tr><td>Capacitor Preferences</td><td>token 镜像（iOS 快速终止时 localStorage 可能蒸发 → 双层防御，W4 落地）</td><td>iOS/Android 原生 Keychain/SharedPrefs</td><td>⏳ W4</td></tr>
+<tr><td>IndexedDB</td><td>源 SPA 既有（若用）；Electron 支持</td><td>全宿主</td><td>继承</td></tr>
+<tr><td>文件系统（桌面）</td><td>用户显式选择的本地目录（经 NativeBridge.fs）；不设默认扫描面</td><td>Electron 主进程</td><td>✅ 桥已实现</td></tr></table>
+<h2>原则</h2>
+<ul><li>不做本地数据库/ORM：与源 SPA 保持同构，避免双端数据一致性成本。</li><li>token 跨宿主统一键名 <code>chatllm_token</code>；迁移 Capacitor Preferences 时保持同键镜像。</li><li>未来离线缓存（4.2 能力翼）若启用，采用 Cache API/Service Worker + 现有 IndexedDB，不引入 SQL 引擎。</li></ul>
+<h2>数据库选型决策（2026-09-23 用户质询：是否全面换 SQLite）</h2>
+<p><b>裁决：服务端保持 PostgreSQL（不换 SQLite）；客户端不引入本地数据库（v0）。</b></p>
+<ul>
+<li><b>服务端不换的依据</b>：记忆系统 8 个服务全依赖 pgvector 向量检索（backend/app/services/memory_*.py；requirements pgvector==0.5.0）；多用户 async 并发写 + 跨表事务 + per-item savepoint（记忆整合修复波）+ JSONB 聚合（jsonb_agg 修复）均为 PG 承重语义；生产数据 129MB dump 已在 PG。SQLite 单写者模型与 sqlite-vec 成熟度均不足以承接；迁移=重写记忆检索层，收益不成比例。</li>
+<li><b>客户端"换 SQLite"不成立</b>：本仓当前无本地数据库（token/皮肤在 localStorage，业务数据全在服务端）；未来离线缓存（W4/W5）若落地，SQLite/IndexedDB 是<b>增量缓存层</b>，与服务端 PG 并存，非替代。</li>
+<li><b>唯一重开条件</b>：产品转型为单用户桌面一体机（后打包进客户端）。届时建议保留容器化 PG（已有 Docker）而非重写数据层；若必须 SQLite，向量检索需 sqlite-vec 替代评估（届时另立评估）。</li>
+</ul>
+<h2>同步 schema（S1 波，2026-09-24；vendored server/ 侧新增，chatbot 零改动）</h2>
+<p>云-本地协同评估（docs/AUDIT_2026-09-24_cloud_local_sync.md §3.1）落地：四张同步表，<b>不改现有业务表语义</b>；事件捕获走 SQLAlchemy mapper 事件（同事务 <code>connection.execute</code>），bulk DML 实测仅 asr.py:124（非同步域）故全覆盖。create_all 幂等建表，无迁移 SQL。</p>
+<table><tr><th>表</th><th>关键列</th><th>语义</th></tr>
+<tr><td><code>sync_events</code></td><td>seq BIGSERIAL PK（=cursor）· user_id FK · entity_type · entity_id · op(create/update/delete) · payload JSONB（全行快照；delete 为 null）· origin_device · created_at；索引 (user_id, seq)</td><td>append-only 变更日志；delta 端点按 seq>cursor 分页 + Joplin 四规则压缩（update-update→update · create-update→create · create-delete→NOOP · update-delete→delete）</td></tr>
+<tr><td><code>sync_tombstones</code></td><td>id PK · user_id · entity_type · entity_id · deleted_at；唯一 (user_id, entity_type, entity_id)</td><td>删除墓碑（当前业务全硬删除，同步必须补）；delete 事件同事务写入</td></tr>
+<tr><td><code>sync_devices</code></td><td>id PK · user_id · name · platform · last_seen_at · revoked · created_at</td><td>设备注册/撤销；delta 携带 device_id 时抑制 origin 回显</td></tr>
+<tr><td><code>sync_blobs</code></td><td>复合 PK (sha256, user_id) · size · path · created_at</td><td>内容寻址文件元数据（同内容跨用户各持一行、越权 404；底层文件按 sha256 全局单份去重）</td></tr></table>
+<p>事件捕获域（S1）：conversations · messages · notes · notebooks · assistants。users 设置/memory 域（Phase 3）/运行态表（agent_tasks 等）不捕获（评估 §3.3）。Message 删除随 conversation ORM 级联逐行触发事件；payload=全行快照（字段级过滤列 S2 可调项）。user 归属：conversations/notebooks/assistants 直取 user_id；messages/notes 经父表单行 SELECT 归属。</p>
+</body></html>

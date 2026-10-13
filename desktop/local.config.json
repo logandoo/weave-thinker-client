@@ -1,0 +1,6 @@
+{
+  "enabled": true,
+  "pgPort": 55432,
+  "backendPort": 8159,
+  "apiBase": "http://127.0.0.1:8159"
+}

@@ -1,0 +1,298 @@
+"""用户设置 API — 用户资料（昵称/头像）+ 用户级模型供应商覆盖（2026-09-13）。
+
+设计：design/BACKEND_DESIGN_user_settings.html；计划 docs/PLAN.md Task 5。
+- GET/PUT /api/users/me/profile · POST/DELETE /api/users/me/avatar
+- GET/PUT/DELETE /api/users/me/model-provider
+"""
+import json
+import logging
+import uuid
+from datetime import datetime
+from pathlib import Path
+from typing import Optional
+
+from fastapi import APIRouter, Body, Depends, File, HTTPException, UploadFile, status
+from pydantic import BaseModel, Field
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.deps import get_current_user
+from app.db.database import User, UserModelProvider, get_db
+from app.schemas.chat import UserResponse
+from app.services import user_model_provider_service as provider_svc
+from app.services import user_profile_service
+
+logger = logging.getLogger(__name__)
+
+router = APIRouter(tags=["user-settings"])
+
+
+def _profile_response(user: User) -> UserResponse:
+    from app.services.agent_permissions import parse_permissions
+    return UserResponse(
+        id=user.id,
+        username=user.username,
+        created_at=user.created_at.isoformat(),
+        agent_permissions=parse_permissions(user),
+        nickname=getattr(user, "nickname", None) or None,
+        avatar_data=getattr(user, "avatar_data", None) or None,
+    )
+
+
+class ProfileUpdate(BaseModel):
+    nickname: Optional[str] = Field(default=None, max_length=50)
+
+
+# ---------------- 工作区根（W12 P2#10） ----------------
+
+class WorkspaceRootUpdate(BaseModel):
+    workspace_root: Optional[str] = Field(default=None, max_length=500)
+
+
+def _workspace_payload(user: User) -> dict:
+    from app.services.workspace_service import (
+        default_workspace_root,
+        resolve_user_workspace_root,
+        workspace_root_override,
+    )
+    return {
+        "workspace_root": str(resolve_user_workspace_root(user)),
+        "default_root": str(default_workspace_root(user.id, user.username)),
+        "is_override": workspace_root_override(user) is not None,
+    }
+
+
+@router.get("/api/users/me/workspace")
+async def get_workspace_root(user: User = Depends(get_current_user)):
+    return _workspace_payload(user)
+
+
+@router.put("/api/users/me/workspace")
+async def set_workspace_root(
+    payload: WorkspaceRootUpdate,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """设置/清除用户级工作区根（空串/None=恢复默认）。
+
+    校验：绝对路径、非根目录、可创建。持久化到 ui_preferences（随资料同步）。
+    """
+    from app.core.config import get_config
+    from app.services.user_preferences import apply_prefs_patch
+    from app.services.workspace_service import _ensure_workspace_directories, ensure_user_workspace
+
+    raw = (payload.workspace_root or "").strip()
+    if raw:
+        target = Path(raw).expanduser()
+        if not target.is_absolute():
+            raise HTTPException(status_code=400, detail="工作区目录必须是绝对路径")
+        target = target.resolve()
+        if len(target.parts) <= 1:
+            raise HTTPException(status_code=400, detail="工作区目录不合法")
+        # 多租户部署可用 [workspace].override_allowed_roots 白名单约束（空=不限制）。
+        allowed = get_config().workspace.get("override_allowed_roots") or []
+        if allowed:
+            def _under(p: Path, roots) -> bool:
+                for r in roots:
+                    if not isinstance(r, str) or not r.strip():
+                        continue
+                    try:
+                        rr = Path(r).expanduser().resolve()
+                    except OSError:
+                        continue
+                    if p == rr or rr in p.parents:
+                        return True
+                return False
+            if not _under(target, allowed):
+                raise HTTPException(status_code=400, detail="该部署不允许将工作区设置到指定目录")
+        # 评审修复：先完整预置目录（可写性预检），失败则不落配置；
+        # 提交后 ensure 不应再失败（同样的目录操作已成功过一次）。
+        try:
+            _ensure_workspace_directories(target)
+        except OSError as exc:
+            raise HTTPException(status_code=400, detail=f"目录不可用: {exc}")
+        apply_prefs_patch(user, {"workspace_root": str(target)})
+    else:
+        apply_prefs_patch(user, {"workspace_root": None})
+    db.add(user)
+    await db.commit()
+    await db.refresh(user)
+    try:
+        await ensure_user_workspace(db, user.id, user.username)
+    except Exception as exc:  # 兜底回滚，避免坏根持久化后卡死后续任务
+        apply_prefs_patch(user, {"workspace_root": None})
+        db.add(user)
+        await db.commit()
+        await db.refresh(user)
+        await ensure_user_workspace(db, user.id, user.username)
+        raise HTTPException(status_code=400, detail=f"工作区初始化失败，已回滚默认: {exc}")
+    return _workspace_payload(user)
+
+
+# ---------------- 用户资料 ----------------
+
+@router.get("/api/users/me/profile", response_model=UserResponse)
+async def get_profile(user: User = Depends(get_current_user)):
+    return _profile_response(user)
+
+
+@router.put("/api/users/me/profile", response_model=UserResponse)
+async def update_profile(
+    payload: ProfileUpdate,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    nickname = (payload.nickname or "").strip()
+    user.nickname = nickname or None
+    db.add(user)
+    await db.commit()
+    await db.refresh(user)
+    return _profile_response(user)
+
+
+@router.post("/api/users/me/avatar", response_model=UserResponse)
+async def upload_avatar(
+    file: UploadFile = File(...),
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    chunks: list[bytes] = []
+    total = 0
+    while True:
+        chunk = await file.read(1024 * 1024)
+        if not chunk:
+            break
+        total += len(chunk)
+        if total > user_profile_service.MAX_UPLOAD_BYTES:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"avatar too large (max {user_profile_service.MAX_UPLOAD_BYTES // (1024 * 1024)}MB)",
+            )
+        chunks.append(chunk)
+    try:
+        data_url = user_profile_service.process_avatar(b"".join(chunks))
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+    user.avatar_data = data_url
+    db.add(user)
+    await db.commit()
+    await db.refresh(user)
+    return _profile_response(user)
+
+
+@router.delete("/api/users/me/avatar", response_model=UserResponse)
+async def delete_avatar(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    user.avatar_data = None
+    db.add(user)
+    await db.commit()
+    await db.refresh(user)
+    return _profile_response(user)
+
+
+# ---------------- 模型供应商覆盖 ----------------
+
+def _llm_provider_list() -> list:
+    """系统 LLM 供应商（公共别名 + 显示名；不含 URL/Key/真实模型名）。"""
+    from app.model_gateway.registry import get_model_registry
+    return [
+        {"alias": ep["alias"], "display_name": ep["display_name"]}
+        for ep in get_model_registry().public_aliases(kind="llm")
+    ]
+
+
+@router.get("/api/users/me/model-provider")
+async def get_model_provider(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    rows = await provider_svc.list_user_provider_rows(db, user.id)
+    return {**provider_svc.serialize_status(rows), "llm_providers": _llm_provider_list()}
+
+
+@router.put("/api/users/me/model-provider")
+async def update_model_provider(
+    payload: dict = Body(...),
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    known_aliases = {p["alias"] for p in _llm_provider_list()}
+    try:
+        parsed = provider_svc.parse_overrides_payload(payload, known_llm_aliases=known_aliases)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+
+    result = await db.execute(
+        select(UserModelProvider).where(UserModelProvider.user_id == user.id)
+    )
+    existing = {
+        provider_svc.override_key_for_row(row): row
+        for row in result.scalars().all()
+    }
+    # A4.9 Important 修复：改 pg upsert（ON CONFLICT (user_id, kind, provider)）——
+    # 唯一索引下并发双 PUT 不再产生重复行/IntegrityError。
+
+    for key, cfg in parsed.items():
+        row = existing.get(key)
+        if cfg is None:
+            if row is not None:
+                await db.delete(row)
+            continue
+        # A4.9 Minor 修复（2026-09-13）：全空覆盖无意义（无 URL/模型/参数/Key）
+        # → 视同删除，避免留下 GET 可见但无 "已覆盖" 标记的空行。例外：既有行
+        # 且 api_key 保持原值（None）时保留——UI 承诺"留空保持不变"。
+        _has_effective = bool(
+            cfg["base_url"] or cfg["model_name"]
+            or any(v is not None for v in cfg["params"].values())
+            or (cfg["api_key"] not in (None, ""))
+            or (row is not None and cfg["api_key"] is None)
+        )
+        if not _has_effective:
+            if row is not None:
+                await db.delete(row)
+            continue
+        kind, provider = provider_svc.split_override_key(key)
+        # 全量保真波（评审 I1）：供应商覆盖属同步域——改 ORM 路径使
+        # sync_capture mapper 事件逐行触发（Core pg_insert 绕过事件，UI 保存
+        # 永不出站）。row 已由上方既有 select 载入。
+        if row is None:
+            row = UserModelProvider(
+                id=str(uuid.uuid4()), user_id=user.id, kind=kind, provider=provider,
+                created_at=datetime.utcnow(),
+            )
+            db.add(row)
+        row.enabled = cfg["enabled"]
+        row.base_url = cfg["base_url"]
+        row.model_name = cfg["model_name"]
+        row.params_json = json.dumps(cfg["params"], ensure_ascii=False)
+        if cfg["api_key"] is not None:
+            row.api_key = cfg["api_key"]
+        row.updated_at = datetime.utcnow()
+    await db.commit()
+    # 历史上 Core upsert 旁路 identity map 需显式过期；现 ORM 路径下保留
+    # expire_all 作为防御（读响应前强制回源，代价一次 SELECT）。
+    # 注意：expire_all 会连同 user 一起过期，uid 必须提前捕获（否则后续
+    # user.id 触发 async 上下文中的同步懒加载 → MissingGreenlet 500）。
+    uid = user.id
+    provider_svc.invalidate_user_overrides(uid)
+    db.expire_all()
+    rows = await provider_svc.list_user_provider_rows(db, uid)
+    return {**provider_svc.serialize_status(rows), "llm_providers": _llm_provider_list()}
+
+
+@router.delete("/api/users/me/model-provider")
+async def delete_model_provider(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(UserModelProvider).where(UserModelProvider.user_id == user.id)
+    )
+    rows = result.scalars().all()
+    for row in rows:
+        await db.delete(row)
+    await db.commit()
+    provider_svc.invalidate_user_overrides(user.id)
+    return {"deleted": len(rows)}

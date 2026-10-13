@@ -1,0 +1,1551 @@
+import asyncio
+import base64
+import json
+import logging
+import os
+import struct
+import uuid
+import time
+import httpx
+from typing import Optional, AsyncIterator
+from pathlib import Path
+from urllib.parse import urlparse, urlunparse
+
+import websockets
+from fastapi import WebSocket, WebSocketDisconnect
+from websockets.exceptions import ConnectionClosed
+
+from app.core.config import get_config
+from app.services.http_client import get_shared_async_client
+
+logger = logging.getLogger(__name__)
+
+# ── 听写/语音 WS 客户端关闭码契约（useAsrStreaming.handleSocketClose 依此决策）──
+# 1000 = 正常结束（用户 finish / task-finished）        → 不重连
+# 1008 = 致命（task-failed / 鉴权 / 配置 / 未预期异常） → 不重连，报错停止
+# 1011 = 瞬断（上游 ASR WS 掉线）                       → scheduleReconnect 收编
+# 客户端侧把「1000/1005/1008」判为停止，其余异常码（含网络层合成的 1006）判为可重连。
+WS_CLOSE_NORMAL = 1000
+WS_CLOSE_FATAL = 1008
+WS_CLOSE_UPSTREAM_DROP = 1011
+
+
+def _is_fatal_connect_error(exc: BaseException) -> bool:
+    """建连失败是否致命（不可重试）。
+
+    鉴权/握手被拒（401/403/InvalidHandshake）与「服务未配置」类错误重试必然
+    复现，交客户端以 WS_CLOSE_FATAL 停止；其余（DNS/超时/连接被重置）判瞬断。
+    """
+    try:
+        from websockets.exceptions import InvalidHandshake, InvalidStatusCode
+        if isinstance(exc, (InvalidHandshake, InvalidStatusCode)):
+            return True
+        status = getattr(exc, "status_code", None) or getattr(exc, "response", None) and getattr(exc.response, "status_code", None)
+        if status in (400, 401, 403, 404):
+            return True
+    except Exception:
+        pass
+    return False
+
+
+def _compose_funasr_final_text(finalized_segments: list, pending_tail: str) -> str:
+    """Compose the final transcript for a Fun-ASR task.
+
+    ``finalized_segments`` holds sentences that reached ``sentence_end``;
+    ``pending_tail`` is the latest in-progress sentence (empty when the last
+    result was finalized). The pending tail is always appended so the final
+    text never truncates what the user saw as partial text — including the
+    verbatim-repetition case where the tail is an exact suffix of the join.
+    """
+    final_text = "".join(finalized_segments)
+    if pending_tail:
+        final_text += pending_tail
+    return final_text
+
+
+def _hotword_text(item) -> str:
+    if item is None:
+        return ""
+    if isinstance(item, dict):
+        return str(item.get("text", "")).strip()
+    return str(getattr(item, "text", "")).strip()
+
+
+def _hotword_weight(item) -> int:
+    if item is None:
+        return 4
+    if isinstance(item, dict):
+        return int(item.get("weight", 4))
+    return int(getattr(item, "weight", 4))
+
+
+def apply_hotword_phonetic_correction(text: str, hotwords: Optional[list]) -> str:
+    """Replace phonetically identical ASR outputs with configured hotwords.
+
+    Some ASR models (especially for rare Chinese characters) return homophones
+    instead of the exact hotword text. This function uses pinyin to map those
+    homophones back to the intended hotword.
+    """
+    if not text or not hotwords:
+        return text
+
+    try:
+        from pypinyin import lazy_pinyin
+    except Exception:
+        return text
+
+    hotword_map: dict[str, tuple[str, int]] = {}
+    for item in hotwords:
+        word = _hotword_text(item)
+        if len(word) < 2:
+            continue
+        pinyin = " ".join(lazy_pinyin(word))
+        if pinyin not in hotword_map or _hotword_weight(item) > hotword_map[pinyin][1]:
+            hotword_map[pinyin] = (word, _hotword_weight(item))
+
+    if not hotword_map:
+        return text
+
+    # Sort by word length (desc) then weight (desc) so longer / stronger matches win.
+    ordered = sorted(hotword_map.items(), key=lambda kv: (-len(kv[1][0]), -kv[1][1]))
+    chars = list(text)
+    i = 0
+    while i < len(chars):
+        matched = False
+        for pinyin, (word, _) in ordered:
+            n = len(word)
+            if i + n > len(chars):
+                continue
+            substr = "".join(chars[i:i + n])
+            if substr == word:
+                i += n
+                matched = True
+                break
+            substr_pinyin = " ".join(lazy_pinyin(substr))
+            if substr_pinyin == pinyin:
+                chars[i:i + n] = list(word)
+                i += n
+                matched = True
+                logger.debug("Phonetic hotword correction: %r -> %r", substr, word)
+                break
+        if not matched:
+            i += 1
+
+    return "".join(chars)
+
+
+def _general_auth_headers(api_key: str) -> dict:
+    """通用 HTTP ASR 路径的鉴权头（A4.9 R2 复审修复）。
+
+    自定义 URL 时 api_key = 用户填写或空；空则不发 Authorization。
+    系统通用端点携带自己的端点 Key（同 URL 语义，无外泄）。
+    """
+    return {"Authorization": f"Bearer {api_key}"} if api_key else {}
+
+
+DEFAULT_DASSCOPE_ASR_MODEL = "qwen3-asr-flash-realtime-2026-02-10"
+
+
+def _is_run_task_protocol_model(model: str) -> bool:
+    """run-task duplex WS 协议族判定。
+
+    Fun-ASR-Realtime / Paraformer-realtime / Qwen-Audio-3.x-ASR-Flash-Streaming
+    共用同一 run-task/finish-task 协议（百炼 Realtime API 概述）；Filetrans 系
+    非流式整文件转写（qwen-audio-*-filetrans），不入此族。"""
+    m = (model or "").lower()
+    return (
+        m.startswith("fun-asr")
+        or m.startswith("paraformer")
+        or (m.startswith("qwen-audio") and "asr" in m and m.endswith("streaming"))
+    )
+
+
+def _recognition_tuning_params(cfg: dict, model: str = "") -> dict:
+    """run-task 识别调参接线（Qwen-Audio-3.1 专属键经 [asr] 配置下发）。
+
+    - ``vad_model``: near_meeting_16k（近场）/ far_field_meeting_16k（服务端默认）
+    - ``keep_dialect``: true=保留方言原文，false/缺省=方言转写为普通话
+    未显式配置的键不下发，取服务端默认。**3.1 专属**：仅 qwen-audio-3.1 系
+    模型下发，fun-asr/paraformer 回退收不到不支持键（A4.9 R2-I1）。"""
+    out: dict = {}
+    if not (model or "").lower().startswith("qwen-audio-3.1"):
+        return out
+    if cfg.get("vad_model"):
+        out["vad_model"] = str(cfg["vad_model"])
+    if cfg.get("keep_dialect") is not None:
+        out["keep_dialect"] = bool(cfg["keep_dialect"])
+    return out
+
+
+def _supports_instant_vocabulary(model: str) -> bool:
+    """即时热词 ``vocabulary`` 仅 Qwen-Audio-3.x 族支持（百炼 improve-asr-accuracy）；
+    fun-asr/paraformer 走预编译 vocabulary_id，内联词不下发。"""
+    return (model or "").lower().startswith("qwen-audio")
+
+
+def _keepalive_run_task_params(cfg: dict, speech_noise_threshold: float) -> dict:
+    """run-task 保活/断句参数 —— 语音面与听写面唯一事实源。
+
+    官方文档（百炼 Fun-ASR-Realtime 客户端事件）：``heartbeat`` 缺省 ``false``，
+    「即使持续发送静音音频，连接也将在 60 秒后因超时而断开」——即「语音识别很容易
+    断开」的直接来源。听写面曾四键全缺（上游 A4.9 复审 deferred Minor，从未修），
+    与语音面 ``voice_service._funasr_connect`` 参数面漂移；本函数收口双面同源。
+
+    - ``max_sentence_silence``: VAD 断句静音阈值 ms，取 [asr] 配置（缺省 800；
+      服务端默认 1300 会与语音面手感不一致）
+    - ``multi_threshold_mode_enabled``: 防 VAD 切断长句
+    - ``heartbeat``: 静默保活（真断开根因）
+    - ``speech_noise_threshold``: 语音/噪声判定阈值，与语音面同旋钮
+      ``voice_asr_speech_noise_threshold``（单旋钮，per-purpose 拆分留后续）
+    """
+    return {
+        "max_sentence_silence": int(cfg.get("max_sentence_silence", 800)),
+        "multi_threshold_mode_enabled": True,
+        "heartbeat": True,
+        "speech_noise_threshold": speech_noise_threshold,
+    }
+
+
+class ASRService:
+    @property
+    def _asr_config(self) -> dict:
+        return get_config().asr
+
+    @property
+    def _endpoint(self):
+        """model_gateway 收口（2026-08-30）：ASR 端点统一来自 registry
+        （url/key/model + dashscope/mimo 协议细节入 extra）；超时等
+        行为调参键仍读 [asr] config。"""
+        from app.model_gateway.registry import get_model_registry
+        try:
+            return get_model_registry().get("asr")
+        except Exception:
+            return None
+
+    @property
+    def base_url(self) -> str:
+        ep = self._endpoint
+        if ep is not None:
+            return ep.base_url
+        return self._asr_config.get("base_url", "")
+
+    @property
+    def model(self) -> str:
+        ep = self._endpoint
+        if ep is not None and ep.model_name:
+            return ep.model_name
+        # 2026-09-01 用户纠正：早期方案遗留默认 qwen3-asr 已废弃——
+        # MiMo 默认 mimo-v2.5-asr，通用模式默认 paraformer-zh（按 provider 区分）。
+        default = "mimo-v2.5-asr" if self.provider == "mimo" else "paraformer-zh"
+        return self._asr_config.get("model", default)
+
+    @property
+    def provider(self) -> str:
+        """ASR 引擎选择（2026-08-31 端点池化，U1）：单一 provider 字段取代
+        is_dashscope/is_mimo 布尔对。解析链：endpoint.provider_type →
+        [asr].asr_provider（新键）→ legacy 布尔 → 缺省 dashscope。"""
+        ep = self._endpoint
+        if ep is not None:
+            pt = str(ep.provider_type or "").strip().lower()
+            if pt in ("dashscope", "mimo", "general"):
+                return pt
+            if pt == "" and (ep.base_url or ""):
+                # 显式端点带 base_url 而未声明 provider = 通用 HTTP 模式
+                return "general"
+        raw = str(self._asr_config.get("asr_provider", "") or "").strip().lower()
+        if raw in ("dashscope", "mimo", "general"):
+            return raw
+        if bool(self._asr_config.get("is_mimo", False)):
+            return "mimo"
+        if bool(self._asr_config.get("is_dashscope", False)):
+            return "dashscope"
+        if str(self._asr_config.get("base_url", "") or ""):
+            # legacy 通用模式（旧文件三模式之 3）：base_url 有值且未开流式布尔
+            return "general"
+        return "dashscope"
+
+    @property
+    def is_dashscope(self) -> bool:
+        return self.provider == "dashscope"
+
+    @property
+    def dashscope_api_key(self) -> str:
+        ep = self._endpoint
+        if ep is not None:
+            # 单一密钥原则（2026-08-31）：顶层 api_key 即当前 provider 的密钥；
+            # 旧显式端点（密钥在 extra.dashscope_api_key）仍兜底。
+            return str(ep.api_key or "") or str(ep.extra.get("dashscope_api_key", "") or "")
+        return self._asr_config.get("dashscope_api_key", "")
+
+    @property
+    def dashscope_model(self) -> str:
+        ep = self._endpoint
+        if ep is not None:
+            # 单一模型名原则：顶层 model_name 即当前 provider 的模型
+            return str(ep.model_name or "") or str(ep.extra.get("dashscope_model", "") or "") or DEFAULT_DASSCOPE_ASR_MODEL
+        return self._asr_config.get("dashscope_model", DEFAULT_DASSCOPE_ASR_MODEL)
+
+    @property
+    def is_mimo(self) -> bool:
+        return self.provider == "mimo"
+
+    @property
+    def api_key(self) -> str:
+        ep = self._endpoint
+        if ep is not None:
+            return ep.api_key
+        return self._asr_config.get("api_key", "")
+
+    @property
+    def enabled(self) -> bool:
+        if self.is_mimo:
+            return bool(self.base_url and self.api_key)
+        if self.is_dashscope:
+            return bool(self.dashscope_api_key)
+        return bool(self.base_url)
+
+    @property
+    def websocket_url(self) -> str:
+        if not self.base_url:
+            return ""
+
+        parsed = urlparse(self.base_url)
+        scheme = "wss" if parsed.scheme == "https" else "ws"
+        base_path = parsed.path.rstrip("/")
+        stream_path = f"{base_path}/ws/transcribe/stream" if base_path else "/ws/transcribe/stream"
+        return urlunparse((scheme, parsed.netloc, stream_path, "", "", ""))
+
+    @property
+    def mimo_partial_interval_seconds(self) -> float:
+        return float(self._asr_config.get("mimo_partial_interval_seconds", 1.5))
+
+    @property
+    def mimo_partial_min_seconds(self) -> float:
+        return float(self._asr_config.get("mimo_partial_min_seconds", 0.5))
+
+    @property
+    def hotword_phonetic_correction(self) -> bool:
+        return bool(self._asr_config.get("hotword_phonetic_correction", True))
+
+    def get_audio_files_dir(self) -> Path:
+        backend_dir = Path(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+        audio_dir = backend_dir / "audio_files"
+        audio_dir.mkdir(parents=True, exist_ok=True)
+        return audio_dir
+
+    async def save_audio_file(self, audio_data: bytes, original_filename: str = "audio.wav") -> Path:
+        audio_dir = self.get_audio_files_dir()
+        timestamp = int(time.time() * 1000)
+        unique_id = uuid.uuid4().hex[:8]
+        file_ext = Path(original_filename).suffix or ".wav"
+        filename = f"{timestamp}_{unique_id}{file_ext}"
+        file_path = audio_dir / filename
+        await asyncio.to_thread(file_path.write_bytes, audio_data)
+        return file_path
+
+    def _detect_audio_type(self, audio_data: bytes) -> tuple[str, str]:
+        if audio_data[:4] == b'RIFF' and audio_data[8:12] == b'WAVE':
+            return ("audio.wav", "audio/wav")
+        elif audio_data[:4] == b'\x1aE\xdf\xa3':
+            return ("audio.webm", "audio/webm")
+        elif audio_data[:4] == b'fLaC':
+            return ("audio.flac", "audio/flac")
+        elif audio_data[:6] == b'ID3' or audio_data[:2] in [b'\xff\xfb', b'\xff\xf3', b'\xff\xf9']:
+            return ("audio.mp3", "audio/mpeg")
+        return ("audio.wav", "audio/wav")
+
+    @staticmethod
+    def _float32_to_pcm16(float32_bytes: bytes) -> bytes:
+        num_samples = len(float32_bytes) // 4
+        if num_samples == 0:
+            return b""
+        try:
+            floats = struct.unpack(f'<{num_samples}f', float32_bytes[:num_samples * 4])
+        except struct.error:
+            return b""
+        pcm16_samples = []
+        for f in floats:
+            clamped = max(-1.0, min(1.0, f))
+            pcm16_samples.append(int(clamped * 32767))
+        return struct.pack(f'<{len(pcm16_samples)}h', *pcm16_samples)
+
+    @staticmethod
+    def _float32_to_pcm16_base64(float32_bytes: bytes) -> str:
+        pcm16_bytes = ASRService._float32_to_pcm16(float32_bytes)
+        if not pcm16_bytes:
+            return ""
+        return base64.b64encode(pcm16_bytes).decode('ascii')
+
+    @staticmethod
+    def _pcm16_to_wav(pcm16_bytes: bytes, sample_rate: int = 16000, channels: int = 1) -> bytes:
+        """Wrap raw PCM16 bytes in a minimal WAV header."""
+        if not pcm16_bytes:
+            return b""
+        byte_rate = sample_rate * channels * 2
+        block_align = channels * 2
+        data_chunk_size = len(pcm16_bytes)
+        fmt_chunk_size = 16
+        audio_format = 1  # PCM
+        header = struct.pack(
+            '<4sI4s4sIHHIIHH4sI',
+            b'RIFF',
+            36 + data_chunk_size,
+            b'WAVE',
+            b'fmt ',
+            fmt_chunk_size,
+            audio_format,
+            channels,
+            sample_rate,
+            byte_rate,
+            block_align,
+            16,
+            b'data',
+            data_chunk_size,
+        )
+        return header + pcm16_bytes
+
+    @staticmethod
+    def _float32_to_wav(float32_bytes: bytes) -> bytes:
+        pcm16 = ASRService._float32_to_pcm16(float32_bytes)
+        return ASRService._pcm16_to_wav(pcm16)
+
+    def _build_mimo_asr_payload(self, audio_base64: str, mime_type: str = "audio/wav", language: str = "auto") -> dict:
+        return {
+            "model": self.model,
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "input_audio",
+                            "input_audio": {
+                                "data": f"data:{mime_type};base64,{audio_base64}"
+                            }
+                        }
+                    ]
+                }
+            ],
+            "asr_options": {
+                "language": language
+            }
+        }
+
+    async def _convert_audio_to_wav(self, audio_data: bytes, filename: str = "audio.wav") -> bytes:
+        """Convert input audio bytes to a 16 kHz mono WAV, reusing the temp file layout."""
+        detected_name, detected_type = self._detect_audio_type(audio_data)
+        audio_dir = self.get_audio_files_dir()
+        timestamp = int(time.time() * 1000)
+        unique_id = uuid.uuid4().hex[:8]
+        original_file = audio_dir / f"{timestamp}_{unique_id}_{detected_name}"
+        await asyncio.to_thread(original_file.write_bytes, audio_data)
+
+        wav_bytes: bytes
+        try:
+            need_conversion = detected_type in ("audio/webm", "audio/flac", "audio/mpeg", "audio/mp3")
+            if need_conversion:
+                wav_file = audio_dir / f"{timestamp}_{unique_id}_converted.wav"
+                try:
+                    proc = await asyncio.create_subprocess_exec(
+                        "ffmpeg", "-y", "-i", str(original_file), "-ar", "16000", "-ac", "1", "-acodec", "pcm_s16le", str(wav_file),
+                        stdout=asyncio.subprocess.PIPE,
+                        stderr=asyncio.subprocess.PIPE,
+                    )
+                    try:
+                        stdout, stderr = await asyncio.wait_for(
+                            proc.communicate(),
+                            timeout=int(self._asr_config.get("ffmpeg_timeout_seconds", 60))
+                        )
+                    except asyncio.TimeoutError:
+                        proc.kill()
+                        await proc.wait()
+                        raise RuntimeError("ffmpeg conversion timed out")
+                    if proc.returncode != 0:
+                        raise RuntimeError(f"ffmpeg conversion failed: {stderr.decode()}")
+                    wav_bytes = await asyncio.to_thread(wav_file.read_bytes)
+                finally:
+                    if await asyncio.to_thread(wav_file.exists):
+                        await asyncio.to_thread(wav_file.unlink)
+            else:
+                wav_bytes = await asyncio.to_thread(original_file.read_bytes)
+        finally:
+            if await asyncio.to_thread(original_file.exists):
+                await asyncio.to_thread(original_file.unlink)
+
+        return wav_bytes
+
+    async def _transcribe_mimo_streaming(
+        self,
+        audio_data: bytes,
+        filename: str = "audio.wav",
+        language: str = "auto",
+        is_float32: bool = False,
+    ) -> AsyncIterator[str]:
+        """Stream MiMo ASR results via the OpenAI-compatible streaming API.
+
+        MiMo requires the full audio to be sent in a single request, but the
+        text is returned incrementally when ``stream: true`` is set. This
+        generator yields each incoming content delta.
+        """
+        if not self.base_url or not self.api_key:
+            raise RuntimeError("MiMo ASR is not configured")
+
+        if is_float32:
+            wav_bytes = await asyncio.to_thread(self._float32_to_wav, audio_data)
+        else:
+            wav_bytes = await self._convert_audio_to_wav(audio_data, filename)
+        if not wav_bytes:
+            raise RuntimeError("Audio conversion produced empty WAV")
+
+        audio_base64 = await asyncio.to_thread(base64.b64encode, wav_bytes)
+        audio_base64_str = audio_base64.decode('ascii')
+        payload = self._build_mimo_asr_payload(audio_base64_str, mime_type="audio/wav", language=language)
+        payload["stream"] = True
+
+        client = get_shared_async_client()
+        async with client.stream(
+            "POST",
+            f"{self.base_url}/chat/completions",
+            headers={"api-key": self.api_key},
+            json=payload,
+            timeout=float(self._asr_config.get("http_timeout_seconds", 300.0)),
+        ) as response:
+            response.raise_for_status()
+            async for line in response.aiter_lines():
+                line = line.strip()
+                if not line or not line.startswith("data: "):
+                    continue
+                data = line[6:].strip()
+                if data == "[DONE]":
+                    break
+                try:
+                    chunk = json.loads(data)
+                except json.JSONDecodeError:
+                    continue
+                choices = chunk.get("choices") or []
+                if not choices:
+                    continue
+                delta = choices[0].get("delta", {})
+                content = delta.get("content", "")
+                if content:
+                    yield content
+
+    async def _transcribe_mimo(self, audio_data: bytes, filename: str = "audio.wav", language: str = "auto") -> dict:
+        """Non-streaming MiMo ASR: collect all streaming deltas and return the full text."""
+        if not self.base_url or not self.api_key:
+            raise RuntimeError("MiMo ASR is not configured")
+
+        text_parts: list[str] = []
+        async for chunk in self._transcribe_mimo_streaming(audio_data, filename, language):
+            text_parts.append(chunk)
+
+        return {
+            "text": "".join(text_parts),
+            "language": language if language != "auto" else None,
+            "timestamps": [],
+            "segments": [],
+            "hotwords_used": [],
+            "speaker_mode": "disabled",
+            "duration": None,
+        }
+
+    @property
+    def _is_funasr_model(self) -> bool:
+        """run-task duplex WS 协议族判定（听写流式代理分派用）。
+
+        Fun-ASR-Realtime / Paraformer-realtime / Qwen-Audio-3.x-ASR-Flash-Streaming
+        共用同一 run-task/finish-task 协议（百炼 Realtime API 概述）；Filetrans
+        系非流式整文件转写，不入此族。"""
+        return _is_run_task_protocol_model(self.dashscope_model)
+
+    async def transcribe_file(self, audio_data: bytes, filename: str = "audio.wav", language: str = "auto") -> dict:
+        """一次性整段转写（agent 工具 asr_transcribe 入口，2026-08-31）。
+
+        按 provider 分派：mimo → 既有非流式 POST；dashscope → Fun-ASR WS
+        一次性（语音通道只有流式代理实现，此处补齐单段转写）；general →
+        既有 POST {base_url}/transcribe。"""
+        if not self.enabled:
+            raise RuntimeError("ASR service is not configured")
+        if self.is_mimo:
+            return await self._transcribe_mimo(audio_data, filename, language)
+        if self.is_dashscope:
+            return await self._transcribe_dashscope_oneshot(audio_data, filename, language)
+        return await self.transcribe(audio_data, filename)
+
+    async def _transcribe_dashscope_oneshot(self, audio_data: bytes, filename: str = "audio.wav", language: str = "auto") -> dict:
+        """DashScope Fun-ASR WebSocket 一次性转写：run-task → 送整段 pcm16 →
+        finish-task → 收集 sentence_end 句子直到 task-finished。
+        （general 路径的 language 由 self-hosted 服务端自行处理，POST 契约不带该字段。）"""
+        import websockets
+
+        if not self.dashscope_api_key:
+            raise RuntimeError("Dashscope API key is not configured")
+
+        pcm = await asyncio.to_thread(
+            self._convert_audio_to_raw_pcm16, audio_data, filename
+        )
+        if not pcm:
+            raise RuntimeError("Audio conversion produced empty PCM")
+
+        task_id = uuid.uuid4().hex[:32]
+        headers = {"Authorization": f"bearer {self.dashscope_api_key}"}
+        upstream = await websockets.connect(
+            "wss://dashscope.aliyuncs.com/api-ws/v1/inference/",
+            proxy=None,
+            additional_headers=headers,
+            max_size=None,
+            open_timeout=int(self._asr_config.get("ws_open_timeout", 10)),
+            ping_interval=int(self._asr_config.get("ws_ping_interval", 20)),
+            ping_timeout=int(self._asr_config.get("ws_ping_timeout", 20)),
+            close_timeout=int(self._asr_config.get("ws_close_timeout", 5)),
+        )
+        try:
+            async with upstream:
+                parameters: dict = {"sample_rate": 16000, "format": "pcm"}
+                parameters.update(_recognition_tuning_params(self._asr_config, self.dashscope_model))
+                if language and language != "auto":
+                    parameters["language_hints"] = [language]
+                run_task = {
+                    "header": {"action": "run-task", "task_id": task_id, "streaming": "duplex"},
+                    "payload": {
+                        "task_group": "audio", "task": "asr", "function": "recognition",
+                        "model": self.dashscope_model,
+                        "parameters": parameters, "input": {},
+                    },
+                }
+                await upstream.send(json.dumps(run_task))
+                # 等 task-started
+                while True:
+                    raw = await upstream.recv()
+                    msg = json.loads(raw) if isinstance(raw, str) else {}
+                    if msg.get("header", {}).get("event") == "task-started":
+                        break
+                    if msg.get("header", {}).get("event") == "task-failed":
+                        raise RuntimeError(str(msg.get("header", {}).get("error_message", "task failed")))
+                # 送整段 pcm（32KB 帧序贯发送）+ finish-task
+                chunk_size = 32000
+                for i in range(0, len(pcm), chunk_size):
+                    await upstream.send(pcm[i:i + chunk_size])
+                await upstream.send(json.dumps({
+                    "header": {"action": "finish-task", "task_id": task_id, "streaming": "duplex"},
+                    "payload": {"input": {}},
+                }))
+                finalized: list[str] = []
+                pending_tail = ""
+                while True:
+                    raw = await upstream.recv()
+                    if isinstance(raw, bytes):
+                        continue
+                    msg = json.loads(raw)
+                    event = msg.get("header", {}).get("event", "")
+                    if event == "result-generated":
+                        sentence = (msg.get("payload", {}).get("output", {}) or {}).get("sentence", {}) or {}
+                        text_val = str(sentence.get("text", "") or "")
+                        if text_val:
+                            if sentence.get("sentence_end", False):
+                                finalized.append(text_val)
+                                pending_tail = ""
+                            else:
+                                pending_tail = text_val
+                    elif event == "task-finished":
+                        final_text = _compose_funasr_final_text(finalized, pending_tail)
+                        # 注：一次性通道暂不注入用户热词（热词属 per-user 上下文，
+                        # 工具层未传；与流式通道的 vocabulary_id/inline 热词不同）。
+                        return {
+                            "text": final_text, "language": None if language == "auto" else language,
+                            "timestamps": [], "segments": [
+                                {"text": t} for t in finalized
+                            ], "hotwords_used": [], "speaker_mode": "disabled", "duration": None,
+                        }
+                    elif event == "task-failed":
+                        raise RuntimeError(str(msg.get("header", {}).get("error_message", "task failed")))
+        except Exception as exc:
+            logger.error("dashscope one-shot transcribe failed: %s", exc)
+            raise
+
+    def _convert_audio_to_raw_pcm16(self, audio_data: bytes, filename: str = "audio.wav") -> bytes:
+        """ffmpeg → 16kHz 单声道 s16le 裸 PCM（Fun-ASR WS 需要 headerless pcm）。"""
+        import subprocess
+        detected_name, _detected_type = self._detect_audio_type(audio_data)
+        audio_dir = self.get_audio_files_dir()
+        timestamp = int(time.time() * 1000)
+        unique_id = uuid.uuid4().hex[:8]
+        original_file = audio_dir / f"{timestamp}_{unique_id}_{detected_name}"
+        pcm_file = audio_dir / f"{timestamp}_{unique_id}_oneshot.pcm"
+        try:
+            original_file.write_bytes(audio_data)
+            proc = subprocess.run(
+                ["ffmpeg", "-y", "-i", str(original_file), "-ar", "16000", "-ac", "1",
+                 "-f", "s16le", str(pcm_file)],
+                stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
+                timeout=int(self._asr_config.get("ffmpeg_timeout_seconds", 60)),
+            )
+            if proc.returncode != 0:
+                raise RuntimeError(f"ffmpeg conversion failed: {proc.stderr.decode(errors='ignore')[:200]}")
+            return pcm_file.read_bytes()
+        finally:
+            for f in (original_file, pcm_file):
+                try:
+                    f.unlink(missing_ok=True)
+                except Exception:
+                    pass
+
+    async def transcribe(self, audio_data: bytes, filename: str = "audio.wav", custom_hotwords: Optional[list[dict]] = None) -> dict:
+        if not self.enabled:
+            raise RuntimeError("ASR service is not configured")
+
+        if self.is_mimo:
+            return await self._transcribe_mimo(audio_data, filename)
+
+        detected_name, detected_type = self._detect_audio_type(audio_data)
+        audio_dir = self.get_audio_files_dir()
+        timestamp = int(time.time() * 1000)
+        unique_id = uuid.uuid4().hex[:8]
+        original_file = audio_dir / f"{timestamp}_{unique_id}_{detected_name}"
+        await asyncio.to_thread(original_file.write_bytes, audio_data)
+
+        need_conversion = detected_type in ("audio/webm", "audio/flac", "audio/mpeg", "audio/mp3")
+        wav_file = None
+        if need_conversion:
+            wav_file = audio_dir / f"{timestamp}_{unique_id}_converted.wav"
+            try:
+                proc = await asyncio.create_subprocess_exec(
+                    "ffmpeg", "-y", "-i", str(original_file), "-ar", "16000", "-ac", "1", "-acodec", "pcm_s16le", str(wav_file),
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                )
+                try:
+                    stdout, stderr = await asyncio.wait_for(
+                        proc.communicate(),
+                        timeout=int(self._asr_config.get("ffmpeg_timeout_seconds", 60))
+                    )
+                except asyncio.TimeoutError:
+                    proc.kill()
+                    await proc.wait()
+                    raise RuntimeError("ffmpeg conversion timed out")
+                if proc.returncode != 0:
+                    raise RuntimeError(f"ffmpeg conversion failed: {stderr.decode()}")
+                send_file = wav_file
+                send_name = "audio.wav"
+                send_type = "audio/wav"
+            except Exception:
+                if await asyncio.to_thread(original_file.exists):
+                    await asyncio.to_thread(original_file.unlink)
+                if wav_file and await asyncio.to_thread(wav_file.exists):
+                    await asyncio.to_thread(wav_file.unlink)
+                raise
+            finally:
+                if await asyncio.to_thread(original_file.exists):
+                    await asyncio.to_thread(original_file.unlink)
+        else:
+            send_file = original_file
+            send_name = detected_name
+            send_type = detected_type
+
+        client = get_shared_async_client()
+        file_bytes = await asyncio.to_thread(send_file.read_bytes)
+        files = {"audio": (send_name, file_bytes, send_type)}
+        data = {
+            "return_timestamps": "true",
+            "use_hotwords": "true",
+        }
+        if custom_hotwords:
+            data["custom_hotwords"] = json.dumps(custom_hotwords, ensure_ascii=False)
+        # 用户级 ASR 覆盖（2026-09-13 A4.9 复审修复）：通用 HTTP 路径必须按
+        # 端点 Key 发送 Authorization（自定义 URL 时 Key = 用户填写或空；
+        # 空 Key 不发送）。此前该路径恒不发 Key，与覆盖契约相悖。
+        headers = _general_auth_headers(self.api_key)
+        response = await client.post(
+            f"{self.base_url}/transcribe",
+            files=files,
+            data=data,
+            headers=headers,
+            timeout=float(self._asr_config.get("http_timeout_seconds", 300.0)),
+        )
+
+        if need_conversion and await asyncio.to_thread(wav_file.exists):
+            await asyncio.to_thread(wav_file.unlink)
+        if await asyncio.to_thread(original_file.exists):
+            await asyncio.to_thread(original_file.unlink)
+
+        response.raise_for_status()
+        result = response.json()
+        if self.hotword_phonetic_correction and result.get("text"):
+            result["text"] = apply_hotword_phonetic_correction(result["text"], custom_hotwords)
+        return result
+
+    async def proxy_websocket_stream(self, client_websocket: WebSocket) -> None:
+        if not self.enabled:
+            raise RuntimeError("ASR service is not configured")
+
+        if not self.websocket_url:
+            raise RuntimeError("ASR WebSocket service is not configured")
+
+        async with websockets.connect(
+            self.websocket_url,
+            proxy=None,
+            max_size=None,
+            open_timeout=int(self._asr_config.get("ws_open_timeout", 10)),
+            ping_interval=int(self._asr_config.get("ws_ping_interval", 20)),
+            ping_timeout=int(self._asr_config.get("ws_ping_timeout", 20)),
+            close_timeout=int(self._asr_config.get("ws_close_timeout", 5)),
+        ) as upstream:
+            client_task = asyncio.create_task(client_websocket.receive())
+            upstream_task = asyncio.create_task(upstream.recv())
+
+            try:
+                while True:
+                    done, pending = await asyncio.wait(
+                        {client_task, upstream_task},
+                        return_when=asyncio.FIRST_COMPLETED,
+                    )
+
+                    if client_task in done:
+                        try:
+                            message = client_task.result()
+                        except WebSocketDisconnect:
+                            return
+
+                        message_type = message.get("type")
+                        if message_type == "websocket.disconnect":
+                            return
+
+                        text = message.get("text")
+                        data = message.get("bytes")
+
+                        if text is not None:
+                            await upstream.send(text)
+                        elif data is not None:
+                            await upstream.send(data)
+
+                        client_task = asyncio.create_task(client_websocket.receive())
+
+                    if upstream_task in done:
+                        try:
+                            message = upstream_task.result()
+                        except ConnectionClosed:
+                            return
+
+                        if isinstance(message, bytes):
+                            await client_websocket.send_bytes(message)
+                        else:
+                            await client_websocket.send_text(message)
+
+                        upstream_task = asyncio.create_task(upstream.recv())
+            finally:
+                for task in (client_task, upstream_task):
+                    task.cancel()
+
+                await asyncio.gather(client_task, upstream_task, return_exceptions=True)
+
+    async def proxy_mimo_websocket_stream(self, client_websocket: WebSocket, default_hotwords: Optional[list[dict]] = None) -> None:
+        if not self.is_mimo:
+            raise RuntimeError("MiMo ASR is not enabled")
+        if not self.base_url or not self.api_key:
+            raise RuntimeError("MiMo ASR is not configured")
+
+        logger.info("Starting MiMo ASR WebSocket proxy")
+
+        accumulated_float32 = bytearray()
+        language = "auto"
+        session_started = False
+        finish_event = asyncio.Event()
+        partial_task: Optional[asyncio.Task] = None
+        last_partial_text = ""
+
+        async def periodic_partial_asr() -> None:
+            nonlocal last_partial_text
+            min_bytes = int(16000 * self.mimo_partial_min_seconds * 4)
+            while not finish_event.is_set():
+                try:
+                    await asyncio.wait_for(
+                        finish_event.wait(),
+                        timeout=self.mimo_partial_interval_seconds,
+                    )
+                    return
+                except asyncio.TimeoutError:
+                    pass
+
+                if finish_event.is_set():
+                    return
+
+                snapshot = bytes(accumulated_float32)
+                if len(snapshot) < min_bytes:
+                    continue
+
+                try:
+                    text_parts: list[str] = []
+                    async for chunk in self._transcribe_mimo_streaming(
+                        snapshot, language=language, is_float32=True
+                    ):
+                        text_parts.append(chunk)
+                    text = "".join(text_parts)
+                    if self.hotword_phonetic_correction:
+                        text = apply_hotword_phonetic_correction(text, default_hotwords)
+                    if text and text != last_partial_text:
+                        last_partial_text = text
+                        await client_websocket.send_json({"event": "partial", "text": text})
+                except Exception as e:
+                    logger.warning("MiMo ASR partial transcription failed: %s", e)
+
+        try:
+            while True:
+                try:
+                    message = await client_websocket.receive()
+                except WebSocketDisconnect:
+                    return
+
+                if message.get("type") == "websocket.disconnect":
+                    return
+
+                text = message.get("text")
+                data = message.get("bytes")
+
+                if text is not None:
+                    try:
+                        msg = json.loads(text)
+                    except json.JSONDecodeError:
+                        continue
+
+                    event = msg.get("event")
+                    if event == "start":
+                        language = msg.get("language", "auto")
+                        session_started = True
+                        await client_websocket.send_json({"event": "ready"})
+                        logger.info("MiMo ASR session started, language=%s", language)
+                        partial_task = asyncio.create_task(periodic_partial_asr())
+                    elif event == "finish":
+                        if not session_started:
+                            await client_websocket.send_json({"event": "error", "error": "会话未开始"})
+                            return
+
+                        finish_event.set()
+                        if partial_task is not None:
+                            partial_task.cancel()
+                            try:
+                                await partial_task
+                            except asyncio.CancelledError:
+                                pass
+
+                        float32_bytes = bytes(accumulated_float32)
+                        logger.info("MiMo ASR finish requested, accumulated %d float32 bytes", len(float32_bytes))
+
+                        try:
+                            wav_bytes = await asyncio.to_thread(self._float32_to_wav, float32_bytes)
+                            if not wav_bytes:
+                                await client_websocket.send_json({"event": "error", "error": "没有收到音频数据"})
+                                return
+
+                            full_text = ""
+                            async for chunk in self._transcribe_mimo_streaming(
+                                wav_bytes, language=language, is_float32=True
+                            ):
+                                if chunk:
+                                    full_text += chunk
+                            final_text = full_text or last_partial_text
+                            if self.hotword_phonetic_correction:
+                                final_text = apply_hotword_phonetic_correction(final_text, default_hotwords)
+                            await client_websocket.send_json({"event": "final", "text": final_text})
+                            logger.info("MiMo ASR final text length=%d", len(final_text))
+                        except Exception as e:
+                            logger.exception("MiMo ASR transcription failed")
+                            await client_websocket.send_json({"event": "error", "error": f"MiMo 语音识别失败: {str(e)}"})
+                        return
+
+                elif data is not None:
+                    if not session_started:
+                        await client_websocket.send_json({"event": "error", "error": "会话未开始"})
+                        return
+                    accumulated_float32.extend(data)
+
+        except Exception as e:
+            logger.exception("MiMo ASR WebSocket proxy error")
+            try:
+                await client_websocket.send_json({"event": "error", "error": f"MiMo ASR 服务错误: {str(e)}"})
+            except Exception:
+                pass
+        finally:
+            finish_event.set()
+            if partial_task is not None:
+                partial_task.cancel()
+                try:
+                    await partial_task
+                except asyncio.CancelledError:
+                    pass
+
+    async def proxy_dashscope_websocket_stream(self, client_websocket: WebSocket, default_hotwords: Optional[list[dict]] = None) -> None:
+        if not self.is_dashscope:
+            raise RuntimeError("Dashscope ASR is not enabled")
+        if not self.dashscope_api_key:
+            raise RuntimeError("Dashscope API key is not configured")
+
+        dashscope_ws_url = f"wss://dashscope.aliyuncs.com/api-ws/v1/realtime?model={self.dashscope_model}"
+        headers = {
+            "Authorization": f"Bearer {self.dashscope_api_key}",
+        }
+
+        logger.info(f"Connecting to Dashscope ASR, model={self.dashscope_model}")
+
+        try:
+            upstream = await websockets.connect(
+                dashscope_ws_url,
+                proxy=None,
+                additional_headers=headers,
+                max_size=None,
+                open_timeout=int(self._asr_config.get("ws_open_timeout", 10)),
+                ping_interval=int(self._asr_config.get("ws_ping_interval", 20)),
+                ping_timeout=int(self._asr_config.get("ws_ping_timeout", 20)),
+                close_timeout=int(self._asr_config.get("ws_close_timeout", 5)),
+            )
+        except Exception as e:
+            logger.error(f"Failed to connect to Dashscope ASR: {e}")
+            await client_websocket.send_json({"event": "error", "error": f"无法连接语音识别服务: {str(e)}"})
+            await client_websocket.close(code=1011, reason="Dashscope connection failed")
+            return
+
+        try:
+            segment_texts: list[str] = []
+            finish_requested = False
+            session_ready = asyncio.Event()
+            start_received = False
+
+            async def relay_from_client():
+                nonlocal finish_requested, start_received
+                while True:
+                    try:
+                        message = await client_websocket.receive()
+                    except WebSocketDisconnect:
+                        logger.info("Client WebSocket disconnected during relay")
+                        return
+
+                    if message.get("type") == "websocket.disconnect":
+                        return
+
+                    text = message.get("text")
+                    data = message.get("bytes")
+
+                    if text is not None:
+                        try:
+                            msg = json.loads(text)
+                        except json.JSONDecodeError:
+                            continue
+
+                        event = msg.get("event")
+                        if event == "start":
+                            start_received = True
+                            language = msg.get("language", "zh")
+                            custom_hotwords = msg.get("custom_hotwords") or default_hotwords
+                            logger.info("Client sent start, waiting for Dashscope session...")
+                            await session_ready.wait()
+                            logger.info("Dashscope session ready, sending session.update")
+                            input_audio_transcription = {
+                                "enabled": True,
+                                "model": self.dashscope_model,
+                                "language": language,
+                            }
+                            if custom_hotwords:
+                                input_audio_transcription["custom_hotwords"] = custom_hotwords
+                            session_update = {
+                                "type": "session.update",
+                                "session": {
+                                    "modalities": ["text"],
+                                    "input_audio_format": "pcm16",
+                                    "turn_detection": None,
+                                    "input_audio_transcription": input_audio_transcription,
+                                },
+                            }
+                            await upstream.send(json.dumps(session_update))
+                            logger.info("Sent session.update, waiting for session.updated before signaling ready")
+
+                        elif event == "finish":
+                            finish_requested = True
+                            logger.info("Client requested finish, sending commit + session.finish")
+                            await upstream.send(json.dumps({"type": "input_audio_buffer.commit"}))
+                            await upstream.send(json.dumps({"type": "session.finish"}))
+
+                    elif data is not None:
+                        pcm16_b64 = await asyncio.to_thread(self._float32_to_pcm16_base64, data)
+                        if pcm16_b64:
+                            try:
+                                await upstream.send(json.dumps({
+                                    "type": "input_audio_buffer.append",
+                                    "audio": pcm16_b64,
+                                }))
+                            except websockets.exceptions.ConnectionClosed as e:
+                                logger.warning(f"Dashscope connection closed while sending audio: {e}")
+                                return
+
+            async def relay_from_dashscope():
+                nonlocal finish_requested
+                while True:
+                    try:
+                        raw = await upstream.recv()
+                    except ConnectionClosed as e:
+                        logger.warning(f"Dashscope connection closed: code={e.code}, reason={e.reason}")
+                        try:
+                            error_detail = e.reason or f"code={e.code}"
+                            await client_websocket.send_json({
+                                "event": "error",
+                                "error": f"语音识别服务连接断开: {error_detail}",
+                            })
+                        except Exception:
+                            pass
+                        return
+
+                    try:
+                        msg = json.loads(raw)
+                    except (json.JSONDecodeError, TypeError):
+                        continue
+
+                    event_type = msg.get("type", "")
+                    logger.debug(f"Dashscope event: {event_type}")
+
+                    if event_type == "session.created":
+                        sid = msg.get("session", {}).get("id", "")
+                        logger.info(f"Dashscope session created: {sid}")
+                        session_ready.set()
+
+                    elif event_type == "session.updated":
+                        logger.info("Dashscope session updated successfully")
+                        await client_websocket.send_json({"event": "ready"})
+                        logger.info("Sent ready to client after session.updated confirmation")
+
+                    elif event_type == "conversation.item.input_audio_transcription.text":
+                        text_val = msg.get("text", "")
+                        stash = msg.get("stash", "")
+                        combined = text_val + stash
+                        if combined:
+                            if self.hotword_phonetic_correction:
+                                combined = apply_hotword_phonetic_correction(combined, default_hotwords)
+                            await client_websocket.send_json({
+                                "event": "partial",
+                                "text": combined,
+                            })
+
+                    elif event_type == "conversation.item.input_audio_transcription.completed":
+                        transcript = msg.get("transcript", "")
+                        if transcript:
+                            segment_texts.append(transcript)
+                            accumulated = "".join(segment_texts)
+                            if self.hotword_phonetic_correction:
+                                accumulated = apply_hotword_phonetic_correction(accumulated, default_hotwords)
+                            await client_websocket.send_json({
+                                "event": "segment",
+                                "text": accumulated,
+                            })
+
+                    elif event_type == "session.finished":
+                        final_text = "".join(segment_texts)
+                        if self.hotword_phonetic_correction:
+                            final_text = apply_hotword_phonetic_correction(final_text, default_hotwords)
+                        logger.info(f"Session finished, final text: {final_text}")
+                        await client_websocket.send_json({
+                            "event": "final",
+                            "text": final_text,
+                        })
+                        return
+
+                    elif event_type == "error":
+                        error_msg = msg.get("error", {})
+                        if isinstance(error_msg, dict):
+                            error_text = error_msg.get("message", str(error_msg))
+                        else:
+                            error_text = str(error_msg)
+                        logger.error(f"Dashscope ASR error: {error_text}, raw: {json.dumps(msg)}")
+                        await client_websocket.send_json({
+                            "event": "error",
+                            "error": error_text,
+                        })
+                        return
+
+                    elif event_type in (
+                        "input_audio_buffer.speech_started",
+                        "input_audio_buffer.speech_stopped",
+                        "input_audio_buffer.committed",
+                        "session.closing",
+                    ):
+                        pass
+
+            client_task = asyncio.create_task(relay_from_client())
+            upstream_task = asyncio.create_task(relay_from_dashscope())
+
+            try:
+                done, pending = await asyncio.wait(
+                    {client_task, upstream_task},
+                    return_when=asyncio.FIRST_COMPLETED,
+                )
+                for task in pending:
+                    task.cancel()
+                await asyncio.gather(*pending, return_exceptions=True)
+            finally:
+                for task in (client_task, upstream_task):
+                    if not task.done():
+                        task.cancel()
+                await asyncio.gather(client_task, upstream_task, return_exceptions=True)
+
+        except Exception as e:
+            logger.error(f"Dashscope ASR proxy error: {e}")
+            try:
+                await client_websocket.send_json({
+                    "event": "error",
+                    "error": f"语音识别服务错误: {str(e)}",
+                })
+            except Exception:
+                pass
+        finally:
+            try:
+                await upstream.close()
+            except Exception:
+                pass
+
+    def _format_funasr_hotwords(self, hotwords: Optional[list[dict]]) -> Optional[dict]:
+        """即时热词 → 百炼标准 ``vocabulary`` 对象（dict[词]=权重）。
+
+        Qwen-Audio-3.x 族 run-task ``parameters.vocabulary`` 为官方即时热词
+        参数；权重 [1,5]（推荐 4）或 50（超级热词，账户≤50 个）；旧 ``hotwords``
+        JSON 串仅兼容自部署 FunASR，已弃用不再下发。"""
+        if not hotwords:
+            return None
+        valid: dict = {}
+        for item in hotwords:
+            text = item.get("text", "") if isinstance(item, dict) else getattr(item, "text", "")
+            weight = item.get("weight", 4) if isinstance(item, dict) else getattr(item, "weight", 4)
+            if text and str(text).strip():
+                w = 50 if int(weight or 4) == 50 else max(1, min(5, int(weight or 4)))
+                valid[str(text).strip()] = w
+        return valid or None
+
+    async def _notify_upstream_drop(self, client_websocket: WebSocket, exc: Exception, _seen: Optional[set] = None) -> None:
+        """上游 ASR WS 中途掉线 → 告知客户端并以 ``WS_CLOSE_UPSTREAM_DROP`` 收尾。
+
+        关闭码契约（客户端 ``useAsrStreaming.handleSocketClose`` 依此决定是否重连）：
+        - **1000** 正常结束（用户 finish / task-finished）→ 不重连
+        - **1008** 致命（task-failed / 鉴权 / 配置 / 未预期异常）→ 不重连，报错停止
+        - **1011** 瞬断（上游 ASR WS 掉线）→ 客户端 ``scheduleReconnect`` 收编
+
+        **退出路径必须显式带码收尾**：裸 ``return`` 会落到 ASGI 层的合成关闭码
+        （实测 uvicorn 0.49 + websockets 16 裸 return = 1006），语义不可控——若客户端
+        把 1006 当瞬断则致命错误触发重连风暴，当正常则瞬断被硬停。
+        **已知残口**（A4.9 R2-B M#4）：两个 relay task 内部的意外异常经
+        ``gather(..., return_exceptions=True)`` 吞掉，不落到 ``except Exception``，
+        仍以 ASGI 合成码收尾；该形态下客户端按瞬断处理，最坏是 10 轮有界重连后停止。"""
+        if _seen is not None:
+            if _seen:
+                return
+            _seen.add(True)
+        try:
+            detail = getattr(exc, "reason", "") or f"code={getattr(exc, 'code', '?')}"
+            await client_websocket.send_json({
+                "event": "error",
+                "error": f"语音识别服务连接断开: {detail}",
+                "fatal": False,
+            })
+        except Exception:
+            pass
+        try:
+            await client_websocket.close(code=WS_CLOSE_UPSTREAM_DROP, reason="asr upstream closed")
+        except Exception:
+            pass
+
+    async def _finish_client(self, client_websocket: WebSocket, code: int, reason: str = "") -> None:
+        """按契约显式带码收尾客户端 WS（致命/正常两条路，杜绝裸 return 落到 1006）。"""
+        try:
+            await client_websocket.close(code=code, reason=reason)
+        except Exception:
+            pass
+
+    async def proxy_funasr_websocket_stream(
+        self,
+        client_websocket: WebSocket,
+        default_hotwords: Optional[list[dict]] = None,
+        vocabulary_id: Optional[str] = None,
+    ) -> None:
+        if not self.is_dashscope:
+            raise RuntimeError("Dashscope ASR is not enabled")
+        if not self.dashscope_api_key:
+            raise RuntimeError("Dashscope API key is not configured")
+
+        task_id = uuid.uuid4().hex[:32]
+        funasr_ws_url = "wss://dashscope.aliyuncs.com/api-ws/v1/inference/"
+        headers = {
+            "Authorization": f"bearer {self.dashscope_api_key}",
+        }
+
+        logger.info(f"Connecting to Fun-ASR, model={self.dashscope_model}, task_id={task_id}")
+
+        try:
+            upstream = await websockets.connect(
+                funasr_ws_url,
+                proxy=None,
+                additional_headers=headers,
+                max_size=None,
+                open_timeout=int(self._asr_config.get("ws_open_timeout", 10)),
+                ping_interval=int(self._asr_config.get("ws_ping_interval", 20)),
+                ping_timeout=int(self._asr_config.get("ws_ping_timeout", 20)),
+                close_timeout=int(self._asr_config.get("ws_close_timeout", 5)),
+            )
+        except Exception as e:
+            logger.error(f"Failed to connect to Fun-ASR: {e}")
+            # 建连失败分流：鉴权/握手被拒（key 失效、配额、403）是**致命**，重连只会
+            # 反复撞同一堵墙（A4.9 R2-I1）；网络/超时才是瞬断，可重试。
+            fatal = _is_fatal_connect_error(e)
+            try:
+                await client_websocket.send_json({
+                    "event": "error",
+                    "error": f"无法连接语音识别服务: {str(e)}",
+                    "fatal": fatal,
+                })
+            except Exception:
+                pass
+            await self._finish_client(
+                client_websocket,
+                WS_CLOSE_FATAL if fatal else WS_CLOSE_UPSTREAM_DROP,
+                "Fun-ASR connect failed",
+            )
+            return
+
+        try:
+            finalized_segments: list[str] = []
+            finish_requested = False
+            task_started = asyncio.Event()
+            # 上行/下行掉线会并发触发通知；只报一次（避免双 error 帧 / 双 toast）
+            drop_seen: set = set()
+
+            async def relay_from_client():
+                nonlocal finish_requested
+                while True:
+                    try:
+                        message = await client_websocket.receive()
+                    except WebSocketDisconnect:
+                        return
+
+                    if message.get("type") == "websocket.disconnect":
+                        return
+
+                    text = message.get("text")
+                    data = message.get("bytes")
+
+                    if text is not None:
+                        try:
+                            msg = json.loads(text)
+                        except json.JSONDecodeError:
+                            continue
+
+                        event = msg.get("event")
+                        if event == "start":
+                            language = msg.get("language", "zh")
+                            logger.info("Client sent start, sending run-task to Fun-ASR")
+
+                            parameters: dict = {
+                                "sample_rate": 16000,
+                                "format": "pcm",
+                            }
+                            # 保活/断句面与语音面同源（_keepalive_run_task_params）。
+                            parameters.update(_keepalive_run_task_params(
+                                self._asr_config,
+                                get_config().voice_asr_speech_noise_threshold,
+                            ))
+                            parameters.update(
+                                _recognition_tuning_params(self._asr_config, self.dashscope_model)
+                            )
+
+                            if language:
+                                parameters["language_hints"] = [language]
+
+                            if vocabulary_id:
+                                parameters["vocabulary_id"] = vocabulary_id
+                                logger.info("Fun-ASR vocabulary_id: %s", vocabulary_id)
+                                # Per-utterance hotwords still pass as instant
+                                # vocabulary when present (merged server-side).
+                                inline_items = msg.get("custom_hotwords")
+                            else:
+                                # Instant vocabulary when no DashScope vocabulary is synced
+                                inline_items = msg.get("custom_hotwords") or default_hotwords
+                            vocabulary = self._format_funasr_hotwords(inline_items)
+                            if vocabulary and _supports_instant_vocabulary(self.dashscope_model):
+                                parameters["vocabulary"] = vocabulary
+                                logger.info("Fun-ASR inline vocabulary enabled, count=%d", len(vocabulary))
+
+                            run_task_message = {
+                                "header": {
+                                    "action": "run-task",
+                                    "task_id": task_id,
+                                    "streaming": "duplex",
+                                },
+                                "payload": {
+                                    "task_group": "audio",
+                                    "task": "asr",
+                                    "function": "recognition",
+                                    "model": self.dashscope_model,
+                                    "parameters": parameters,
+                                    "input": {},
+                                },
+                            }
+                            logger.info("Fun-ASR run-task parameters: %s", json.dumps(parameters, ensure_ascii=False))
+                            try:
+                                await upstream.send(json.dumps(run_task_message))
+                            except websockets.exceptions.ConnectionClosed as e:
+                                logger.warning(f"Fun-ASR connection closed while sending run-task: {e}")
+                                await self._notify_upstream_drop(client_websocket, e, drop_seen)
+                                return
+                            logger.info("Sent run-task, waiting for task-started...")
+
+                        elif event == "finish":
+                            finish_requested = True
+                            logger.info("Client requested finish, sending finish-task")
+                            finish_task_message = {
+                                "header": {
+                                    "action": "finish-task",
+                                    "task_id": task_id,
+                                    "streaming": "duplex",
+                                },
+                                "payload": {
+                                    "input": {},
+                                },
+                            }
+                            try:
+                                await upstream.send(json.dumps(finish_task_message))
+                            except websockets.exceptions.ConnectionClosed as e:
+                                logger.warning(f"Fun-ASR connection closed while sending finish-task: {e}")
+                                await self._notify_upstream_drop(client_websocket, e, drop_seen)
+                                return
+
+                    elif data is not None:
+                        pcm16_bytes = await asyncio.to_thread(self._float32_to_pcm16, data)
+                        if pcm16_bytes:
+                            try:
+                                await upstream.send(pcm16_bytes)
+                            except websockets.exceptions.ConnectionClosed as e:
+                                logger.warning(f"Fun-ASR connection closed while sending audio: {e}")
+                                await self._notify_upstream_drop(client_websocket, e, drop_seen)
+                                return
+
+            async def relay_from_funasr():
+                nonlocal finalized_segments
+                pending_tail = ""
+                while True:
+                    try:
+                        raw = await upstream.recv()
+                    except ConnectionClosed as e:
+                        logger.warning(f"Fun-ASR connection closed: code={e.code}, reason={e.reason}")
+                        await self._notify_upstream_drop(client_websocket, e, drop_seen)
+                        return
+
+                    if isinstance(raw, bytes):
+                        continue
+
+                    try:
+                        msg = json.loads(raw)
+                    except (json.JSONDecodeError, TypeError):
+                        continue
+
+                    header = msg.get("header", {})
+                    event_type = header.get("event", "")
+                    logger.debug(f"Fun-ASR event: {event_type}")
+
+                    if event_type == "task-started":
+                        logger.info(f"Fun-ASR task started: {task_id}")
+                        task_started.set()
+                        await client_websocket.send_json({"event": "ready"})
+                        logger.info("Sent ready to client")
+
+                    elif event_type == "result-generated":
+                        payload = msg.get("payload", {})
+                        output = payload.get("output", {})
+                        sentence = output.get("sentence", {})
+                        text_val = sentence.get("text", "")
+                        sentence_end = sentence.get("sentence_end", False)
+
+                        if text_val:
+                            # VAD splits speech into sentences. To prevent the displayed
+                            # transcription from disappearing during a pause, we always send
+                            # the accumulated text recognized so far.
+                            if sentence_end:
+                                finalized_segments.append(text_val)
+                                pending_tail = ""
+                                accumulated = "".join(finalized_segments)
+                            else:
+                                pending_tail = text_val
+                                accumulated = "".join(finalized_segments) + text_val
+
+                            if self.hotword_phonetic_correction:
+                                accumulated = apply_hotword_phonetic_correction(accumulated, default_hotwords)
+
+                            await client_websocket.send_json({
+                                "event": "partial",
+                                "text": accumulated,
+                            })
+
+                            if sentence_end:
+                                await client_websocket.send_json({
+                                    "event": "segment",
+                                    "text": accumulated,
+                                })
+
+                    elif event_type == "task-finished":
+                        final_text = _compose_funasr_final_text(finalized_segments, pending_tail)
+                        if self.hotword_phonetic_correction:
+                            final_text = apply_hotword_phonetic_correction(final_text, default_hotwords)
+                        logger.info(f"Fun-ASR task finished, final text: {final_text}")
+                        await client_websocket.send_json({
+                            "event": "final",
+                            "text": final_text,
+                        })
+                        await self._finish_client(client_websocket, WS_CLOSE_NORMAL, "asr task finished")
+                        return
+
+                    elif event_type == "task-failed":
+                        error_msg = header.get("error_message", header.get("message", "Fun-ASR task failed"))
+                        logger.error(f"Fun-ASR task failed: {error_msg}")
+                        # 致命（key 失效/配额/参数不支持）：必须以 1008 收尾，客户端
+                        # 才不会把「模型拒绝」当瞬断去重连（否则 10 轮 run-task 风暴）。
+                        try:
+                            await client_websocket.send_json({
+                                "event": "error",
+                                "error": str(error_msg),
+                                "fatal": True,
+                            })
+                        except Exception:
+                            pass
+                        await self._finish_client(client_websocket, WS_CLOSE_FATAL, "asr task failed")
+                        return
+
+                    elif event_type in (
+                        "task-paused",
+                        "task-resumed",
+                        "task-cancelling",
+                    ):
+                        pass
+
+            client_task = asyncio.create_task(relay_from_client())
+            upstream_task = asyncio.create_task(relay_from_funasr())
+
+            try:
+                done, pending = await asyncio.wait(
+                    {client_task, upstream_task},
+                    return_when=asyncio.FIRST_COMPLETED,
+                )
+                for task in pending:
+                    task.cancel()
+                await asyncio.gather(*pending, return_exceptions=True)
+            finally:
+                for task in (client_task, upstream_task):
+                    if not task.done():
+                        task.cancel()
+                await asyncio.gather(client_task, upstream_task, return_exceptions=True)
+
+        except Exception as e:
+            logger.error(f"Fun-ASR proxy error: {e}")
+            try:
+                await client_websocket.send_json({
+                    "event": "error",
+                    "error": f"语音识别服务错误: {str(e)}",
+                    "fatal": True,
+                })
+            except Exception:
+                pass
+            await self._finish_client(client_websocket, WS_CLOSE_FATAL, "asr proxy error")
+        finally:
+            try:
+                await upstream.close()
+            except Exception:
+                pass
