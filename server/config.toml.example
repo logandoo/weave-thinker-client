@@ -1,0 +1,672 @@
+# Copyright (c) 2026 Weave Thinker Contributors
+# SPDX-License-Identifier: Apache-2.0
+
+# Weave Thinker 配置模板（主基础设施配置）。
+# 复制为 backend/config.toml 后按部署环境填写。所有 <YOUR-*> 占位必须替换。
+# 模型相关配置见 config_model.toml（模板 config_model.toml.example）。
+
+[server]
+host = "0.0.0.0"
+port = 8158
+
+[security]
+jwt_secret_key = "<YOUR-SECRET>"
+super_admin_bypass = true
+
+[database]
+host = "127.0.0.1"
+port = 5432
+username = "<YOUR-DB-USER>"
+password = "<YOUR-SECRET>"
+name = "<YOUR-DB-NAME>"
+
+[agent]
+name = "共享智能体"
+background_task_memory_injection_enabled = false
+background_task_memory_budget_chars = 600
+memory_max_items = 12
+note_context_limit = 12
+conversation_context_limit = 40
+memory_refresh_note_limit = 20
+memory_refresh_message_limit = 60
+cross_turn_citation_note_enabled = true
+scheduled_task_system_prompt = """你是一个智能助手，正在执行用户设定的定时任务。请根据任务要求完成操作并给出结果。你可以使用 web_search 联网搜索最新信息，使用 browser 浏览网页深入获取内容，使用 execute_code 执行代码。当你不确定某个事实或需要最新信息时，必须主动搜索而不是猜测。
+
+Markdown格式要求（严格遵守，否则渲染会出错）：
+- 每个标题（#, ##, ###）前必须有空行，标题的 # 后必须有空格。错误：\"正文###标题\"，正确：\"正文\\n\\n### 标题\"
+- 表格起始行 | 前必须有空行。错误：\"文本| 列1 |\"，正确：\"文本\\n\\n| 列1 |\"
+- 表格每行之间必须换行，表头分隔行 |---| 必须独占一行
+- 禁止标题后紧跟粗体文本，粗体内容应另起一行
+- 禁止两个粗体块之间没有换行分隔"""
+background_task_system_prompt = """你是一个专业的研究助手。请根据用户的任务，使用搜索和浏览器工具收集信息，最后给出完整的总结。当你不确定某个事实或需要最新信息时，必须主动搜索而不是猜测。
+
+Markdown格式要求（严格遵守，否则渲染会出错）：
+- 每个标题（#, ##, ###）前必须有空行，标题的 # 后必须有空格。错误：\"正文###标题\"，正确：\"正文\\n\\n### 标题\"
+- 表格起始行 | 前必须有空行。错误：\"文本| 列1 |\"，正确：\"文本\\n\\n| 列1 |\"
+- 表格每行之间必须换行，表头分隔行 |---| 必须独占一行
+- 禁止标题后紧跟粗体文本，粗体内容应另起一行
+- 禁止两个粗体块之间没有换行分隔"""
+[agent.tools]
+mcp_progressive_enabled = true
+
+[agent.skills]
+# vibeweaver 集成：SKILL.md 全文强制注入 system prompt（见 docs/VIBEAWEAVER.md）
+force_inject = ["vibeweaver"]
+force_inject_max_chars = 60000
+
+[agent.process]
+max_sessions_per_user = 4
+idle_timeout_seconds = 1800
+max_buffer_bytes = 262144
+max_read_chars = 20000
+
+[agent.tool_loop]
+max_iterations = 50
+max_consecutive_iterations = 999
+memory_read_dedup = true
+max_empty_answer_retries = 2
+max_force_stage_rounds = 50
+max_tool_retry_attempts = 2
+keepalive_interval_seconds = 10
+parallel_tool_calls = true
+tool_call_timeout_seconds = 1800
+[agent.tool_loop.tool_call_timeout_overrides]
+vision_interpret = 3600
+
+[agent.tool_loop.tool_call_stall_timeout_overrides]
+vision_interpret = 600
+code_execution = 300
+
+tool_call_progress_check_interval_seconds = 10
+subtask_iteration_timeout_seconds = 1800
+inactivity_timeout_seconds = 3600
+judge_timeout_seconds = 300
+grace_timeout_seconds = 120
+live_thinking = true
+
+[agent.background_tasks]
+enabled = true
+max_concurrent_tasks = 3
+poll_interval_seconds = 3
+total_timeout_seconds = 18000
+progress_update_interval_seconds = 2
+stale_recovery_minutes = 10
+
+[agent.durable_jobs]
+enabled = true
+max_concurrent_jobs = 4
+lease_seconds = 120
+poll_interval_seconds = 3
+total_timeout_seconds = 0
+jobs_root = "output_files/jobs"
+
+[agent.cache]
+enabled = false
+cache_ttl_minutes = 5
+
+[agent.audit]
+policy = "advisory"
+reject_budget = 2
+numeric_gate_enabled = true
+numeric_provenance_gate_mode = "enforce"
+numeric_gate_tolerance = 0.01
+retry_reasoning_keep_chars = 6000
+revision_thinking_enabled = false
+salvage_thinking_enabled = false
+call_timeout_seconds = 600
+revision_min_similarity = 0.45
+reject_budget_search = 4
+max_evidence_tokens = 128000
+full_evidence_max_tokens = 0
+soft_reject_limit = 3
+stall_cut_family_repeats = 2
+visibility_accept_enabled = true
+segmented_verify_enabled = true
+segmented_verify_max_packs = 8
+segmented_verify_pack_tokens = 4000
+segmented_verify_max_concurrency = 4
+segmented_verify_timeout_seconds = 120
+segmented_verify_max_claims = 40
+segmented_verify_retry_window_chars = 1500
+low_confidence_note_enabled = true
+chunked_claim_audit_enabled = true
+chunked_claim_target_tokens = 3000
+chunked_claim_max_chunks = 16
+chunked_claim_max_concurrency = 3
+chunked_claim_timeout_seconds = 90
+citation_map_gate_enabled = true
+draft_selection_enabled = true
+selection_timeout_seconds = 480
+salvage_timeout_seconds = 240
+selection_draft_budget_tokens = 60000
+selection_draft_window_chars = 6000
+evidence_context_ceiling_tokens = 128000
+
+[agent.canary]
+enabled = true
+miss_threshold = 2
+auto_disable_after = 3
+compress_min_ratio = 0.6
+
+[agent.citation]
+disambiguate_timeout_seconds = 60.0
+disambiguate_retries = 1
+remand_min_chars = 200
+
+[agent.auxiliary]
+judge_default_timeout_seconds = 120.0
+
+[agent.ptc]
+enabled = false
+allowed_tools = ["web_search", "browser", "memory"]
+socket_timeout_seconds = 120
+
+[agent.session_search]
+enabled = true
+
+[agent.error_recovery]
+enabled = true
+max_retries = 2
+
+[agent.delegation]
+max_depth = 2
+default_child_max_iterations = 999
+default_child_timeout = 300
+
+[agent.skill_evolution]
+enabled = true
+auto_suggest_threshold = 5
+
+[agent.proactive_learning]
+enabled = true
+user_modeling_enabled = true
+
+[agent.compression]
+enabled = true
+threshold_percent = 0.65
+protect_first_n = 3
+protect_last_tokens = 20000
+min_summary_tokens = 800
+summary_ratio = 0.15
+summary_tokens_ceiling = 6000
+failure_cooldown_seconds = 300
+context_length = 262144
+spike_guard_ratio = 0.75
+
+[agent.moa]
+enabled = false
+reference_providers = []
+aggregator_provider = "default"
+max_reference_models = 3
+timeout_seconds = 120
+reference_max_tokens = 4096
+aggregator_max_tokens = ""
+
+[agent.memory]
+summary_temperature = 0.2
+summary_max_tokens = ""
+summary_storage_limit = 4000
+dream_storage_limit = 4000
+default_importance = 0.85
+
+[agent.tool_digest]
+enabled = true
+min_digest_chars = 8000
+max_digest_chars = 6000
+max_concurrent = 5
+max_tokens = 8192
+timeout_seconds = 120
+batch_timeout_seconds = 300
+temperature = 0.3
+verify = true
+digest_tools = ["workspace_read", "browser", "browser_snapshot", "session_search", "grep", "diff", "memory", "notes", "context7_query_docs"]
+
+[agent.sub_agent]
+max_concurrent_subtasks = 5
+max_result_length = 8000
+max_tokens = 4000
+temperature = 0.7
+
+
+[llm]
+stream_include_usage = true
+
+[mcp]
+[mcp.servers]
+[mcp.servers.rempilot]
+url = "https://your-endpoint.example/v1"
+oauth_state_file = "<YOUR-HOME>/Library/Application Support/WeaveThinker/rempilot_oauth.json"
+
+
+
+[web_search]
+enabled = true
+provider = "exa"
+fallback_providers = ["bocha", "firecrawl", "tavily"]
+api_url = ""
+api_key = "<YOUR-SECRET>"
+exa_api_key = "<YOUR-SECRET>"
+bocha_api_key = "<YOUR-SECRET>"
+firecrawl_api_key = "<YOUR-SECRET>"
+max_results = 10
+timeout_seconds = 8.0
+max_search_rounds = 3
+min_qualified_rounds = 2
+blocked_domains = ["wikipedia.org", "wikimedia.org", "youtube.com", "facebook.com", "twitter.com", "instagram.com", "pinterest.com", "reddit.com", "quora.com", "medium.com", "google.com"]
+
+[context7]
+api_key = "<YOUR-SECRET>"
+
+[scheduler]
+enabled = true
+poll_interval_minutes = 15
+run_on_startup = true
+cleanup_interval_hours = 6
+agent_task_retention_days = 7
+scheduled_task_retention_days = 30
+
+[workspace]
+# 多租户部署：用户自定义工作区根白名单（前缀列表；空=不限制——本地单用户客户端默认）。
+# override_allowed_roots = ["/srv/workspaces", "/data/users"]
+root_dir = "user_workspaces"
+use_project_venv = true
+create_readme = true
+snapshots_enabled = true
+snapshots_max_file_mb = 10
+snapshots_retention = 50
+
+[office_preview]
+enabled = true
+html_enabled = true
+soffice_path = "soffice"
+timeout_seconds = 60
+cache_max_mb = 512
+
+[browser]
+enabled = true
+max_content_length = 30000
+max_pages = 5
+playwright_networkidle_timeout_ms = 3000
+playwright_navigation_timeout_ms = 5000
+playwright_challenge_wait_ms = 8000
+httpx_html_truncation = 500000
+min_text_for_skip_playwright = 200
+title_truncation = 500
+ignore_https_errors = true
+[browser.interaction]
+enabled = true
+session_timeout_seconds = 18000
+max_concurrent_sessions = 5
+
+
+[terminal]
+enabled = true
+timeout_seconds = 30
+max_timeout_seconds = 120
+
+[git_tool]
+# agent `git` 工具（vibeweaver 集成）：白名单子命令，见 app/tools/git.py
+enabled = true
+path = "git"
+timeout_seconds = 30
+
+[hooks]
+# hook 运行时预算：stop hook 拦截续跑的递归防护（app/services/hook_service.py）
+stop_hook_max_per_turn = 2
+stop_hook_max_per_conversation = 3
+
+[vibeweaver]
+# vibeweaver 执法层开关（VIBEWEAVER_GATE/AUDIT/LOOPGUARD=off 可强制关闭）
+enabled = true
+gate_enabled = true
+audit_enabled = true
+loop_guard_enabled = true
+red_ttl_hours = 24
+
+[code_execution]
+enabled = true
+timeout_seconds = 1800
+max_output_chars = 128000
+gen_max_tokens = 128000
+max_retries = 6
+total_timeout_seconds = 1800.0
+repair_offset_tokens = 400
+repair_extra_tokens = 400
+grace_period_seconds = 5.0
+
+[asr]
+ffmpeg_timeout_seconds = 60
+http_timeout_seconds = 300
+ws_open_timeout = 10
+ws_ping_interval = 20
+ws_ping_timeout = 20
+ws_close_timeout = 5
+max_sentence_silence = 800
+mimo_partial_interval_seconds = 1.5
+mimo_partial_min_seconds = 0.5
+hotword_phonetic_correction = true
+
+[voice]
+enabled = true
+temperature = 0.7
+max_tokens = 4096
+truncation_retry_limit = 2
+max_tokens_ceiling = 8192
+context_turns = 8
+disable_thinking = true
+barge_in_enabled = true
+barge_in_no_interrupt_seconds = 1.2
+barge_in_cooldown_seconds = 2.0
+barge_in_onset_enabled = true
+barge_in_proximity_gate = true
+barge_in_proximity_stale_seconds = 1.0
+barge_in_onset_min_chars = 3
+eot_semantic_enabled = true
+eot_semantic_probe_seconds = 0.6
+eot_paused_probe_seconds = 0.6
+eot_semantic_timeout_seconds = 1.5
+eot_silence_seconds = 0.6
+eot_silence_incomplete_seconds = 2.0
+eot_complete_grace_seconds = 1.2
+eot_complete_max_seconds = 3.0
+eot_activity_bridge = true
+eot_activity_extension_seconds = 8.0
+fragment_merge_seconds = 1.0
+fragment_merge_max_seconds = 10.0
+noise_gate_max_chars = 3
+asr_speech_noise_threshold = 0.3
+asr_context_enabled = true
+asr_context_turns = 3
+intent_context_turns = 4
+subagent_timeout_seconds = 6.0
+llm_ttft_timeout_seconds = 45.0
+llm_inactivity_timeout_seconds = 30.0
+llm_retry_attempts = 2
+backchannel_recall_seconds = 30.0
+interjection_enabled = true
+interjection_cooldown_seconds = 3.0
+interjection_max_per_turn = 3
+emotion_enabled = true
+filler_enabled = true
+filler_ttft_threshold_seconds = 0.7
+filler_phrases = ["我来看看啊", "我来想想啊", "等下啊，我琢磨一下", "嗯，我想想", "让我捋一捋哈", "稍等，我查查看", "好，我这就看", "嗯，我看下哈"]
+backchannel_enabled = true
+backchannel_phrases = ["嗯", "嗯嗯", "哦", "对", "嗯哼", "对啊", "好", "明白"]
+backchannel_pause_seconds = 0.35
+backchannel_cooldown_seconds = 8.0
+backchannel_max_per_turn = 2
+memory_recall_enabled = true
+memory_interjection_enabled = true
+memory_correct_enabled = false
+memory_interjection_max_append = 3
+memory_interjection_max_correct = 2
+memory_interjection_cooldown_seconds = 20.0
+memory_interjection_min_score = 0.5
+bg_task_notify_enabled = true
+system_prompt = """你是一个全双工语音对话助手，正在与用户进行实时语音交流。请严格遵守以下要求：
+1. 用自然、亲切、口语化的中文回答，像朋友聊天一样，句子简短，避免长篇大论和复杂排版（不要使用标题、表格、代码块、列表符号）。
+2. 回复可以以整体风格标签开头，用于控制语音演绎风格，只能使用以下风格词：(温柔)、(平静)、(开心)、(兴奋)、(激动)、(严肃)、(无奈)、(委屈)、(冷漠)、(活泼)、(慵懒)、(俏皮)、(深沉)、(欣慰)、(感动)、(失望)、(焦急)、(惊讶)、(害怕)、(难过)、(生气)、(磁性)。风格标签只能出现在回答最开头且只出现一次。严禁在括号内写动作描写或声音词（如 温柔地笑、微笑、叹气、笑、哼、啊、嗯、思考、停顿），也不要在回答中插入任何方括号音频标签（如 [轻笑]、[叹气]、[停顿]）——这些会被语音合成读成不自然的怪声。
+3. 默认直接回答用户的问题，不要调用任何工具。只有当用户明确要求你联网搜索、查资料、执行代码、操作文件等任务时，才考虑使用工具。
+4. 你的回答会被语音合成朗读，因此绝不要在回答中包含工具调用的细节、JSON、URL、代码或任何不适合朗读的内容。
+5. 如果用户的问题很复杂、需要长时间检索或多步操作，先用一两句话口头回应，并说明这可能需要一些时间。
+6. 禁止使用任何 emoji 表情符号和颜文字。"""
+tts_enabled = true
+
+[deathmatch]
+enabled = true
+memory_injection_enabled = false
+memory_injection_budget_chars = 600
+max_consecutive_failures = 5
+tool_loop_max_iterations = 999
+verify_enabled = true
+verify_max_retries = 20
+stall_partial_threshold = 8
+stall_hard_threshold = 16
+verify_interval = 1
+self_eval_username = "<YOUR-DB-USER>"
+self_eval_password = "<YOUR-SECRET>"
+criteria_enabled = true
+obligation_criteria_enabled = true
+plan_audit_enabled = true
+goal_comparator_enabled = true
+node_recovery_max_retries = 2
+failed_direction_forbidden_threshold = 3
+no_progress_replan_cap = 3
+events_cap = 50
+reflection_memory_max_items = 10
+continuity_anchor_enabled = true
+judge_evidence_enabled = true
+visual_critic_enabled = false
+rubric_compression_enabled = false
+
+[sub_agent]
+structured_output_attempts = 3
+retry_delay_seconds = 2.0
+llm_call_timeout_seconds = 90.0
+search_decision_max_tokens = 800
+search_decision_repair_max_tokens = 1200
+keyword_generation_max_tokens = 2000
+keyword_generation_repair_max_tokens = 2600
+
+[title_generation]
+structured_output_attempts = 3
+retry_delay_seconds = 1.0
+max_tokens = ""
+repair_max_tokens = ""
+
+[memory]
+interest_extract_timeout_seconds = 120
+enabled = true
+migration_enabled = false
+retrieval_enabled = true
+subconscious_enabled = true
+recurrence_trigger_enabled = true
+dreaming_enabled = true
+cost_governance_enabled = true
+migration_max_concurrent = 2
+migration_batch_size = 5
+migration_max_retries = 5
+migration_llm_timeout_seconds = 120
+timezone = "Asia/Shanghai"
+concept_extraction_temperature = 0.1
+concept_extraction_max_tokens = ""
+extraction_interval_minutes = 15
+dream_temperature = 0.2
+dream_max_tokens = ""
+dream_concept_window_days = 14
+consolidation_dedup_threshold = 0.08
+consolidation_trigger_threshold = 20
+consolidation_max_interval_hours = 48
+query_expansion_temperature = 0.1
+stage0_llm_enabled = false
+clarification_temperature = 0.1
+clarification_auto_apply_threshold = 0.8
+clarification_pending_threshold = 0.5
+embedding_dim_override = true
+embedding_cache_size = 100
+embedding_provider_check_on_startup = true
+rerank_enabled = true
+stage4_llm_enabled = true
+stage4_llm_trigger_score_gap = 0.1
+rerank_mode = "cross_encoder"
+stage4_ce_skip_strong_top_sim = 0.7
+profile_sync_enabled = true
+recall_log_enabled = true
+recall_log_retention_days = 30
+recall_log_max_per_user = 20000
+recall_log_sample_rate = 1.0
+[memory.concept]
+weight_init = 0.5
+weight_recall_boost = 0.03
+weight_evidence_boost = 0.03
+weight_max = 1.0
+trust_cap_agent_inferred = 0.7
+trust_cap_external = 0.5
+hot_forget_threshold = 0.15
+avg_weight_reset = true
+cold_resurrect_weight = 0.3
+maturation_window_days = 21
+silent_max_windows = 2
+silent_activation_threshold = 0.05
+weight_decay_writeback = true
+weight_decay_floor = 0.05
+[memory.concept.fatigue]
+cold_forget_threshold_episodic = 2
+cold_forget_threshold_semantic = 8
+episodic_stability_init_days = 7
+episodic_stability_growth_days = 4
+episodic_stability_max_days = 45
+semantic_stability_init_days = 14
+semantic_stability_growth_days = 7
+semantic_stability_max_days = 90
+procedural_skip_decay = true
+
+
+[memory.subconscious]
+recurrence_sim_threshold = 0.6
+recurrence_count_threshold = 3
+top_k_neighbors = 5
+scan_batch_size = 50
+embedding_cache_size = 200
+subconscious_retention_days = 30
+subconscious_archive_retention_days = 90
+accelerate_recurrence_threshold = 2
+
+[memory.episodic]
+description_max_tokens = 500
+merge_first_threshold = 0.85
+retrieval_k_epi = 5
+retrieval_k_concept = 10
+cross_boost_concept_weight = true
+
+[memory.multimodal]
+enabled = false
+fallback_on_cold_start = true
+provider = "default"
+snapshot_top_k = 10
+max_image_tokens = 4000
+set_of_mark = true
+fallback_first_msg_only = true
+
+[memory.cost_governance]
+calls_table = "memory_llm_calls"
+rolling_window_days = 7
+warn_multiplier = 5.0
+min_today_calls = 8
+recovery_ratio = 1.0
+degrade_steps = ["rerank_off", "profile_sync_off", "stage0_off", "dreaming_step6_off", "subconscious_off"]
+per_user_independent = true
+
+[memory.retrieval]
+bootstrap_threshold = 10
+embedding_sim_threshold = 0.3
+stage1_concept_top_k = 30
+stage1_episodic_top_k = 5
+stage1_subconscious_top_k = 10
+stage2_concept_top_k = 15
+stage2_relation_expansion_enabled = true
+stage2_relation_seed_top_k = 5
+stage2_relation_max_neighbors = 5
+stage2_relation_max_new = 10
+stage2_relation_score_decay = 0.6
+stage2_relation_min_edge_weight = 0.3
+rrf_k = 60
+rrf_weight_concept = 1.0
+rrf_weight_episodic = 1.5
+rrf_weight_subconscious = 0.5
+embedding_score_weight = 0.6
+bm25_score_weight = 0.4
+injection_max_dream = 1
+injection_max_episodic = 2
+injection_max_concept = 4
+injection_max_cluster = 3
+injection_max_subconscious = 2
+injection_max_clarification = 3
+injection_total_token_budget = 2000
+injection_min_relevance = 0.35
+injection_min_relevance_episodic = 0.3
+injection_min_relevance_subconscious = 0.3
+boost_min_relevance = 0.5
+boost_min_relevance_episodic = 0.4
+overview_max_concepts = 12
+overview_max_episodes = 5
+overview_max_chars = 800
+fusion_concept_relevance = 0.5
+fusion_concept_recency = 0.2
+fusion_concept_weight = 0.3
+fusion_episodic_relevance = 0.6
+fusion_episodic_recency = 0.4
+fusion_subconscious_relevance = 0.4
+fusion_subconscious_recency = 0.6
+recency_tau_days_concept = 14
+recency_tau_days_episodic = 21
+recency_tau_days_subconscious = 7
+stage0_hard_ceiling_ms = 0
+stage4_llm_timeout_ms = 500
+stage4_cross_encoder_timeout_ms = 800
+bm25_k1 = 1.5
+bm25_b = 0.75
+bm25_tokenizer = "jieba"
+expansion_rho_enabled = false
+agpr_enabled = false
+deterministic_edges_enabled = false
+edge_read_whitelist_enabled = false
+assembly_mmr_enabled = false
+assembly_mmr_lambda = 0.5
+assembly_grouping_enabled = false
+contradicts_read_downgrade_enabled = false
+adaptive_cardinality_enabled = false
+adaptive_cardinality_high_score = 0.5
+text_cross_turn_dedup_enabled = false
+merge_fast_path_enabled = false
+merge_mst_enabled = false
+merge_gray_zone_low = 0.03
+injection_usage_instruction_enabled = false
+injection_usage_instruction_text = "以上历史记忆可能过时或不适用于当前任务，请结合当前对话判断。"
+listwise_verifier_enabled = false
+listwise_verifier_timeout_ms = 8000
+
+
+[secrets]
+tavily_api_key = "<YOUR-SECRET>"
+exa_api_key = "<YOUR-SECRET>"
+bocha_api_key = "<YOUR-SECRET>"
+firecrawl_api_key = "<YOUR-SECRET>"
+context7_api_key = "<YOUR-SECRET>"
+
+# [sync]（S1 同步波 2026-09-24；全部可选，缺省即下列默认）
+# [sync]
+# enabled = true          # false 时事件捕获关闭且 /api/sync/* 404
+# blob_max_mb = 100       # 单 blob 上传上限
+# blob_dir = "sync_blobs" # 相对 server 目录解析；绝对路径亦可
+# memory_enabled = true   # 记忆域纳入同步（文本+元数据；向量每设备本地重算）；false 可关（全量保真波起默认开）
+# model_config_enabled = true      # D-21：模型池（config_model.toml 的 endpoints/routing/defaults）随 resync 下行到客户端
+# model_config_include_keys = true # D-22：载荷是否携带 api_key；多租户/开放注册部署建议 false（只同步端点结构）
+# 配置路径覆盖：WEAVE_CONFIG_PATH 环境变量（测试/多实例部署）；本仓桌面侧车另注入 LOCALSTACK_CONFIG_PATH（兜底，优先级低于 WEAVE_CONFIG_PATH）
+
+# [sync.client]（S2 客户端 worker；全部缺省=关闭。配置后本栈作为远端同步服务器的客户端）
+# [sync.client]
+# enabled = true
+# server_url = "http://127.0.0.1:8160"  # 远端同步服务器 base URL
+# username = "cloud-account"            # 云端账号（本地须存在同名用户）
+# password = "secret"
+# interval_seconds = 30                 # 同步周期
+# batch = 200                           # 单批事件上限
+
+# [client_exec]（设备执行器 P0，PLAN_device_executor §4；键拼写=主方案 §6.5，勿改名）
+# 本栈作为「被云端 agent 驱动」的执行设备：出站 WSS 连云端 /api/device/ws，
+# 工具在本机执行。token 落 LOCALSTACK_HOME/app/device_exec.json（0600，配对面板写入）。
+[client_exec]
+enabled = true                # false 时不启动 executor worker
+cloud_url = ""                # 留空=复用 sync 绑定的 server_url；否则独立云端 origin
+heartbeat_seconds = 30        # 设备→云心跳间隔
+call_timeout_seconds = 120    # tools/call 等待下限；实际 = max(本值, 请求值)
+call_max_extension_seconds = 3600  # progress 续期硬上限镜像（自调用起总时长；非法回落 3600）；
+                                  # 0=不限制仅及 zip 打包线程，office 转换仍受 office_preview_timeout_seconds 兜底（D-94）
+max_payload_mb = 10           # fs/* 与 provide_* 文件字节上限（超限走 chunk 分块）
+allowed_tools = [             # 设备侧白名单镜像（fail-closed）；与主方案 §7「走设备」同源
+  "workspace_read", "workspace_write", "workspace_edit", "workspace_glob",
+  "grep", "diff", "word_count", "terminal", "process", "git",
+  "execute_code", "skill_run_script", "provide_file", "provide_folder",
+  "citation_render", "pdf_export",
+]

@@ -1,0 +1,31 @@
+{
+  "name": "weave-thinker-client",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Weave Thinker multi-platform client — Electron desktop + Capacitor mobile, shared Vue SPA",
+  "workspaces": [
+    "app",
+    "desktop"
+  ],
+  "scripts": {
+    "build": "bash script/linux/project_build.sh",
+    "start": "bash script/linux/start.sh",
+    "stop": "bash script/linux/stop.sh",
+    "restart": "bash script/linux/restart.sh",
+    "smoke": "bash script/linux/smoke_desktop.sh"
+  },
+  "devDependencies": {
+    "electron-builder": "^26.15.3",
+    "smol-toml": "^1.9.0"
+  },
+  "allowScripts": {
+    "esbuild@0.21.5": true,
+    "vue-demi@0.14.10": true,
+    "@vue-office/docx@1.6.3": true,
+    "@vue-office/excel@1.7.14": true,
+    "@vue-office/pptx@1.0.1": true,
+    "fsevents@2.3.3": true
+  },
+  "main": "desktop/main.cjs",
+  "author": "Weave Thinker"
+}

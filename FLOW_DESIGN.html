@@ -1,0 +1,25 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8"><title>FLOW_DESIGN — weave-thinker-client</title>
+<style>body{font-family:system-ui;max-width:960px;margin:2rem auto;line-height:1.6}code{background:#f3f4f6;padding:.1rem .3rem;border-radius:4px}table{border-collapse:collapse}td,th{border:1px solid #ddd;padding:.4rem .6rem}</style></head><body>
+<h1>FLOW_DESIGN — 多端客户端关键流</h1>
+<p>范围：桌面（Electron）/移动（Capacitor）/Web 三宿主共享同一 <code>app/dist</code> SPA 与 <code>src/native/bridge.ts</code> 缝隙。</p>
+<h2>F1 启动流（桌面）</h2>
+<ol><li>Electron 主进程注册 <code>app://</code> 特权 scheme → <code>protocol.handle</code> 映射 <code>app/dist</code>（SPA fallback → index.html）。</li><li><code>BrowserWindow</code>（contextIsolation+sandbox）载入 <code>app://weave/index.html</code>；preload 暴露 <code>NativeBridge</code> 与 <code>WeaverNoteApp</code>。</li><li>SPA 启动：皮肤预引导（localStorage）→ Pinia/Vue → 路由守卫（无 token → /login）。</li><li>API 基址：构建期 <code>VITE_API_BASE</code>（config.toml 注入）；Web 同源时为空串走相对路径。</li></ol>
+<h2>F2 认证流</h2>
+<ol><li>登录页 → axios <code>POST {base}/api/auth/login</code> → token 存 localStorage（移动端后续迁移 Capacitor Preferences）。</li><li>401 拦截 → 清凭据 → <code>window.location.href='/login?expired=1'</code>（三宿主统一，已从 <code>/app/frontend/login</code> 校正）。</li></ol>
+<h2>F3 对话流（SSE）</h2>
+<p><code>fetch({base}/api/chat/stream)</code>（Authorization: Bearer）→ 增量渲染（markdown/mermaid/katex/echarts）。断线重连走 <code>/api/chat/stream/resume</code>。媒体附件 <code>/api/files/download?path=…&token=…</code> 经 <code>apiUrl()</code> 绝对化。</p>
+<h2>F4 语音流（WS）</h2>
+<p><code>apiWsUrl('/api/voice/ws'|'/api/asr/ws/transcribe/stream')</code>（wss + token 查询参数）→ AudioWorklet+rnnoise WASM 采集 → 二进制帧。宿主差异仅在权限提示（Electron 无感；移动需 usage string；Web 浏览器弹窗）。</p>
+<h2>F5 本地文件桥（桌面）</h2>
+<ol><li>SPA 调 <code>NativeBridge.fs.pickDirectory()</code> → ipcMain <code>dialog.showOpenDialog</code> → 返回绝对路径。</li><li><code>fs.readTextFile / writeTextFile / listDir / reveal</code> → 主进程校验绝对路径后执行。</li><li>下载：<code>WeaverNoteApp.saveFile/downloadFile</code> 兼容桥 → 主进程写系统下载目录（继承既有 useDownload 探测逻辑）。</li></ol>
+<h2>F6 冒烟流（CI/交付闸门）</h2>
+<p><code>smoke_desktop.sh</code> → electron --smoke → 挂载/桥读写列/截图断言 → <code>SMOKE_RESULT</code> JSON + 退出码。移动端未来等价物：模拟器启动 + 同页截图（W2/W3 规划）。</p>
+<h2>F7 云端 workspace 文件物化流（2026-09-29 波）</h2>
+<p>问题：附件按 workspace 相对路径渲染，但本地栈预览只读本地 workspace——云端上传（另一设备/Web 端）的文件本地缺失即 404。裁决：<b>云端→本地单向物化</b>，复用远端既有 <code>/api/files/list</code> + <code>/api/files/download</code>（生产 chatbot 后端同款，零服务端改动）；否决「sha256 索引表/blob 管道」（须上游部署，收益不匹配本波）与「服务端新增清单端点」（同上，留作后续优化）。</p>
+<ol>
+<li><b>全量同步自动拉取</b>（判据 1/1b/2）：首连 resync / 手动「重新全量同步」→ worker 递归远端清单（<b>分页</b>：<code>/api/files/list</code> offset/limit，limit≤1000，响应含 total/offset/truncated；单目录页数上限 32、无进展防御；旧服务端无 offset/total 字段时不翻页仅告警）→ 跳过内部目录/点文件（深度 8/目录 200/条目 5000 有界）→ 对 <code>size &lt; workspace_auto_max_mb</code>(默认 10MB) 且（本地缺失 或 远端 mtime 更新）的文件流式下载（<code>.part</code> + 原子替换；mtime 对齐远端）→ 单周期上限 <code>workspace_pull_cap</code>(默认 200)，超出部分经 <code>_workspace_pending</code> 跨周期续拉至全量；崩溃残留 <code>*.syncpart</code> 按需清扫（>1h，每小时至多一次）。</li>
+<li><b>大文件按需同步</b>（判据 3）：预览打开时 <code>GET /api/sync/workspace/status?path=</code>——本地已有直接加载；缺失且远端存在且 ≤ 阈值 → 自动同步（“正在从云端同步…”）；&gt; 阈值 → 显示「当前文件较大，是否同步？」+ 同步按钮 → <code>POST /api/sync/workspace/fetch</code>（上限 <code>workspace_max_mb</code>，默认 1024）→ 落盘后加载预览。</li>
+<li><b>旧附件绝对路径归一化</b>（2026-09-29 热修）：旧消息附件只有部署侧绝对路径（`rel_path:null`，`/…/user_workspaces/&lt;账号段&gt;/…`）——前端渲染/同步门控与后端 status/fetch 双层归一化为相对路径后再工作（无标记绝对路径原样保留=本地旧行为）。</li>
+<li><b>冲突与安全</b>（判据 4/5/6）：LWW（仅远端 mtime 显著更新才覆盖本地）；未绑定/远端缺失/不可达走既有 404/502 语义；rel_path 只接受 workspace 相对路径，落点 resolve 后必须在 workspace 内（<code>../</code>/绝对路径/符号链接逃逸拒绝）。</li>
+</ol>
+</body></html>
