@@ -766,9 +766,9 @@ async def skill_run_script(args: dict, **kwargs) -> str:
 _SKILL_PROMPT_CACHE: Dict[str, tuple[float, str]] = {}
 
 
-async def build_skills_system_prompt(user: Any = None) -> str:
+async def build_skills_system_prompt(user: Any = None, include_force_inject: bool = True) -> str:
     user_id = str(user.id) if user and hasattr(user, "id") else "__no_user__"
-    cache_key = f"skills_{user_id}"
+    cache_key = f"skills_{user_id}" if include_force_inject else f"skills_noinj_{user_id}"
     now = _time.monotonic()
 
     cached = _SKILL_PROMPT_CACHE.get(cache_key)
@@ -812,20 +812,41 @@ async def build_skills_system_prompt(user: Any = None) -> str:
     lines.append("Use skill_view(name) to load a skill's full instructions. Use skill_manage(action='create', ...) to save new skills. 系统技能（source=system）只读，用户技能不可与系统技能重名。")
     result = "\n".join(lines)
 
-    # C2（vibeweaver 集成）：force-inject —— 指定 skill 的 SKILL.md 全文
-    # 直接注入（基准证明 available 自触发率不足）；{VW_DIR} 占位替换为
-    # skill 目录绝对路径。受 force_inject_max_chars 预算约束。
+    if include_force_inject:
+        block = await build_force_injected_skills_prompt(user)
+        if block:
+            result = result + "\n\n" + block
+
+    _SKILL_PROMPT_CACHE[cache_key] = (now, result)
+    return result
+
+
+async def build_force_injected_skills_prompt(user: Any = None) -> str:
+    """force-inject 段独立构建（W17 轮次门控：chat.py 按轮决定是否拼接）。
+
+    C2（vibeweaver 集成）：指定 skill 的 SKILL.md 全文直接注入（基准证明
+    available 自触发率不足）；{VW_DIR} 占位替换为 skill 目录绝对路径。
+    受 force_inject_max_chars 预算约束。返回段自带 authoritative 头；无内容
+    返回空串。"""
+    user_id = str(user.id) if user and hasattr(user, "id") else "__no_user__"
+    cache_key = f"vwinj_{user_id}"
+    now = _time.monotonic()
+    cached = _SKILL_PROMPT_CACHE.get(cache_key)
+    if cached:
+        cached_time, cached_value = cached
+        if now - cached_time < 60:
+            return cached_value
     try:
         force_list = get_config().agent_skills_force_inject
     except Exception:
         force_list = []
+    injected: List[str] = []
     if force_list:
         budget = 60000
         try:
             budget = max(0, int(get_config().agent_skills_force_inject_max_chars))
         except Exception:
             pass
-        injected: List[str] = []
         used = 0
         for fname in force_list:
             try:
@@ -857,9 +878,10 @@ async def build_skills_system_prompt(user: Any = None) -> str:
             injected.append(
                 f"<force_injected_skill name=\"{fname}\">\n{text}\n</force_injected_skill>"
             )
-        if injected:
-            result = result + "\n\n## Force-injected skill instructions (authoritative)\n\n" + "\n\n".join(injected)
-
+    result = (
+        "## Force-injected skill instructions (authoritative)\n\n" + "\n\n".join(injected)
+        if injected else ""
+    )
     _SKILL_PROMPT_CACHE[cache_key] = (now, result)
     return result
 

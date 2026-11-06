@@ -7,7 +7,9 @@ HTTP 500（conv 4e159a79「编辑内容并发送→500→内容消失」机制�
 且旧实现 trim 自带 commit：删+建两段落库，其间失败=编辑点后消息真丢。
 
 修复契约：
-1. 删除按 id 批量 DELETE（不碰 resolve 拷贝），payload 行随 DB CASCADE 清理；
+1. 删除按 id 重查 ORM 行逐行 db.delete（不碰 resolve 拷贝；2026-10-31 P0 起
+   经 mapper after_delete 补 messages/delete 事件+墓碑，见
+   test_edit_resend_delete_events.py），payload 行随 DB CASCADE 清理；
 2. 删除不自带 commit——删+建由调用方单事务 commit（失败回滚旧消息不丢）。
 
 Run from backend/:  source ../.venv/bin/activate && python -m pytest tests/test_edit_resend_trim.py -v

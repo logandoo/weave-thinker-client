@@ -1,0 +1,73 @@
+{
+  "id": "stale_state_02",
+  "category": "stale_state",
+  "title": "陈旧状态：旧收件邮箱 valid_to 过期，现行邮箱 alice@example.dev",
+  "query": "我现在的常用收件邮箱是哪个？",
+  "stage0": {
+    "query_type": "semantic",
+    "keywords": [
+      "收件",
+      "邮箱"
+    ]
+  },
+  "seed": {
+    "concepts": [
+      {
+        "id": "c-mail-old",
+        "canonical_name": "收件邮箱（旧）",
+        "content": "常用收件邮箱 alice@corp.example",
+        "memory_type": "semantic"
+      },
+      {
+        "id": "c-mail-new",
+        "canonical_name": "收件邮箱（现行）",
+        "content": "常用收件邮箱改为 alice@example.dev",
+        "memory_type": "semantic"
+      }
+    ],
+    "episodic": [],
+    "subconscious": []
+  },
+  "fake_retrieval": {
+    "candidates": [
+      {
+        "id": "c-mail-old",
+        "tier": "concept",
+        "score": 0.88,
+        "content": "常用收件邮箱 alice@corp.example",
+        "metadata": {
+          "canonical_name": "收件邮箱（旧）",
+          "valid_to": "2026-10-10"
+        }
+      },
+      {
+        "id": "c-mail-new",
+        "tier": "concept",
+        "score": 0.72,
+        "content": "常用收件邮箱改为 alice@example.dev",
+        "metadata": {
+          "canonical_name": "收件邮箱（现行）"
+        }
+      }
+    ]
+  },
+  "expect": {
+    "hit_ids": [
+      "c-mail-new"
+    ],
+    "hit_k": 3,
+    "forbidden_ids": [
+      "c-mail-old"
+    ],
+    "llm_checks": [
+      {
+        "type": "answer_contains",
+        "value": "alice@example.dev"
+      },
+      {
+        "type": "answer_not_contains",
+        "value": "alice@corp.example"
+      }
+    ]
+  }
+}

@@ -530,7 +530,13 @@ def test_usage_instruction_gated(monkeypatch):
         ret_cfg["injection_usage_instruction_enabled"] = True
         ret_cfg.pop("injection_usage_instruction_text", None)
         ctx_on, _ = asyncio.run(_run())
-        assert ctx_on.startswith(mrs._DEFAULT_USAGE_INSTRUCTION)
+        # 2026-10-18 起注入上下文以「记忆使用边界」前言开头（dca19082，所有注入
+        # 出口共用）；指令本体紧随其后 —— 断言改为「前言在前、指令存在」，
+        # 仍钉住「指令受开关控制且不被改写」的原意。
+        assert ctx_on.startswith(mrs.MEMORY_INJECTION_BOUNDARY)
+        assert mrs._DEFAULT_USAGE_INSTRUCTION in ctx_on
+        assert (ctx_on.index(mrs.MEMORY_INJECTION_BOUNDARY)
+                < ctx_on.index(mrs._DEFAULT_USAGE_INSTRUCTION))
         assert len(mrs._DEFAULT_USAGE_INSTRUCTION) <= 60
         assert not re.search(r"\d", mrs._DEFAULT_USAGE_INSTRUCTION)
     finally:

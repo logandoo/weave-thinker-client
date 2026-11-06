@@ -3,7 +3,10 @@
 import os
 import sys
 
-DST = sys.argv[1] if len(sys.argv) > 1 else os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'opensource')
+_ARGV = sys.argv[1:]
+CHECK = '--check' in _ARGV          # 只读模式：仅报告缺头，exit 1，不写文件
+_PATHS = [a for a in _ARGV if not a.startswith('--')]
+DST = _PATHS[0] if _PATHS else os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'opensource')
 YEAR = '2026'
 HOLDER = 'Weave Thinker Contributors'
 
@@ -68,7 +71,7 @@ def has_spdx(text):
 
 def main():
     stats = {'added': 0, 'already': 0, 'binary': 0, 'skipped_ext': 0, 'no_style': 0,
-             'skipped_frontmatter': 0}
+             'skipped_frontmatter': 0, 'missing': 0}
     nostyle = []
     for base, dirs, files in os.walk(DST):
         dirs[:] = [d for d in dirs if d not in SKIP_DIRS]
@@ -103,6 +106,9 @@ def main():
                     stats['skipped_frontmatter'] += 1
                     continue
                 if fm_end > 0:
+                    if CHECK:
+                        stats['missing'] += 1
+                        continue
                     insert_at = text.find('\n', fm_end + 1)
                     insert_at = len(text) if insert_at < 0 else insert_at + 1
                     hd = headers(style)
@@ -113,6 +119,9 @@ def main():
                     continue
                 stats['skipped_frontmatter'] += 1
                 continue
+            if CHECK:
+                stats['missing'] += 1
+                continue
             lines = text.split('\n')
             start = 1 if lines and lines[0].startswith('#!') else 0
             hd = headers(style)
@@ -120,6 +129,11 @@ def main():
             with open(p, 'w', encoding='utf-8') as f:
                 f.write(new_text)
             stats['added'] += 1
+    if CHECK:
+        # 缺头 = 本应加头却没加（不含 frontmatter 已声明 license 的刻意跳过）。
+        # 调用方（opensource_strip）据此 fail-closed：半成品树不再被当成功。
+        print('LICENSE HEADER CHECK:', stats)
+        sys.exit(1 if stats['missing'] else 0)
     print('LICENSE HEADER STATS:', stats)
     if nostyle:
         print('no-style (未加头，需人工确认类型):')

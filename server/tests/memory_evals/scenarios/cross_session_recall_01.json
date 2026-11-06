@@ -1,0 +1,24 @@
+{
+  "id": "cross_session_recall_01",
+  "category": "cross_session_recall",
+  "title": "跨会话回忆：上次约定的部署端口",
+  "query": "我上次跟你说的部署端口是多少？",
+  "stage0": {"query_type": "semantic", "keywords": ["部署", "端口"]},
+  "seed": {
+    "concepts": [{"id": "c-port", "canonical_name": "部署端口", "content": "weave 服务部署在 8158 端口", "memory_type": "semantic"}],
+    "episodic": [{"id": "e-meet", "content": "[2026-10-01] 开会定了部署方案"}],
+    "subconscious": []
+  },
+  "fake_retrieval": {
+    "candidates": [
+      {"id": "c-port", "tier": "concept", "score": 0.82, "content": "weave 服务部署在 8158 端口", "metadata": {"canonical_name": "部署端口"}},
+      {"id": "e-meet", "tier": "episodic", "score": 0.55, "content": "[2026-10-01] 开会定了部署方案", "metadata": {"valid_from": "2026-10-01"}}
+    ]
+  },
+  "expect": {
+    "hit_ids": ["c-port"],
+    "hit_k": 3,
+    "forbidden_ids": [],
+    "llm_checks": [{"type": "answer_contains", "value": "8158"}]
+  }
+}

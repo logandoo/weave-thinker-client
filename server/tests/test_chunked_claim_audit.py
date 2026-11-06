@@ -138,10 +138,11 @@ def test_audit_wires_chunked_full_audit_and_confidence_floor():
     """2026-10-06 用户红线（conv ae9aa092）：草稿窗口废除后，声称清单不再是
     窗口补偿件（草稿全文/分块全覆盖直接可见）；审计主流程改为接线
     `_chunked_full_audit`（分块全覆盖审计，零省略）。清单函数本体保留可用。"""
-    src = open(
-        os.path.join(os.path.dirname(__file__), "..", "app", "services", "agent_loop.py"),
-        encoding="utf-8",
-    ).read()
+    _dir = os.path.join(os.path.dirname(__file__), "..", "app", "services")
+    src = "\n".join(
+        open(os.path.join(_dir, name), encoding="utf-8").read()
+        for name in ("agent_loop.py", "agent_loop_audit.py", "agent_loop_orchestrator.py")
+    )
     assert "_chunked_full_audit(" in src, "审计主流程必须接线分块全覆盖审计"
     assert "audit_chunk_coverage_incomplete" in src, "分块覆盖缺口必须显式置位"
     assert "audit_low_confidence = True" in src
@@ -232,10 +233,11 @@ def test_low_confidence_note_helper_semantics(monkeypatch):
 
 
 def test_ship_sites_no_direct_note_yield():
-    src = open(
-        os.path.join(os.path.dirname(__file__), "..", "app", "services", "agent_loop.py"),
-        encoding="utf-8",
-    ).read()
+    _dir = os.path.join(os.path.dirname(__file__), "..", "app", "services")
+    src = "\n".join(
+        open(os.path.join(_dir, name), encoding="utf-8").read()
+        for name in ("agent_loop.py", "agent_loop_audit.py", "agent_loop_orchestrator.py")
+    )
     assert 'yield {"content": _AUDIT_LOW_CONFIDENCE_NOTE}' not in src
     assert 'yield {"content": _AUDIT_CHUNK_COVERAGE_NOTE}' not in src
     assert src.count("_consume_low_confidence_note(state)") >= 4
@@ -307,10 +309,11 @@ def test_quote_grounded_helper():
 
 
 def test_advisory_branch_consumes_coverage_only_note():
-    src = open(
-        os.path.join(os.path.dirname(__file__), "..", "app", "services", "agent_loop.py"),
-        encoding="utf-8",
-    ).read()
+    _dir = os.path.join(os.path.dirname(__file__), "..", "app", "services")
+    src = "\n".join(
+        open(os.path.join(_dir, name), encoding="utf-8").read()
+        for name in ("agent_loop.py", "agent_loop_audit.py", "agent_loop_orchestrator.py")
+    )
     assert "coverage_only=True" in src, "advisory 分支必须消费覆盖说明"
 
 
@@ -334,10 +337,11 @@ def test_note_helper_coverage_only_mode(monkeypatch):
 
 def test_advisory_coverage_note_emitted_in_both_branches():
     """A4.9 r3 Important：draft 与 synthesis 两个 advisory 分支都必须消费覆盖说明。"""
-    src = open(
-        os.path.join(os.path.dirname(__file__), "..", "app", "services", "agent_loop.py"),
-        encoding="utf-8",
-    ).read()
+    _dir = os.path.join(os.path.dirname(__file__), "..", "app", "services")
+    src = "\n".join(
+        open(os.path.join(_dir, name), encoding="utf-8").read()
+        for name in ("agent_loop.py", "agent_loop_audit.py", "agent_loop_orchestrator.py")
+    )
     assert src.count("coverage_only=True") >= 2
 
 

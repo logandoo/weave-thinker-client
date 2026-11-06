@@ -1,0 +1,152 @@
+[
+ {
+  "id": "cal-01",
+  "label": "accept",
+  "reviewer": "ai:mimo-v2.6-pro"
+ },
+ {
+  "id": "cal-02",
+  "label": "accept",
+  "reviewer": "ai:mimo-v2.6-pro"
+ },
+ {
+  "id": "cal-03",
+  "label": "accept",
+  "reviewer": "ai:mimo-v2.6-pro"
+ },
+ {
+  "id": "cal-04",
+  "label": "accept",
+  "reviewer": "ai:mimo-v2.6-pro"
+ },
+ {
+  "id": "cal-05",
+  "label": "reject",
+  "reviewer": "ai:mimo-v2.6-pro"
+ },
+ {
+  "id": "cal-06",
+  "label": "accept",
+  "reviewer": "ai:mimo-v2.6-pro"
+ },
+ {
+  "id": "cal-07",
+  "label": "accept",
+  "reviewer": "ai:mimo-v2.6-pro"
+ },
+ {
+  "id": "cal-08",
+  "label": "accept",
+  "reviewer": "ai:mimo-v2.6-pro"
+ },
+ {
+  "id": "cal-09",
+  "label": "accept",
+  "reviewer": "ai:mimo-v2.6-pro"
+ },
+ {
+  "id": "cal-10",
+  "label": "accept",
+  "reviewer": "ai:mimo-v2.6-pro"
+ },
+ {
+  "id": "cal-11",
+  "label": "accept",
+  "reviewer": "ai:mimo-v2.6-pro"
+ },
+ {
+  "id": "cal-12",
+  "label": "accept",
+  "reviewer": "ai:mimo-v2.6-pro"
+ },
+ {
+  "id": "cal-13",
+  "label": "accept",
+  "reviewer": "ai:mimo-v2.6-pro"
+ },
+ {
+  "id": "cal-14",
+  "label": "reject",
+  "reviewer": "ai:mimo-v2.6-pro"
+ },
+ {
+  "id": "cal-15",
+  "label": "accept",
+  "reviewer": "ai:mimo-v2.6-pro"
+ },
+ {
+  "id": "cal-16",
+  "label": "reject",
+  "reviewer": "ai:mimo-v2.6-pro"
+ },
+ {
+  "id": "cal-17",
+  "label": "reject",
+  "reviewer": "ai:mimo-v2.6-pro"
+ },
+ {
+  "id": "cal-18",
+  "label": "reject",
+  "reviewer": "ai:mimo-v2.6-pro"
+ },
+ {
+  "id": "cal-19",
+  "label": "reject",
+  "reviewer": "ai:mimo-v2.6-pro"
+ },
+ {
+  "id": "cal-20",
+  "label": "reject",
+  "reviewer": "ai:mimo-v2.6-pro"
+ },
+ {
+  "id": "cal-21",
+  "label": "reject",
+  "reviewer": "ai:mimo-v2.6-pro"
+ },
+ {
+  "id": "cal-22",
+  "label": "reject",
+  "reviewer": "ai:mimo-v2.6-pro"
+ },
+ {
+  "id": "cal-23",
+  "label": "reject",
+  "reviewer": "ai:mimo-v2.6-pro"
+ },
+ {
+  "id": "cal-24",
+  "label": "reject",
+  "reviewer": "ai:mimo-v2.6-pro"
+ },
+ {
+  "id": "cal-25",
+  "label": "accept",
+  "reviewer": "ai:mimo-v2.6-pro"
+ },
+ {
+  "id": "cal-26",
+  "label": "accept",
+  "reviewer": "ai:mimo-v2.6-pro"
+ },
+ {
+  "id": "cal-27",
+  "label": "accept",
+  "reviewer": "ai:mimo-v2.6-pro"
+ },
+ {
+  "id": "cal-28",
+  "label": "reject",
+  "reviewer": "ai:mimo-v2.6-pro"
+ },
+ {
+  "id": "cal-29",
+  "label": "accept",
+  "reviewer": "ai:mimo-v2.6-pro"
+ },
+ {
+  "id": "cal-30",
+  "label": "reject",
+  "reviewer": "ai:mimo-v2.6-pro"
+ }
+]

@@ -26,11 +26,15 @@ class ChatRequest(BaseModel):
     thinking_budget: Optional[int] = None
     deathmatch_mode: bool = False
     deathmatch_action: Optional[str] = None  # "start", "stop", "pause", "resume"
+    # W16 设备执行模式：执行环境（None=云端；device:<id>=配对设备）。
+    # 会话已有目标时必须一致（D-6 不可变）；无目标时首设 adopt。
+    execution_target: Optional[str] = None
 
 
 class ConversationCreate(BaseModel):
     title: Optional[str] = None
     assistant_id: Optional[str] = None
+    execution_target: Optional[str] = None
 
 
 class ConversationUpdate(BaseModel):
@@ -43,6 +47,7 @@ class ConversationResponse(BaseModel):
     title: str
     group_id: Optional[str] = None
     assistant_id: Optional[str] = None
+    execution_target: Optional[str] = None
     sort_order: int = 0
     created_at: str
     updated_at: str
@@ -129,6 +134,9 @@ class MessageResponse(BaseModel):
     # 渐进落库交付状态（2026-10-06）：final（默认）| interrupted（中断残稿，
     # 前端「已中断」徽标）。streaming 在途行被列表接口过滤，永不下发。
     delivery_status: str = "final"
+    # 2026-11-01 插话内联：assistant 行的小型侧车 + user 行的渲染归属。
+    interjection_items: Optional[str] = None
+    embedded_in_message_id: Optional[str] = None
     created_at: str
 
 

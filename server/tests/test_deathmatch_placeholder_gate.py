@@ -454,10 +454,10 @@ def test_begin_revision_done_gets_fresh_budget_window():
 # ── D: chat.py 接线（静态防回退） ─────────────────────────────────────────
 
 def test_chat_routes_wire_revise_to_begin_revision():
-    src_path = os.path.join(
-        os.path.dirname(__file__), "..", "app", "api", "chat.py"
-    )
-    with open(src_path, encoding="utf-8") as fh:
+    base = os.path.join(os.path.dirname(__file__), "..", "app", "api")
+    with open(os.path.join(base, "chat.py"), encoding="utf-8") as fh:
         src = fh.read()
+    with open(os.path.join(base, "chat_stream_transport.py"), encoding="utf-8") as fh:
+        src += fh.read()
     assert src.count('intent == "REVISE"') >= 2
     assert "begin_revision(latest_user_query)" in src

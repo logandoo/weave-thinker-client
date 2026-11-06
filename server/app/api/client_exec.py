@@ -120,11 +120,13 @@ async def pair(req: PairRequest, current_user=Depends(get_current_user)):
 
     data = None
     device_id_changed = False
+    # name 解析链（acceptance #24）：req.name → 旧绑定名（重配对空名不丢显示名）→ platform 缺省
+    effective_name = (req.name or "").strip() or str(prev_rec.get("name") or "") or f"{req.platform or 'device'}"
     try:
         data = await pairing.register_with_cloud(
             cloud_url,
             req.pairing_code,
-            name=req.name or f"{req.platform or 'device'}",
+            name=effective_name,
             platform=req.platform,
             device_id=effective_device_id,
             tls_verify=not req.tls_skip,
@@ -140,7 +142,7 @@ async def pair(req: PairRequest, current_user=Depends(get_current_user)):
                 data = await pairing.register_with_cloud(
                     cloud_url,
                     req.pairing_code,
-                    name=req.name or f"{req.platform or 'device'}",
+                    name=effective_name,
                     platform=req.platform,
                     device_id="",
                     tls_verify=not req.tls_skip,
@@ -173,6 +175,12 @@ async def pair(req: PairRequest, current_user=Depends(get_current_user)):
                        effective_device_id, data.get("device_id"))
         device_id_changed = True
 
+    # 换代标注真相（re-review NEW-2 修复轮）：换云/"new" 逃生口不带 id 时上分支不触发，
+    # 但 wire 实际换代——凡旧记录 device_id 与本次不等即标注（前端据实提示，不假报「保持连续」）。
+    prev_id = str(prev_rec.get("device_id") or "")
+    if prev_id and str(data.get("device_id") or "") != prev_id:
+        device_id_changed = True
+
     token = str(data.get("token") or "")
     if not token:
         raise HTTPException(status_code=400, detail="云端响应缺少 device token")
@@ -180,7 +188,7 @@ async def pair(req: PairRequest, current_user=Depends(get_current_user)):
     record = {
         "cloud_url": cloud_url,
         "device_id": str(data.get("device_id") or effective_device_id or ""),
-        "name": str(data.get("name") or req.name or ""),
+        "name": str(data.get("name") or effective_name or ""),
         "platform": str(data.get("platform") or req.platform or ""),
         "token": token,
         "tls_verify": not req.tls_skip,
@@ -216,6 +224,50 @@ async def reset(current_user=Depends(get_current_user)):
     return {"reset": bool(cleared)}
 
 
+class RenameRequest(BaseModel):
+    name: str = ""
+
+
+@router.post("/rename")
+async def rename(req: RenameRequest, current_user=Depends(get_current_user)):
+    """改设备显示名（本地绑定记录 name，acceptance #22/#25）。
+
+    语义=修改（不动 token/device_id）；重置/替换绑定走 reset/pair，三动作分离。
+    W25：本地写后推送云端改名（handoff ③ 端点形状）；旧版云端 404/不可达降级
+    renamed_cloud=false+cloud_note 如实回执，本地改名不回滚。"""
+    from app.services import device_pairing_service as pairing
+
+    name = (req.name or "").strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="name 不能为空")
+    if len(name) > 128:
+        raise HTTPException(status_code=400, detail="name 超长（>128）")
+    record = pairing.load_binding_record()
+    if not record or not record.get("token"):
+        raise HTTPException(status_code=400, detail="未配对，无法修改设备名称")
+    record["name"] = name
+    pairing.save_binding(record)
+    logger.info("device renamed (local): device_id=%s", record.get("device_id", ""))
+    # W25：改名推送云端（handoff ③ 端点形状）——旧版云端/不可达如实降级，本地不回滚。
+    renamed_cloud = False
+    cloud_note = ""
+    cloud_url = str(record.get("cloud_url") or "")
+    dev_token = str(record.get("token") or "")
+    if not cloud_url:
+        cloud_note = "未配置云端（本地名称已保存）"
+    if cloud_url and dev_token:
+        res = await pairing.push_rename_to_cloud(
+            cloud_url, str(record.get("device_id") or ""), name,
+            token=dev_token, tls_verify=bool(record.get("tls_verify", True)),
+        )
+        renamed_cloud = bool(res.get("ok"))
+        cloud_note = str(res.get("detail") or "")
+    return {
+        "device_id": str(record.get("device_id") or ""), "name": name,
+        "renamed": True, "renamed_cloud": renamed_cloud, "cloud_note": cloud_note,
+    }
+
+
 async def _resolve_cloud_url_async(requested: str) -> str:
     url = (requested or "").strip().rstrip("/")
     if url:
@@ -234,3 +286,97 @@ async def _resolve_cloud_url_async(requested: str) -> str:
             return (getattr(state, "server_url", "") or "").rstrip("/") or ""
     except Exception:
         return ""
+
+
+# ---- W32 执行环境云端联动：云端执行器注册表代理（契约=server/API.md）----
+# 云端注册表是「其他绑定的客户端」的唯一事实源（本地 /devices 是本机栈自己的注册表，
+# 客户端场景为空）；本机设备（device_exec.json 绑定）带 is_self 呈现「本地」语义。
+
+def _self_device_id() -> str:
+    try:
+        from app.services.device_pairing_service import load_binding
+
+        return str((load_binding() or {}).get("device_id") or "")
+    except Exception:
+        return ""
+
+
+@router.get("/cloud-devices")
+async def cloud_devices(current_user=Depends(get_current_user)):
+    from app.services.cloud_link_service import (
+        LinkAuthError,
+        LinkUnavailable,
+        cloud_link_service,
+    )
+
+    user_id = str(current_user.id)
+    if not await cloud_link_service.is_linked(user_id):
+        return {"linked": False, "devices": []}
+    try:
+        resp = await cloud_link_service.request(user_id, "GET", "/api/devices")
+    except LinkUnavailable:
+        raise HTTPException(status_code=500, detail="云端不可达：无法获取设备列表，请检查网络后重试")
+    except LinkAuthError:
+        raise HTTPException(status_code=400, detail="云端凭据失效：请在「云端关联」重新绑定后重试")
+    if resp.status_code != 200:
+        raise HTTPException(
+            status_code=500,
+            detail=f"云端设备列表获取失败（HTTP {resp.status_code}）",
+        )
+    try:
+        payload = resp.json()
+    except Exception:
+        raise HTTPException(status_code=500, detail="云端设备列表响应异常（非 JSON）")
+    rows = payload.get("devices") if isinstance(payload, dict) else payload
+    if not isinstance(rows, list):
+        rows = []
+    self_id = _self_device_id()
+    devices = [
+        {
+            "device_id": str(r.get("device_id") or ""),
+            "name": r.get("name") or "",
+            "platform": r.get("platform") or "",
+            "online": bool(r.get("online")),
+            "revoked": bool(r.get("revoked")),
+            "last_seen_at": r.get("last_seen_at"),
+            "is_self": bool(self_id and str(r.get("device_id") or "") == self_id),
+        }
+        for r in rows
+        if isinstance(r, dict) and r.get("device_id")
+    ]
+    return {"linked": True, "devices": devices}
+
+
+@router.post("/cloud-devices/{device_id}/revoke")
+async def cloud_device_revoke(device_id: str, current_user=Depends(get_current_user)):
+    from app.services.cloud_link_service import (
+        LinkAuthError,
+        LinkUnavailable,
+        cloud_link_service,
+    )
+
+    if _self_device_id() and device_id == _self_device_id():
+        raise HTTPException(
+            status_code=400,
+            detail="不能撤销本机设备：请走「云端关联」重置本地凭据，或在云端网页端管理其他设备",
+        )
+    user_id = str(current_user.id)
+    try:
+        resp = await cloud_link_service.request(
+            user_id, "POST", f"/api/devices/{device_id}/revoke"
+        )
+    except LinkUnavailable:
+        raise HTTPException(status_code=500, detail="云端不可达：撤销未生效，请稍后重试")
+    except LinkAuthError:
+        raise HTTPException(status_code=400, detail="云端凭据失效：请在「云端关联」重新绑定后重试")
+    if resp.status_code // 100 != 2:
+        detail = ""
+        try:
+            detail = str(resp.json().get("detail") or "")
+        except Exception:
+            detail = ""
+        raise HTTPException(
+            status_code=400,
+            detail=detail or f"云端拒绝撤销（HTTP {resp.status_code}）",
+        )
+    return {"revoked": True}

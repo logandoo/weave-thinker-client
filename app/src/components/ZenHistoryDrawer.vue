@@ -128,7 +128,7 @@
             <div v-show="!groupsDirectoryCollapsed" class="groups-directory-content">
               <SortableList
                 v-model="groupStore.groups"
-                :group="{ name: 'zen-groups', pull: false, put: false }"
+                :group="zenGroupsDragGroup"
                 item-key="id"
                 handle=".group-header"
                 :delay="100"
@@ -993,6 +993,9 @@ const ungroupedTimeCategories = computed(() => {
 })
 
 const convDragGroup = { name: 'zen-conversations', pull: true, put: true }
+// W26（评审 A-M3  parity）：内联对象字面量每次渲染新引用 → props.group
+// watcher 重建实例；拖拽中重建 = SortableJS 全局态清空卡死。稳定常量同 Sidebar。
+const zenGroupsDragGroup = { name: 'zen-groups', pull: false, put: false }
 
 function syncDragLists() {
   if (isDragging.value) return
@@ -1078,9 +1081,17 @@ async function handleNewChat() {
     return (!msgs || msgs.length === 0) && c.title === '新对话'
   })
   if (emptyConv) {
+    // Match Sidebar: the click is the clean boundary; a newer ON during the
+    // async selection must not be cleared when that selection completes.
+    chatStore.deathmatchMode = false
+    chatStore.deathmatchAction = null
     await chatStore.selectConversation(emptyConv.id)
-    emit('close')
-    return
+    if (!chatStore.messages[emptyConv.id]?.length) {
+      // Match Sidebar: binding failure must not dead-lock new chat.
+      await chatStore.applyDefaultExecutionTargetToConversation(emptyConv.id)
+      emit('close')
+      return
+    }
   }
   await chatStore.createConversation(undefined, assistantStore.currentAssistantId)
   emit('close')

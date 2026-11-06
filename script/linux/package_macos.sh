@@ -8,13 +8,18 @@ mkdir -p logs dist_installer build
 if [ -f "$ROOT/assets/icon.png" ]; then cp "$ROOT/assets/icon.png" "$ROOT/build/icon.png"; fi
 LOG="$ROOT/logs/package_macos.log"
 {
+  echo "== [0/4] BUILD_ID（单源：同一 BID 注入 SPA 与侧车，W39 同源核对）=="
+  BID="$(date +%Y%m%d%H%M)-$(git rev-parse --short HEAD 2>/dev/null || echo nogit)"
+  export WEAVE_BUILD_ID="$BID"
+  echo "BUILD_ID=$BID"
   echo "== [1/4] SPA build =="
   bash script/linux/project_build.sh
   echo "== [2/4] sidecar build =="
   bash script/linux/build_sidecar.sh
   echo "== [2.2/4] BUILD_ID (sidecar build generation marker, W21 P1#4) =="
   # 侧车 status 暴露 build_id（env→本文件→dev）；现场判代免靠错误文案。
-  BID="$(date +%Y%m%d%H%M)-$(git rev-parse --short HEAD 2>/dev/null || echo nogit)"
+  # W39：BID 在 [0/4] 生成一次并 export WEAVE_BUILD_ID，SPA 侧同值烘入 VITE_BUILD_ID
+  # ⇒ 冒烟可断言「SPA 与侧车同一代」；此处只负责把同一 BID 落成侧车文件。
   printf '%s' "$BID" > "$ROOT/dist_sidecar/weave-server/_internal/BUILD_ID"
   echo "BUILD_ID=$BID"
 

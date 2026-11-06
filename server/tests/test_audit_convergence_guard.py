@@ -395,10 +395,12 @@ def test_gate_kill_switch_disables():
 
 def test_main_loop_wiring_present():
     """Q4(a)：主循环 stall cut 接线的静态回归（防意外移除）。"""
-    src_path = os.path.join(os.path.dirname(__file__), "..", "app", "services", "agent_loop.py")
-    with open(src_path, "r", encoding="utf-8") as f:
+    with open(os.path.join(os.path.dirname(__file__), "..", "app", "services", "agent_loop.py"), "r", encoding="utf-8") as f:
         src = f.read()
-    assert "state.audit_fail_families.append(_audit_family)" in src
+    with open(os.path.join(os.path.dirname(__file__), "..", "app", "services", "agent_loop_orchestrator.py"), "r", encoding="utf-8") as f:
+        src += f.read()
+    # C-01c: `_audit_family` now lives on `_LoopResult` (verdict helper).
+    assert "state.audit_fail_families.append(_loop_result._audit_family)" in src
     assert "_family_stall = _audit_family_stalled(" in src
-    assert "or _family_stall" in src
+    assert "or _loop_result._family_stall" in src
     assert "Audit family stall cut" in src

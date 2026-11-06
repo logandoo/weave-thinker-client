@@ -1,0 +1,36 @@
+{
+  "id": "forget_01",
+  "category": "forget",
+  "title": "遗忘：已遗忘内容零命中 + 缺证据声明（不得凭空召回）",
+  "query": "我之前提过的那条鱼叫什么名字来着？",
+  "stage0": {
+    "query_type": "semantic",
+    "keywords": [
+      "鱼",
+      "名字"
+    ]
+  },
+  "seed": {
+    "concepts": [],
+    "episodic": [],
+    "subconscious": []
+  },
+  "fake_retrieval": {
+    "candidates": []
+  },
+  "expect": {
+    "hit_ids": [],
+    "hit_k": 3,
+    "forbidden_ids": [
+      "f-fish"
+    ],
+    "want_zero_hit": true,
+    "expect_missing_marker": true,
+    "llm_checks": [
+      {
+        "type": "honest_missing",
+        "value": "admit"
+      }
+    ]
+  }
+}

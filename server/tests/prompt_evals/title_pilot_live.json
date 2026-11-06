@@ -1,0 +1,508 @@
+{
+  "generated_at": "2026-10-18T13:58:13.845546+00:00",
+  "mode": "live-pilot:deepseek",
+  "live": true,
+  "baseline_score": 20,
+  "retained": "baseline",
+  "results": {
+    "baseline": {
+      "score": 20,
+      "cases": 20,
+      "rows": [
+        {
+          "query": "Python 的 GIL 是什么？",
+          "ok": true,
+          "reason": "ok",
+          "title": "Python GIL 机制解析",
+          "latency_ms": 2817.8,
+          "output": "{\"title\":\"Python GIL 机制解析\"}"
+        },
+        {
+          "query": "怎么在 Linux 上安装 Docker？",
+          "ok": true,
+          "reason": "ok",
+          "title": "Linux 安装 Docker 指南",
+          "latency_ms": 994.4,
+          "output": "{\"title\": \"Linux 安装 Docker 指南\"}"
+        },
+        {
+          "query": "总结一下远程办公的优缺点",
+          "ok": true,
+          "reason": "ok",
+          "title": "远程办公优缺点总结",
+          "latency_ms": 892.2,
+          "output": "{\"title\": \"远程办公优缺点总结\"}"
+        },
+        {
+          "query": "解释 RAG 和微调的区别",
+          "ok": true,
+          "reason": "ok",
+          "title": "RAG与微调的区别解析",
+          "latency_ms": 1217.7,
+          "output": "{\"title\": \"RAG与微调的区别解析\"}"
+        },
+        {
+          "query": "帮我写一封请假邮件",
+          "ok": true,
+          "reason": "ok",
+          "title": "请假邮件撰写",
+          "latency_ms": 1092.9,
+          "output": "{\"title\": \"请假邮件撰写\"}"
+        },
+        {
+          "query": "2026 年 AI 行业有哪些趋势？",
+          "ok": true,
+          "reason": "ok",
+          "title": "2026年AI行业趋势展望",
+          "latency_ms": 892.3,
+          "output": "{\"title\": \"2026年AI行业趋势展望\"}"
+        },
+        {
+          "query": "如何用 pandas 做数据清洗",
+          "ok": true,
+          "reason": "ok",
+          "title": "pandas 数据清洗方法",
+          "latency_ms": 988.5,
+          "output": "{\"title\": \"pandas 数据清洗方法\"}"
+        },
+        {
+          "query": "推荐几本系统设计的书",
+          "ok": true,
+          "reason": "ok",
+          "title": "系统设计书籍推荐",
+          "latency_ms": 1146.4,
+          "output": "{\"title\": \"系统设计书籍推荐\"}"
+        },
+        {
+          "query": "什么是向量数据库",
+          "ok": true,
+          "reason": "ok",
+          "title": "向量数据库简介",
+          "latency_ms": 1438.9,
+          "output": "{\"title\": \"向量数据库简介\"}"
+        },
+        {
+          "query": "分析一下这个季度的销售数据",
+          "ok": true,
+          "reason": "ok",
+          "title": "季度销售数据分析",
+          "latency_ms": 1111.9,
+          "output": "{\"title\": \"季度销售数据分析\"}"
+        },
+        {
+          "query": "如何在 Excel 中做透视表",
+          "ok": true,
+          "reason": "ok",
+          "title": "Excel 透视表制作方法",
+          "latency_ms": 1359.4,
+          "output": "{\"title\": \"Excel 透视表制作方法\"}"
+        },
+        {
+          "query": "解释 Transformer 注意力机制",
+          "ok": true,
+          "reason": "ok",
+          "title": "Transformer 注意力机制解析",
+          "latency_ms": 1371.4,
+          "output": "{\"title\": \"Transformer 注意力机制解析\"}"
+        },
+        {
+          "query": "写一个 Python 快速排序",
+          "ok": true,
+          "reason": "ok",
+          "title": "Python 快速排序实现",
+          "latency_ms": 965.2,
+          "output": "{\"title\": \"Python 快速排序实现\"}"
+        },
+        {
+          "query": "总结 SQL 注入的防护",
+          "ok": true,
+          "reason": "ok",
+          "title": "SQL注入防护措施总结",
+          "latency_ms": 1122.5,
+          "output": "{\"title\": \"SQL注入防护措施总结\"}"
+        },
+        {
+          "query": "2026 年新能源汽车趋势",
+          "ok": true,
+          "reason": "ok",
+          "title": "2026年新能源汽车发展趋势",
+          "latency_ms": 1609.4,
+          "output": "{\"title\": \"2026年新能源汽车发展趋势\"}"
+        },
+        {
+          "query": "推荐几部科幻电影",
+          "ok": true,
+          "reason": "ok",
+          "title": "经典科幻电影推荐片单",
+          "latency_ms": 905.0,
+          "output": "{\"title\": \"经典科幻电影推荐片单\"}"
+        },
+        {
+          "query": "什么是零知识证明",
+          "ok": true,
+          "reason": "ok",
+          "title": "零知识证明简介",
+          "latency_ms": 1116.9,
+          "output": "{\"title\": \"零知识证明简介\"}"
+        },
+        {
+          "query": "分析一下这份财报",
+          "ok": true,
+          "reason": "ok",
+          "title": "企业财报分析",
+          "latency_ms": 1743.7,
+          "output": "{\"title\":\"企业财报分析\"}"
+        },
+        {
+          "query": "如何学习 Rust",
+          "ok": true,
+          "reason": "ok",
+          "title": "Rust 学习路径与方法",
+          "latency_ms": 919.6,
+          "output": "{\"title\":\"Rust 学习路径与方法\"}"
+        },
+        {
+          "query": "写一首关于秋天的诗",
+          "ok": true,
+          "reason": "ok",
+          "title": "秋日主题诗歌创作",
+          "latency_ms": 936.6,
+          "output": "{\"title\":\"秋日主题诗歌创作\"}"
+        }
+      ]
+    },
+    "strict": {
+      "score": 20,
+      "cases": 20,
+      "rows": [
+        {
+          "query": "Python 的 GIL 是什么？",
+          "ok": true,
+          "reason": "ok",
+          "title": "Python 全局解释器锁解析",
+          "latency_ms": 993.9,
+          "output": "{\"title\": \"Python 全局解释器锁解析\"}"
+        },
+        {
+          "query": "怎么在 Linux 上安装 Docker？",
+          "ok": true,
+          "reason": "ok",
+          "title": "Linux系统Docker安装步骤详解",
+          "latency_ms": 1923.5,
+          "output": "{\"title\": \"Linux系统Docker安装步骤详解\"}"
+        },
+        {
+          "query": "总结一下远程办公的优缺点",
+          "ok": true,
+          "reason": "ok",
+          "title": "远程办公优缺点总结",
+          "latency_ms": 1023.8,
+          "output": "{\"title\":\"远程办公优缺点总结\"}"
+        },
+        {
+          "query": "解释 RAG 和微调的区别",
+          "ok": true,
+          "reason": "ok",
+          "title": "RAG 与微调的区别",
+          "latency_ms": 879.0,
+          "output": "{\"title\":\"RAG 与微调的区别\"}"
+        },
+        {
+          "query": "帮我写一封请假邮件",
+          "ok": true,
+          "reason": "ok",
+          "title": "请假邮件撰写模板",
+          "latency_ms": 892.3,
+          "output": "{\"title\": \"请假邮件撰写模板\"}"
+        },
+        {
+          "query": "2026 年 AI 行业有哪些趋势？",
+          "ok": true,
+          "reason": "ok",
+          "title": "2026年人工智能行业趋势展望",
+          "latency_ms": 714.0,
+          "output": "{\"title\": \"2026年人工智能行业趋势展望\"}"
+        },
+        {
+          "query": "如何用 pandas 做数据清洗",
+          "ok": true,
+          "reason": "ok",
+          "title": "pandas 数据清洗方法",
+          "latency_ms": 644.1,
+          "output": "{\"title\": \"pandas 数据清洗方法\"}"
+        },
+        {
+          "query": "推荐几本系统设计的书",
+          "ok": true,
+          "reason": "ok",
+          "title": "系统设计经典书目推荐",
+          "latency_ms": 1017.2,
+          "output": "{\"title\": \"系统设计经典书目推荐\"}"
+        },
+        {
+          "query": "什么是向量数据库",
+          "ok": true,
+          "reason": "ok",
+          "title": "向量数据库概念解析",
+          "latency_ms": 788.3,
+          "output": "{\"title\": \"向量数据库概念解析\"}"
+        },
+        {
+          "query": "分析一下这个季度的销售数据",
+          "ok": true,
+          "reason": "ok",
+          "title": "季度销售数据分析",
+          "latency_ms": 832.2,
+          "output": "{\"title\": \"季度销售数据分析\"}"
+        },
+        {
+          "query": "如何在 Excel 中做透视表",
+          "ok": true,
+          "reason": "ok",
+          "title": "数据透视表制作步骤",
+          "latency_ms": 1636.4,
+          "output": "{\"title\": \"数据透视表制作步骤\"}"
+        },
+        {
+          "query": "解释 Transformer 注意力机制",
+          "ok": true,
+          "reason": "ok",
+          "title": "Transformer注意力机制解析",
+          "latency_ms": 659.1,
+          "output": "{\"title\": \"Transformer注意力机制解析\"}"
+        },
+        {
+          "query": "写一个 Python 快速排序",
+          "ok": true,
+          "reason": "ok",
+          "title": "Python快速排序算法实现",
+          "latency_ms": 742.1,
+          "output": "{\"title\": \"Python快速排序算法实现\"}"
+        },
+        {
+          "query": "总结 SQL 注入的防护",
+          "ok": true,
+          "reason": "ok",
+          "title": "数据库注入攻击防护总结",
+          "latency_ms": 1071.9,
+          "output": "{\"title\": \"数据库注入攻击防护总结\"}"
+        },
+        {
+          "query": "2026 年新能源汽车趋势",
+          "ok": true,
+          "reason": "ok",
+          "title": "2026年新能源汽车趋势展望",
+          "latency_ms": 809.0,
+          "output": "{\"title\":\"2026年新能源汽车趋势展望\"}"
+        },
+        {
+          "query": "推荐几部科幻电影",
+          "ok": true,
+          "reason": "ok",
+          "title": "高分科幻影片精选片单",
+          "latency_ms": 1318.9,
+          "output": "{\"title\":\"高分科幻影片精选片单\"}"
+        },
+        {
+          "query": "什么是零知识证明",
+          "ok": true,
+          "reason": "ok",
+          "title": "零知识证明的基本原理",
+          "latency_ms": 1129.0,
+          "output": "{\"title\": \"零知识证明的基本原理\"}"
+        },
+        {
+          "query": "分析一下这份财报",
+          "ok": true,
+          "reason": "ok",
+          "title": "企业财报核心指标解读",
+          "latency_ms": 1011.9,
+          "output": "{\"title\": \"企业财报核心指标解读\"}"
+        },
+        {
+          "query": "如何学习 Rust",
+          "ok": true,
+          "reason": "ok",
+          "title": "Rust 学习路径指南",
+          "latency_ms": 956.7,
+          "output": "{\"title\": \"Rust 学习路径指南\"}"
+        },
+        {
+          "query": "写一首关于秋天的诗",
+          "ok": true,
+          "reason": "ok",
+          "title": "秋日诗篇",
+          "latency_ms": 663.9,
+          "output": "{\"title\": \"秋日诗篇\"}"
+        }
+      ]
+    },
+    "compact": {
+      "score": 20,
+      "cases": 20,
+      "rows": [
+        {
+          "query": "Python 的 GIL 是什么？",
+          "ok": true,
+          "reason": "ok",
+          "title": "Python全局解释器锁",
+          "latency_ms": 1384.9,
+          "output": "{\"title\":\"Python全局解释器锁\"}"
+        },
+        {
+          "query": "怎么在 Linux 上安装 Docker？",
+          "ok": true,
+          "reason": "ok",
+          "title": "Linux安装Docker教程",
+          "latency_ms": 1158.4,
+          "output": "{\"title\":\"Linux安装Docker教程\"}"
+        },
+        {
+          "query": "总结一下远程办公的优缺点",
+          "ok": true,
+          "reason": "ok",
+          "title": "远程办公优缺点总结",
+          "latency_ms": 980.9,
+          "output": "{\"title\":\"远程办公优缺点总结\"}"
+        },
+        {
+          "query": "解释 RAG 和微调的区别",
+          "ok": true,
+          "reason": "ok",
+          "title": "检索增强与微调区别",
+          "latency_ms": 1100.2,
+          "output": "{\"title\":\"检索增强与微调区别\"}"
+        },
+        {
+          "query": "帮我写一封请假邮件",
+          "ok": true,
+          "reason": "ok",
+          "title": "请假邮件写作指导",
+          "latency_ms": 1450.7,
+          "output": "{\"title\":\"请假邮件写作指导\"}"
+        },
+        {
+          "query": "2026 年 AI 行业有哪些趋势？",
+          "ok": true,
+          "reason": "ok",
+          "title": "2026年AI趋势前瞻",
+          "latency_ms": 1775.6,
+          "output": "{\"title\":\"2026年AI趋势前瞻\"}"
+        },
+        {
+          "query": "如何用 pandas 做数据清洗",
+          "ok": true,
+          "reason": "ok",
+          "title": "Pandas数据清洗方法",
+          "latency_ms": 1874.2,
+          "output": "{\"title\":\"Pandas数据清洗方法\"}"
+        },
+        {
+          "query": "推荐几本系统设计的书",
+          "ok": true,
+          "reason": "ok",
+          "title": "系统设计书籍推荐",
+          "latency_ms": 1044.3,
+          "output": "{\"title\":\"系统设计书籍推荐\"}"
+        },
+        {
+          "query": "什么是向量数据库",
+          "ok": true,
+          "reason": "ok",
+          "title": "向量数据库概念解析",
+          "latency_ms": 1091.3,
+          "output": "{\"title\":\"向量数据库概念解析\"}"
+        },
+        {
+          "query": "分析一下这个季度的销售数据",
+          "ok": true,
+          "reason": "ok",
+          "title": "季度销售数据分析",
+          "latency_ms": 1124.0,
+          "output": "{\"title\":\"季度销售数据分析\"}"
+        },
+        {
+          "query": "如何在 Excel 中做透视表",
+          "ok": true,
+          "reason": "ok",
+          "title": "数据透视表制作指南",
+          "latency_ms": 1169.6,
+          "output": "{\"title\":\"数据透视表制作指南\"}"
+        },
+        {
+          "query": "解释 Transformer 注意力机制",
+          "ok": true,
+          "reason": "ok",
+          "title": "自注意力机制原理解析",
+          "latency_ms": 2276.8,
+          "output": "{\"title\":\"自注意力机制原理解析\"}"
+        },
+        {
+          "query": "写一个 Python 快速排序",
+          "ok": true,
+          "reason": "ok",
+          "title": "快速排序算法实现",
+          "latency_ms": 1828.2,
+          "output": "{\"title\":\"快速排序算法实现\"}"
+        },
+        {
+          "query": "总结 SQL 注入的防护",
+          "ok": true,
+          "reason": "ok",
+          "title": "SQL注入防护策略",
+          "latency_ms": 1596.8,
+          "output": "{\"title\":\"SQL注入防护策略\"}"
+        },
+        {
+          "query": "2026 年新能源汽车趋势",
+          "ok": true,
+          "reason": "ok",
+          "title": "新能源汽车趋势前瞻",
+          "latency_ms": 1105.9,
+          "output": "{\"title\":\"新能源汽车趋势前瞻\"}"
+        },
+        {
+          "query": "推荐几部科幻电影",
+          "ok": true,
+          "reason": "ok",
+          "title": "科幻电影推荐清单",
+          "latency_ms": 1044.1,
+          "output": "{\"title\":\"科幻电影推荐清单\"}"
+        },
+        {
+          "query": "什么是零知识证明",
+          "ok": true,
+          "reason": "ok",
+          "title": "零知识证明概念解析",
+          "latency_ms": 1352.9,
+          "output": "{\"title\":\"零知识证明概念解析\"}"
+        },
+        {
+          "query": "分析一下这份财报",
+          "ok": true,
+          "reason": "ok",
+          "title": "财报核心指标分析",
+          "latency_ms": 1772.8,
+          "output": "{\"title\":\"财报核心指标分析\"}"
+        },
+        {
+          "query": "如何学习 Rust",
+          "ok": true,
+          "reason": "ok",
+          "title": "Rust学习路线指南",
+          "latency_ms": 2159.4,
+          "output": "{\"title\":\"Rust学习路线指南\"}"
+        },
+        {
+          "query": "写一首关于秋天的诗",
+          "ok": true,
+          "reason": "ok",
+          "title": "秋日诗笺",
+          "latency_ms": 1308.7,
+          "output": "{\"title\":\"秋日诗笺\"}"
+        }
+      ]
+    }
+  },
+  "note": "candidate retained only if score > baseline; otherwise baseline stays"
+}

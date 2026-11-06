@@ -545,7 +545,8 @@ def test_low_confidence_note_wiring_and_config():
     """
     import inspect
     import app.services.agent_loop as _al
-    src = inspect.getsource(_al)
+    import app.services.agent_loop_orchestrator as _orch
+    src = inspect.getsource(_al) + inspect.getsource(_orch)
     assert "_AUDIT_LOW_CONFIDENCE_NOTE" in src
     assert "_AUDIT_CHUNK_COVERAGE_NOTE" in src
     assert src.count("_consume_low_confidence_note(state)") >= 4, \
@@ -574,7 +575,8 @@ def test_draft_note_consumption_covers_non_reasoning_mode():
     """接线回归（Important-1）：draft 出货点的说明消费不再只挂 live 条件。"""
     import inspect
     import app.services.agent_loop as _al
-    src = inspect.getsource(_al)
+    import app.services.agent_loop_orchestrator as _orch
+    src = inspect.getsource(_al) + inspect.getsource(_orch)
     assert "_draft_ships_as_final(" in src
 
 

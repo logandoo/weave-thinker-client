@@ -125,3 +125,49 @@ async def register_with_cloud(
     if not isinstance(data, dict) or not data.get("token"):
         raise ValueError("云端响应缺少 device token")
     return data
+
+
+async def push_rename_to_cloud(
+    cloud_url: str,
+    device_id: str,
+    name: str,
+    *,
+    token: str,
+    tls_verify: bool = True,
+    timeout: float = 5.0,
+) -> Dict[str, Any]:
+    """改名推送云端（W25 handoff ③：`POST /api/devices/{device_id}/rename`，
+    凭 device token，body `{name}`）。
+
+    不抛异常：旧版云端无端点（404）/不可达均降级为 {"ok": False, "detail": ...}，
+    本地改名不回滚、不虚构云端成功（W22「不虚构云端调用」契约延续）。"""
+    import httpx
+
+    base = cloud_url.rstrip("/")
+    import re as _re
+    if not _re.fullmatch(r"[A-Za-z0-9_-]{1,64}", str(device_id or "")):
+        return {"ok": False, "detail": "设备标识非法，未推送云端；本地名称已保存"}
+    try:
+        async with httpx.AsyncClient(verify=tls_verify, timeout=timeout) as client:
+            resp = await client.post(
+                f"{base}/api/devices/{device_id}/rename",
+                json={"name": name},
+                headers={"Authorization": f"Bearer {token}"},
+            )
+    except Exception as exc:  # noqa: BLE001 — 网络失败=如实降级
+        return {"ok": False, "detail": f"云端不可达（{type(exc).__name__}）；本地名称已保存，重新配对时会带上新名称"}
+    if resp.status_code in (200, 201, 204):
+        # 评审 I1：200 空体/HTML 伪应答不得虚报成功（SPA fallback/改写网关场景）——
+        # 锚定响应体 renamed 严格真值（register_with_cloud 锚 token 同款防伪）。
+        try:
+            data = resp.json()
+        except Exception:  # noqa: BLE001
+            data = None
+        if isinstance(data, dict) and data.get("renamed") is True:
+            return {"ok": True, "detail": "云端已同步"}
+        return {"ok": False, "detail": "云端应答异常（2xx 但未确认改名）；本地名称已保存"}
+    if resp.status_code == 404:
+        return {"ok": False, "detail": "云端暂不支持改名（旧版无改名端点）；本地名称已保存，重新配对时会带上新名称"}
+    if resp.status_code in (401, 403):
+        return {"ok": False, "detail": f"云端凭据已失效（HTTP {resp.status_code}）；本地名称已保存，请重新配对后云端名称随配对同步"}
+    return {"ok": False, "detail": f"云端改名被拒（HTTP {resp.status_code}）；本地名称已保存"}

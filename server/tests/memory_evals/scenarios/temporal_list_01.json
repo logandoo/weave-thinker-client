@@ -1,0 +1,28 @@
+{
+  "id": "temporal_list_01",
+  "category": "temporal_list",
+  "title": "时间型列表：昨天的部署操作",
+  "query": "昨天我做了哪些部署操作？",
+  "stage0": {"query_type": "semantic", "keywords": ["昨天", "部署"]},
+  "seed": {
+    "concepts": [{"id": "c-distractor", "canonical_name": "周报模板", "content": "周报模板字段说明", "memory_type": "semantic"}],
+    "episodic": [
+      {"id": "e-deploy-1", "content": "[2026-10-12] 执行了 docker 部署与冒烟"},
+      {"id": "e-deploy-2", "content": "[2026-10-12] 回滚了一次错误配置"}
+    ],
+    "subconscious": []
+  },
+  "fake_retrieval": {
+    "candidates": [
+      {"id": "e-deploy-1", "tier": "episodic", "score": 0.8, "content": "[2026-10-12] 执行了 docker 部署与冒烟", "metadata": {"valid_from": "2026-10-12"}},
+      {"id": "e-deploy-2", "tier": "episodic", "score": 0.7, "content": "[2026-10-12] 回滚了一次错误配置", "metadata": {"valid_from": "2026-10-12"}},
+      {"id": "c-distractor", "tier": "concept", "score": 0.5, "content": "周报模板字段说明", "metadata": {"canonical_name": "周报模板"}}
+    ]
+  },
+  "expect": {
+    "hit_ids": ["e-deploy-1", "e-deploy-2"],
+    "hit_k": 3,
+    "forbidden_ids": [],
+    "llm_checks": [{"type": "answer_contains", "value": "部署"}]
+  }
+}

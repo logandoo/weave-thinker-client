@@ -21,3 +21,6 @@ server/sync_blobs/
 *.bak.*
 app/ios/
 app/android/
+
+.venv/
+venv/

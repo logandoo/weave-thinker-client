@@ -500,9 +500,12 @@ def test_emit_draft_rejected_fail_open():
 
 
 def test_stash_sites_wired_to_emit():
-    src = open(
-        os.path.join(os.path.dirname(__file__), "..", "app", "services", "agent_loop.py"),
-        encoding="utf-8").read()
+    src = "".join(
+        open(
+            os.path.join(os.path.dirname(__file__), "..", "app", "services", name),
+            encoding="utf-8").read()
+        for name in ("agent_loop.py", "agent_loop_orchestrator.py")
+    )
     n_stash = src.count("_stash_rejected_draft(") - 1  # 减 def 行
     n_emit = src.count("_emit_draft_rejected(self, state")
     assert n_emit >= n_stash >= 4, (
@@ -756,3 +759,102 @@ def test_receiver_apply_reexternalizes_and_expands_full_text():
     finally:
         sc.unregister_sync_capture()
         uninstall_message_payload_hook()
+
+
+def test_boot_sweep_keeps_tool_evidence_as_interrupted():
+    """2026-11-01（conv 861cb5af）：重启杀掉的在途 run 只有工具调用/思考、没有正文时，
+    旧 sweep 直接删行 → 用户看到「上一条提问下面什么都没有」（无回答、无中断标记、
+    无任何证据）。工具/思考/工具结果都是证据：必须翻 interrupted 保留，只有全空
+    壳才删除。"""
+    import app.services.sync_capture as sc
+    from app.api.chat import mark_interrupted_streams
+    from app.db.database import Message
+
+    engine, conv_id = _sweep_env()
+    sc.unregister_sync_capture()
+    sc.register_sync_capture()
+    with Session(engine) as s, _sync_on():
+        m_tools = Message(conversation_id=conv_id, role="assistant", content="",
+                          tool_calls='[{"name": "terminal", "arguments": "{}"}]',
+                          delivery_status="streaming")
+        m_reason = Message(conversation_id=conv_id, role="assistant", content="",
+                           reasoning_content="正在生成视频……",
+                           delivery_status="streaming")
+        m_results = Message(conversation_id=conv_id, role="assistant", content="",
+                            tool_results='[{"call_id": "c1", "result": "ok"}]',
+                            delivery_status="streaming")
+        m_empty = Message(conversation_id=conv_id, role="assistant", content="",
+                          tool_results="[]", tool_calls="[]",
+                          delivery_status="streaming")
+        s.add_all([m_tools, m_reason, m_results, m_empty])
+        s.commit()
+        ids = [m_tools.id, m_reason.id, m_results.id, m_empty.id]
+        try:
+            n = _run(mark_interrupted_streams(_AsyncShim(s)))
+            s.commit()
+        finally:
+            sc.unregister_sync_capture()
+        assert n == 3, "三条有证据的行必须翻 interrupted（而不是删除）"
+        for mid in ids[:3]:
+            row = s.get(Message, mid)
+            assert row is not None, "有工具/思考证据的在途行不得删除"
+            assert row.delivery_status == "interrupted"
+        assert s.get(Message, ids[3]) is None, "全空壳（含空 JSON 数组）仍应删除"
+
+
+def test_evidence_tick_flushes_without_text_growth():
+    """2026-11-01（conv 861cb5af）：纯工具型长任务正文不增长时也要按时间刷证据。
+
+    旧 `feed()` 在 cur<=_last_len 时直接 return——正文一直为空则永远不刷，
+    重启后连工具调用/结果都没有，整行被当空壳删除。"""
+    import asyncio as _aio
+    from app.api.chat import ProgressiveFlusher
+
+    writes = []
+    now = [1000.0]
+
+    async def _writer(text):
+        writes.append(text)
+
+    async def main():
+        pf = ProgressiveFlusher(_writer, clock=lambda: now[0], min_chars=2000, min_seconds=5.0)
+        pf.feed("")          # 无增长 → 不刷
+        await _aio.sleep(0)
+        pf.tick("")          # 距上次 <5s → 不刷
+        await _aio.sleep(0)
+        assert writes == [], "最小间隔内不得刷"
+        now[0] += 6.0
+        pf.tick("")          # 仅证据变化 → 允许刷（正文仍为空快照）
+        await _aio.sleep(0)
+        assert writes == [""], "≥5s 必须强制刷一次当前快照（证据由 writer 从 run 取）"
+        now[0] += 1.0
+        pf.tick("")
+        await _aio.sleep(0)
+        assert writes == [""], "连续 tick 仍受最小间隔约束"
+
+    _run(main())
+
+
+def test_evidence_tick_single_flight():
+    """证据 tick 与正文刷写共用单 flight：在途写未完成时不得并发。"""
+    import asyncio as _aio
+    from app.api.chat import ProgressiveFlusher
+
+    started = []
+    release = _aio.Event()
+
+    async def _writer(text):
+        started.append(text)
+        await release.wait()
+
+    pf = ProgressiveFlusher(_writer, min_chars=10, min_seconds=0.0)
+
+    async def main():
+        pf.feed("x" * 20)
+        await _aio.sleep(0)
+        pf.tick("x" * 20)
+        await _aio.sleep(0)
+        assert len(started) == 1, "在途写未完成时 tick 不得并发"
+        release.set()
+
+    _run(main())

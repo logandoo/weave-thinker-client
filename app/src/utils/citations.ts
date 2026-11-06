@@ -92,3 +92,98 @@ export function parseBibliographyEntries(content: string): BibEntry[] {
   }
   return entries
 }
+
+// ─── M6：服务端 citations 载荷（引文体系改造 2026-10-11） ────────────────────
+// 后端在出货点用 CSL 渲染逐条规范 reference 与文内族形态（in_text），前端仅
+// 按载荷展示：卡片=reference 文本（URL 可有可无）、文内角标形态随样式族。
+// 载荷存在时不再走本地 [N] 启发式/重排（防双重重排错位）。
+
+export interface CitationPayloadEntry {
+  id: number
+  num: number
+  in_text?: string
+  reference: string
+  url?: string
+  title?: string
+  snippet?: string
+  author?: string
+  year?: string
+}
+
+export interface CitationsPayload {
+  style_id: string
+  family: string
+  heading: string
+  entries: CitationPayloadEntry[]
+}
+
+export interface CitationChip {
+  result: { url?: string; title?: string; snippet?: string }
+  num: number
+  bibText?: string
+}
+
+/** 载荷 → 引用卡片（每被引条目恰一芯片；num 为服务端编号，点击/预览键）。 */
+export function buildCitationChips(payload: CitationsPayload | null | undefined): CitationChip[] {
+  const entries = payload?.entries ?? []
+  return entries
+    .filter((e) => e && Number.isFinite(e.num))
+    .slice()
+    .sort((a, b) => a.num - b.num)
+    .map((e) => ({
+      result: {
+        url: e.url || '',
+        title: e.title || '',
+        snippet: e.snippet || '',
+      },
+      num: e.num,
+      bibText: e.reference || '',
+    }))
+}
+
+/** in_text 消毒（A4.9 B2/N1，纵深防御）：**转义优先**——先整体转义 `<`/`>`，
+ *  再仅还原四个精确裸标签 `<i></i><sup></sup>`。未闭合标签（`<img …//`）不再
+ *  泄漏（旧白名单正则匹配不到无 `>` 的标签，可被外层 `</span>` 补全执行）。
+ *  `&` 不重复转义（citeproc 已产出实体，实体无法构成标签）。 */
+function _safeInText(t: string): string {
+  return t
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/&lt;(\/?)(i|sup)&gt;/gi, '<$1$2>')
+}
+
+/** 文内 [N] → 样式族形态（可点击角标）。notes 族数字渲染上标；其余族按载荷
+ *  in_text（含 <sup>/<i> 的 HTML 由 CSL 边界转义产出 + _safeInText 白名单）。 */
+export function applyCitationInText(
+  html: string,
+  payload: CitationsPayload | null | undefined,
+): string {
+  if (!html || !payload?.entries?.length) return html
+  const map = new Map<number, CitationPayloadEntry>()
+  for (const e of payload.entries) map.set(e.id, e)
+  const parts = html.split(/(<pre[\s\S]*?<\/pre>|<code[\s\S]*?<\/code>|<a[\s\S]*?<\/a>|<sup[\s\S]*?<\/sup>)/gi)
+  return parts
+    .map((part, i) => {
+      if (i % 2 === 1) return part
+      return part.replace(/\[(\d{1,3})\](?![(:])/g, (match, digits: string) => {
+        const id = parseInt(digits, 10)
+        const e = map.get(id)
+        if (!e) return match
+        const num = Number.isFinite(e.num) ? Math.trunc(e.num) : id
+        const t = _safeInText((e.in_text || '').trim())
+        if (t && /^<sup\b/i.test(t)) {
+          // 上标族（GB 顺序编码/AMA）：注入 class/data-cite-index 保点击
+          return t.replace(
+            /^<sup\b[^>]*>/i,
+            `<sup class="citation-ref" data-cite-index="${num}">`,
+          )
+        }
+        if (payload.family === 'notes' && /^\d{1,3}$/.test(t)) {
+          return `<sup class="citation-ref" data-cite-index="${num}">${t}</sup>`
+        }
+        const label = t || `[${num}]`
+        return `<span class="citation-ref" data-cite-index="${num}">${label}</span>`
+      })
+    })
+    .join('')
+}

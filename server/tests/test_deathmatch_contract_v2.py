@@ -115,12 +115,16 @@ def test_w1a_parse_and_normalize_criteria():
     assert crit[0]["type"] == "mechanical" and crit[0]["source"] == "system"
     assert crit[0]["check"]["kind"] == "file" and crit[0]["check"]["path"] == "report.md"
     assert crit[1]["type"] == "judgmental" and crit[1]["check"]["kind"] == "none"
-    # 非法 kind 回退 none；空文本丢弃
+    # 空文本仍丢弃；unknown kind 必须在 normalization 前明确拒绝（D-dm9）。
     crit2 = ds._parse_criteria_response(json.dumps({"criteria": [
         {"text": "", "type": "mechanical"},
-        {"text": "x", "type": "mechanical", "check": {"kind": "rm -rf", "path": "p"}},
+        {"text": "x", "type": "judgmental", "check": {"kind": "none"}},
     ]}))
     assert len(crit2) == 1 and crit2[0]["check"]["kind"] == "none"
+    with pytest.raises(ds.CriteriaCandidateRejected):
+        ds._parse_criteria_response(json.dumps({"criteria": [
+            {"text": "x", "type": "mechanical", "check": {"kind": "rm -rf", "path": "p"}},
+        ]}))
 
 
 def test_w1a_contract_hash_stable_and_sensitive():
@@ -334,6 +338,74 @@ def test_w1d_audit_issues_trigger_one_repair():
     assert any(e.get("type") == "plan_audit" for e in events), events
 
 
+def test_w1d_unresolved_contradictions_reject_plan():
+    conv = _conv()
+    mgr = DeathmatchManager(conv)
+
+    async def fake_gen(llm, system_prompt, user_prompt, **kwargs):
+        return _PLAN_JSON
+
+    async def fake_audit(plan):
+        return ["步骤写 18 字节，但原始目标明确为 17 字节"]
+
+    mgr._make_llm = lambda **kw: object()
+    mgr._llm_generate = fake_gen
+    mgr._audit_plan_core = fake_audit
+    plan = _run(mgr.generate_goal_plan(db=None))
+    assert plan is None, "审计仍证明硬冲突时不得执行该计划"
+    assert conv.deathmatch_plan is None
+    assert any(e.get("type") == "plan_rejected" for e in conv.deathmatch_events or [])
+
+
+def test_w1d_repair_parse_failure_rejects_original_plan():
+    conv = _conv()
+    mgr = DeathmatchManager(conv)
+
+    async def fake_gen(llm, system_prompt, user_prompt, **kwargs):
+        return _PLAN_JSON
+
+    async def fake_audit(plan):
+        return ["硬冲突"]
+
+    calls = {"parse": 0}
+
+    async def no_repair(*args, **kwargs):
+        calls["parse"] += 1
+        return json.loads(_PLAN_JSON) if calls["parse"] == 1 else None
+
+    mgr._make_llm = lambda **kw: object()
+    mgr._llm_generate = fake_gen
+    mgr._audit_plan_core = fake_audit
+    mgr._parse_plan_with_repair = no_repair
+    plan = _run(mgr.generate_goal_plan(db=None))
+    assert plan is None, "修复解析失败不得保留初审已拒绝计划"
+    assert conv.deathmatch_plan is None
+    assert any(e.get("type") == "plan_rejected" for e in conv.deathmatch_events or [])
+
+
+def test_w1d_second_audit_failure_rejects_plan():
+    conv = _conv()
+    mgr = DeathmatchManager(conv)
+    calls = {"audit": 0}
+
+    async def fake_gen(llm, system_prompt, user_prompt, **kwargs):
+        return _PLAN_JSON
+
+    async def fake_audit(plan):
+        calls["audit"] += 1
+        if calls["audit"] == 1:
+            return ["硬冲突"]
+        raise RuntimeError("second audit unavailable")
+
+    mgr._make_llm = lambda **kw: object()
+    mgr._llm_generate = fake_gen
+    mgr._audit_plan_core = fake_audit
+    plan = _run(mgr.generate_goal_plan(db=None))
+    assert plan is None, "二次审计异常不得保留初审已拒绝计划"
+    assert conv.deathmatch_plan is None
+    assert any(e.get("type") == "plan_rejected" for e in conv.deathmatch_events or [])
+
+
 def test_w1d_audit_fail_open(monkeypatch):
     conv = _conv()
     mgr = DeathmatchManager(conv)
@@ -416,6 +488,9 @@ def test_w1e_finalize_step_done_check_blocks_and_finalize_event():
     assert d2["status"] == "done", d2
     events = conv2.deathmatch_events or []
     assert any(e.get("type") == "finalized_without_step_evidence" for e in events), events
+    assert conv2.deathmatch_last_verification_result["status"] == "complete"
+    assert conv2.deathmatch_last_verification_result["completed_steps"] == ["s1", "s2"]
+    assert conv2.deathmatch_last_verification_result["issues"] == []
 
 
 # ── W2a: 节点恢复 FSM ─────────────────────────────────────────────────────

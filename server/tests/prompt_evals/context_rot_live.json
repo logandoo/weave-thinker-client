@@ -1,0 +1,40 @@
+{
+  "mode": "live:deepseek",
+  "target_tokens": 32000,
+  "results": [
+    {
+      "ratio": 0.25,
+      "prompt_tokens": 9441,
+      "ok": true,
+      "latency_ms": 919.2,
+      "output": "RULE-OK",
+      "error": ""
+    },
+    {
+      "ratio": 0.5,
+      "prompt_tokens": 15963,
+      "ok": true,
+      "latency_ms": 500.0,
+      "output": "RULE-OK",
+      "error": ""
+    },
+    {
+      "ratio": 0.75,
+      "prompt_tokens": 23889,
+      "ok": true,
+      "latency_ms": 1146.1,
+      "output": "RULE-OK",
+      "error": ""
+    },
+    {
+      "ratio": 0.9,
+      "prompt_tokens": 28644,
+      "ok": true,
+      "latency_ms": 1922.6,
+      "output": "RULE-OK",
+      "error": ""
+    }
+  ],
+  "succeeded": 4,
+  "total": 4
+}

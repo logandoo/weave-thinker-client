@@ -1,0 +1,18 @@
+{
+  "messages_with_context": 64,
+  "legacy_messages": 64,
+  "cache_counted_messages": 0,
+  "groups": [
+    {
+      "key": "?:?",
+      "messages": 64,
+      "prompt_tokens": 3435107,
+      "cache_read": 0,
+      "cache_creation": 0,
+      "cache_hit": 0,
+      "cache_miss": 0,
+      "cache_counted": 0,
+      "hit_rate": null
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "id": "missing_evidence_02",
+  "category": "missing_evidence",
+  "title": "缺证据诚实：旅行计划（仅有过时单元，过滤后零命中）",
+  "query": "我之前提过的旅行计划是什么？",
+  "stage0": {"query_type": "semantic", "keywords": ["旅行"]},
+  "seed": {
+    "concepts": [{"id": "c-stale", "canonical_name": "旅行计划（过时）", "content": "旧的出行草案", "memory_type": "semantic"}],
+    "episodic": [],
+    "subconscious": []
+  },
+  "fake_retrieval": {
+    "candidates": [
+      {"id": "c-stale", "tier": "concept", "score": 0.9, "content": "旧的出行草案", "metadata": {"canonical_name": "旅行计划（过时）", "superseded": true}}
+    ]
+  },
+  "expect": {
+    "hit_ids": [],
+    "hit_k": 3,
+    "forbidden_ids": ["c-stale"],
+    "want_zero_hit": true,
+    "expect_missing_marker": true,
+    "llm_checks": [{"type": "honest_missing", "value": "admit"}]
+  }
+}

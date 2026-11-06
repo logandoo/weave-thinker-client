@@ -20,6 +20,7 @@ if (process.env.WEAVE_USER_DATA_DIR) {
 const path = require('node:path')
 const fs = require('node:fs')
 const fsp = require('node:fs/promises')
+const crypto = require('node:crypto')
 
 const ROOT = path.resolve(__dirname, '..')
 const DIST = path.join(ROOT, 'app', 'dist')
@@ -29,9 +30,119 @@ const isSmoke = process.argv.includes('--smoke')
 const isWindowProbe = process.argv.includes('--window-probe') && process.env.WEAVE_WINDOW_PROBE === '1'
 // 右键菜单探针（2026-09-30 波，COV-1 测试接缝）：同构 window-probe 门控
 const isContextMenuProbe = process.argv.includes('--context-menu-probe') && process.env.WEAVE_CONTEXT_MENU_PROBE === '1'
+// macOS dock 激活探针（2026-11-05）：关闭窗口 → 发 activate → 必须重建窗口。
+const isActivateProbe = process.argv.includes('--activate-probe') && process.env.WEAVE_ACTIVATE_PROBE === '1'
 const argValue = (name) => {
   const hit = process.argv.find((a) => a.startsWith(`--${name}=`))
   return hit ? hit.slice(name.length + 3) : null
+}
+
+// ---------------------------------------------------------------------------
+// W39 冒烟探针（行为级证据；只在本地栈模式跑，dev 冒烟跳过）
+// ---------------------------------------------------------------------------
+
+// 原始 TCP 发一条 WebSocket Upgrade 握手，只读 HTTP 状态行。
+// 为什么要自己写而不复用浏览器 WebSocket：浏览器把「握手被拒」压成 onerror，
+// 403（路由在但鉴权拒绝）与 404（路由不存在）不可区分；本探针要的正是这个区分。
+function wsUpgradeStatus(host, port, requestPath, extraHeaders = {}, timeoutMs = 4000) {
+  const nodeNet = require('node:net')
+  return new Promise((resolve) => {
+    const sock = nodeNet.connect({ host, port })
+    let buf = ''
+    let done = false
+    const finish = (value) => {
+      if (done) return
+      done = true
+      try { sock.destroy() } catch { /* ignore */ }
+      resolve(value)
+    }
+    sock.setTimeout(timeoutMs, () => finish({ status: 0, error: 'timeout' }))
+    sock.on('connect', () => {
+      const key = Buffer.from(Array.from({ length: 16 }, (_, i) => i + 1)).toString('base64')
+      const extra = Object.entries(extraHeaders || {})
+        .map(([k, v]) => `${k}: ${v}\r\n`).join('')
+      sock.write(
+        `GET ${requestPath} HTTP/1.1\r\n` +
+        `Host: ${host}:${port}\r\n` +
+        'Upgrade: websocket\r\n' +
+        'Connection: Upgrade\r\n' +
+        `Sec-WebSocket-Key: ${key}\r\n` +
+        'Sec-WebSocket-Version: 13\r\n' +
+        extra +
+        '\r\n'
+      )
+    })
+    sock.on('data', (chunk) => {
+      buf += chunk.toString('latin1')
+      const m = buf.match(/^HTTP\/1\.[01] (\d{3})/)
+      if (m) finish({ status: Number(m[1]) })
+    })
+    sock.on('error', (e) => finish({ status: 0, error: String((e && e.code) || e) }))
+    sock.on('close', () => finish({ status: 0, error: 'closed-before-status' }))
+  })
+}
+
+// 打包态侧车 BUILD_ID（构建期由 package_macos.sh 写入；dev 无此文件则为 ''）。
+function readSidecarBuildId() {
+  const cands = [
+    path.join(process.resourcesPath || '', 'sidecar', 'weave-server', '_internal', 'BUILD_ID'),
+    path.join(ROOT, 'dist_sidecar', 'weave-server', '_internal', 'BUILD_ID')
+  ]
+  for (const p of cands) {
+    try {
+      if (p && fs.existsSync(p)) return fs.readFileSync(p, 'utf8').trim()
+    } catch { /* ignore */ }
+  }
+  return ''
+}
+
+// 冒烟探针用的本地账号（隔离 profile 的全新 DB ⇒ 首次运行 register，其后 login）。
+// 口令**按 profile 随机生成一次**并落该 profile 的 0600 文件（不硬编码、可跨重复冒烟复用）；
+// 只读取 access_token，不落盘、不打印。注意：语音 WS 的鉴权契约本身是 `?token=`，
+// 服务端 access log 会记录该 URL —— 这是产品既有契约，本探针只在**一次性 profile** 内使用，
+// 残余风险已登记（见 tests/verification_log.md W39 iter 3 + docs 审计 §6.2）。
+function probePassword(profileDir) {
+  const pwFile = path.join(profileDir, '.w39_probe_pw')
+  try {
+    if (fs.existsSync(pwFile)) {
+      const prev = fs.readFileSync(pwFile, 'utf8').trim()
+      if (prev) return prev
+    }
+  } catch { /* fall through to regenerate */ }
+  const pw = ['w39', 'smoke', crypto.randomBytes(12).toString('hex')].join('-')
+  try {
+    fs.mkdirSync(profileDir, { recursive: true })
+    fs.writeFileSync(pwFile, pw + '\n', { mode: 0o600 })
+  } catch { /* profile may be read-only — still usable this run */ }
+  return pw
+}
+
+async function mintProbeToken(apiBase) {
+  const base = String(apiBase || '').replace(/\/+$/, '')
+  if (!base) return ''
+  const profileDir = app.getPath('userData')
+  const creds = { username: 'w39_smoke_probe', password: probePassword(profileDir) }
+  const opts = {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(creds),
+    signal: AbortSignal.timeout(5000)
+  }
+  const login = async () => {
+    try {
+      const r = await fetch(base + '/api/auth/login', opts)
+      if (!r.ok) return ''
+      const j = await r.json().catch(() => ({}))
+      return String(j.access_token || '')
+    } catch { return '' }
+  }
+  let tok = await login()
+  if (tok) return tok
+  try {
+    const reg = await fetch(base + '/api/auth/register', opts)
+    if (!reg.ok && reg.status !== 409) return ''
+  } catch { return '' }
+  return login()
 }
 
 const { createLocalStack } = require('./local-stack.cjs')
@@ -44,13 +155,34 @@ if (!gotSingleInstanceLock) {
   app.quit()
 } else {
   app.on('second-instance', () => {
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      if (mainWindow.isMinimized()) mainWindow.restore()
-      mainWindow.focus()
-    }
+    // macOS dock / 二次启动：窗口可能已被用户关闭，不能只 focus 已销毁的引用。
+    focusOrCreateWindow()
   })
 }
 let mainWindow = null
+let windowCreating = false
+let quitting = false
+// macOS 关闭窗口后 app 仍在 dock（window-all-closed 不 quit）：再次点 dock 图标
+// 时 Electron 只发 activate，必须显式重建/聚焦窗口；否则表现为“点图标没反应”。
+async function focusOrCreateWindow() {
+  if (quitting || isSmoke || isWindowProbe || isContextMenuProbe) return
+  if (!app.isReady()) return
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    if (mainWindow.isMinimized()) mainWindow.restore()
+    if (!mainWindow.isVisible()) mainWindow.show()
+    mainWindow.focus()
+    return
+  }
+  if (windowCreating) return
+  windowCreating = true
+  try {
+    await createWindow()
+  } catch (e) {
+    console.error('WINDOW_RECREATE_FAILED ' + String((e && e.stack) || e))
+  } finally {
+    windowCreating = false
+  }
+}
 // 右键菜单探针的记录槽（COV-1 测试接缝，非产品路径）：context-menu 处理器在
 // 探针模式下把 params 摘要 + 菜单模板登记于此，runContextMenuProbe 汇总落盘。
 const contextMenuProbeRecords = []
@@ -233,7 +365,9 @@ async function createWindow() {
       sandbox: true,
       // 运行时 API base（2026-09-29 端口协商波）：仅在本地栈成功启动后注入
       // （评审 Critical：无条件注入会让远程/跳过模式指向 localhost:8159）。
-      ...(runtimeApiBase ? { additionalArguments: [`--weave-api-base=${runtimeApiBase}`] } : {})
+      // W26：同分支注入执行模式 —— runtimeApiBase 非空 ⟺ 本地栈实启成功且非
+      // 外部模式（:795），是「本地执行」的唯一权威信号源；云端/远程连接不注入。
+      ...(runtimeApiBase ? { additionalArguments: [`--weave-api-base=${runtimeApiBase}`, '--weave-exec-mode=local'] } : {})
     }
   })
   win.webContents.setWindowOpenHandler(({ url }) => {
@@ -299,6 +433,9 @@ async function createWindow() {
     }
   }
   mainWindow = win
+  win.on('closed', () => {
+    if (mainWindow === win) mainWindow = null
+  })
   return win
 }
 
@@ -328,6 +465,8 @@ async function runSmoke(win) {
       out.apiProbe = { status: r.status, ct: r.headers.get('content-type') || '' }
       const t1 = await fetch('app://weave/..%2fdist-evil/secret')
       out.traversalProbe = { status: t1.status }
+      // W39：SPA 构建世代（打包脚本烘入 VITE_BUILD_ID）
+      out.buildId = (typeof window.__WEAVE_BUILD_ID__ === 'string') ? window.__WEAVE_BUILD_ID__ : ''
       if (out.runtimeApiBase) {
         try {
           const hr = await fetch(out.runtimeApiBase + '/')
@@ -343,6 +482,38 @@ async function runSmoke(win) {
   const img = await win.webContents.capturePage()
   fs.mkdirSync(path.dirname(shot), { recursive: true })
   fs.writeFileSync(shot, img.toPNG())
+
+  // W39 行为级探针（仅本地栈模式；dev 冒烟 WEAVE_SKIP_LOCAL_STACK=1 时记 localProbes=skipped）：
+  //   ① 语音路由可达性 —— **有效 token → 101**（路由存在 + 鉴权通过）；无 token → 403（鉴权门）；
+  //      未知路由 → 403（负控，证明 101 非「全路径都通」）。
+  //      ⚠ 101 由 accept() 发出，早于读取 audio_protocol ⇒ 本探针**不**主张参数接线；
+  //      参数接线由 server/tests/test_voice_ws_protocol_wiring.py 钉（含「删传参必须红」变异验证）。
+  //   ② 同源世代 —— SPA 的 __WEAVE_BUILD_ID__ 必须等于侧车 _internal/BUILD_ID
+  let voiceRoute = null
+  const sidecarBuildId = readSidecarBuildId()
+  if (localRequested && runtimeApiBase) {
+    try {
+      const u = new URL(runtimeApiBase)
+      const port = Number(u.port || (u.protocol === 'https:' ? 443 : 80))
+      const token = await mintProbeToken(runtimeApiBase)
+      // 用 Authorization: Bearer 头而不是 ?token= —— 服务端 `extract_websocket_token`
+      // 支持两条路（query 优先、header 兜底）；走 header 可避免 access log 落 JWT。
+      const auth = token ? { Authorization: 'Bearer ' + token } : {}
+      voiceRoute = {
+        tokenMinted: !!token,
+        authVia: token ? 'header' : 'none',
+        // ① 有 token → 语音路由必须 **101**（路由存在 + 鉴权通过；101 由 accept() 发出，
+        //    早于读取 audio_protocol ⇒ 不主张参数接线）
+        voice: await wsUpgradeStatus(u.hostname, port, '/api/voice/ws?audio_protocol=epoch_v1', auth),
+        // ② 无 token → 必须 403（鉴权门生效，不是无条件放行）
+        voiceNoToken: await wsUpgradeStatus(u.hostname, port, '/api/voice/ws?audio_protocol=epoch_v1'),
+        // ③ 对照：同一鉴权打**不存在**的路由 → 403（证明 101 不是「全路径都通」）
+        control: await wsUpgradeStatus(u.hostname, port, '/api/voice/__w39_not_a_route__', auth)
+      }
+    } catch (e) {
+      voiceRoute = { error: String((e && e.message) || e) }
+    }
+  }
 
   const readOk = typeof probe.read === 'string' && probe.read.trim() === 'weave-bridge-ok'
   const checks = {
@@ -362,6 +533,19 @@ async function runSmoke(win) {
       || (probe.runtimeApiBase === runtimeApiBase && probe.runtimeApiBase !== ''),
     runtimeReachable: !localRequested || runtimeApiBase === ''
       || !!(probe.runtimeHealth && probe.runtimeHealth.ok === true),
+    // W39 ①：语音路由在包内**可达**（有效 token → 101 = 路由在 + 鉴权通过）、鉴权门生效、
+    //          负控（未知路由 → 403）。注意 101 不证明 query 参数接线，见上方注释。
+    voiceRouteReachable: !localRequested || !runtimeApiBase
+      || !!(voiceRoute && voiceRoute.tokenMinted && voiceRoute.voice && voiceRoute.voice.status === 101),
+    voiceRouteAuthGate: !localRequested || !runtimeApiBase
+      || !!(voiceRoute && voiceRoute.voiceNoToken && voiceRoute.voiceNoToken.status === 403),
+    voiceRouteControl: !localRequested || !runtimeApiBase
+      || !!(voiceRoute && voiceRoute.control && voiceRoute.control.status === 403),
+    // 探针真的跑了（而不是因缺 runtimeApiBase 而空转）；空转时 localHealth 已失败
+    voiceProbesRan: !localRequested || !runtimeApiBase || !!(voiceRoute && !voiceRoute.error),
+    // W39 ②：SPA 与侧车同一构建世代（同一 BID 单源注入，拒绝「新侧车 + 旧 SPA」混装）
+    buildIdSameGeneration: !localRequested || !runtimeApiBase
+      || (!!probe.buildId && probe.buildId !== 'dev' && probe.buildId === sidecarBuildId),
     screenshot: fs.existsSync(shot) && fs.statSync(shot).size > 1000
   }
   const pass = Object.values(checks).every(Boolean)
@@ -370,11 +554,60 @@ async function runSmoke(win) {
     checks,
     screenshot: shot,
     screenshotBytes: fs.existsSync(shot) ? fs.statSync(shot).size : 0,
+    voiceRoute,
+    localProbes: (localRequested && runtimeApiBase) ? 'ran' : 'skipped (no local stack)',
+    buildId: { spa: probe.buildId || '', sidecar: sidecarBuildId },
     probe
   }))
   return pass
 }
 
+
+// macOS dock 激活探针（2026-11-05）：关闭窗口 → 模拟 dock 点击（app.emit('activate')）
+// → 必须重建一个可加载的窗口。仅测试接缝（WEAVE_ACTIVATE_PROBE=1 门控）。
+async function runActivateProbe(win) {
+  if (process.platform !== 'darwin') {
+    console.log('ACTIVATE_PROBE_RESULT ' + JSON.stringify({ skipped: 'non-darwin' }))
+    return true
+  }
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+  const closed = new Promise((r) => win.once('closed', r))
+  win.close()
+  await closed
+  const afterClose = BrowserWindow.getAllWindows().length
+  app.emit('activate')
+  let recreated = null
+  for (let i = 0; i < 60; i++) {
+    await sleep(100)
+    const wins = BrowserWindow.getAllWindows()
+    if (wins.length === 1 && wins[0] !== win && !wins[0].isDestroyed()) {
+      recreated = wins[0]
+      break
+    }
+  }
+  if (recreated) {
+    // 等重建窗口完成 app:// 加载（与 createWindow 的 loadURL 对齐）
+    for (let i = 0; i < 50; i++) {
+      const url = recreated.webContents.getURL()
+      if (url.startsWith('app://weave/')) break
+      await sleep(100)
+    }
+    // createWindow 在 loadURL 之后才赋 mainWindow；等它落定再断言。
+    for (let i = 0; i < 30; i++) {
+      if (mainWindow && !mainWindow.isDestroyed()) break
+      await sleep(100)
+    }
+  }
+  const out = {
+    afterClose,
+    recreated: !!recreated,
+    windowCount: BrowserWindow.getAllWindows().length,
+    mainWindow: !!mainWindow && !mainWindow.isDestroyed(),
+    url: recreated ? recreated.webContents.getURL() : null
+  }
+  console.log('ACTIVATE_PROBE_RESULT ' + JSON.stringify(out))
+  return out.recreated && out.windowCount === 1 && out.mainWindow
+}
 
 // 窗口状态探针（tests/ui_window_state.py 驱动；COV-1 测试接缝，非产品路径）：
 //   WEAVE_WINDOW_PROBE=1 electron . --window-probe --screenshot-dir=<dir>
@@ -805,7 +1038,11 @@ app.whenReady().then(async () => {
   }
 
   try {
+    // W36：初始创建也纳入 windowCreating 闸，防 macOS 启动/加载期 activate
+    // 并发再建第二个窗口（focusOrCreateWindow 只在创建函数内部置位）。
+    windowCreating = true
     const win = await createWindow()
+    windowCreating = false
     if (isSmoke) {
       const ok = await runSmoke(win)
       await localStack.stop()
@@ -818,6 +1055,10 @@ app.whenReady().then(async () => {
       await runContextMenuProbe(win)
       await localStack.stop()
       app.exit(0)
+    } else if (isActivateProbe) {
+      const ok = await runActivateProbe(win)
+      await localStack.stop()
+      app.exit(ok ? 0 : 1)
     }
   } catch (e) {
     console.error('SMOKE_FATAL ' + String((e && e.stack) || e))
@@ -828,6 +1069,7 @@ app.whenReady().then(async () => {
 
 let localQuitHandled = false
 app.on('before-quit', (event) => {
+  quitting = true
   if (localReady && !localQuitHandled) {
     event.preventDefault()
     localQuitHandled = true
@@ -837,4 +1079,9 @@ app.on('before-quit', (event) => {
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin' || isSmoke) app.quit()
+})
+
+// macOS dock 图标点击 / 应用重新激活：窗口被关闭后必须重建（见 focusOrCreateWindow）。
+app.on('activate', () => {
+  focusOrCreateWindow()
 })

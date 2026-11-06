@@ -55,6 +55,371 @@ _CLEAN_MD = (
 )
 
 
+def test_read_only_boundary_suppresses_contradictory_file_obligations(tmp_path):
+    read_only = {
+        "id": "s2",
+        "description": "只读回读目标文件",
+        "kind": "write",
+        "boundary": "只读核验，不得创建任何核验中间文件",
+        "expected_output": "对话内回读结论",
+        "verification_method": "使用工具回读",
+        "done_check": {"mode": "file", "path": "verify.json", "min_bytes": 1},
+        "output_files": [],
+        "writes": [],
+        "evidence_spec": {"kind": "compute", "receipt": {"cmds": ["python verify.py"], "outputs": ["/tmp/verify.json"]}},
+    }
+    assert ds._declared_output_paths(read_only) == [], "只读边界必须优先于计划器自洽失败的文件声明"
+    criteria = ds._build_obligation_criteria([read_only], {"s2"})
+    assert [c["id"] for c in criteria] == ["ob1"], "ob1 保留，但 tool-output 不得再派生 ob2 文件义务"
+
+    compute_step = dict(read_only, boundary="", evidence_spec={"kind": "compute", "receipt": {"cmds": ["python compute.py"], "outputs": ["verify.json"]}})
+    assert ds._declared_output_paths(compute_step), "非只读计算步骤仍保留真实执行凭证要求"
+    assert len(ds._build_obligation_criteria([compute_step], {"s2"})) > 1
+
+    scoped_read_only = dict(read_only, boundary="只读分析，严禁修改 config.toml", writes=["report.md"])
+    assert "report.md" in ds._declared_output_paths(scoped_read_only), " scoped 只读不得误伤合法 report.md"
+    assert len(ds._build_obligation_criteria([scoped_read_only], {"s2"})) > 1
+    scoped_no_temp = dict(read_only, boundary="禁止生成临时核验文件；最终交付 report.md", writes=["report.md"])
+    assert "report.md" in ds._declared_output_paths(scoped_no_temp)
+    sanitized_scoped = ds._sanitize_step_file_contract(scoped_no_temp)
+    assert sanitized_scoped["writes"] == ["report.md"], "禁止临时文件不得清除显式 report.md"
+    explicit_allow = dict(read_only, boundary="仅允许创建并写入 report.md；不得创建任何其他文件", output_files=["report.md"], writes=["report.md"])
+    assert "report.md" in ds._declared_output_paths(explicit_allow)
+    comma_allow = dict(read_only, boundary="不得创建任何其他文件，但允许创建 report.md", output_files=["report.md"], writes=["report.md"])
+    assert "report.md" in ds._declared_output_paths(comma_allow), "中文逗号不得误删明确允许的交付物"
+    assert ds._sanitize_step_file_contract(explicit_allow)["output_files"] == ["report.md"]
+    prohibited = dict(read_only, boundary="不得交付 report.md", output_files=["report.md"], writes=["report.md"])
+    assert "report.md" not in ds._declared_output_paths(prohibited), "禁止交付不得被误判为允许交付"
+    later_prohibited = dict(read_only, boundary="允许交付 report.md；不得交付 report.md", output_files=["report.md"], writes=["report.md"])
+    assert "report.md" not in ds._declared_output_paths(later_prohibited), "后出现的禁止必须否决先前的允许"
+    blanket_prohibited = dict(read_only, boundary="允许创建 report.md；不得创建任何文件", output_files=["report.md"], writes=["report.md"])
+    assert "report.md" not in ds._declared_output_paths(blanket_prohibited), "全量禁止不得被跳过"
+    strict = dict(read_only, output_files=["verify.json"], writes=["verify.json"])
+    strict_sanitized = ds._sanitize_step_file_contract(strict)
+    assert strict_sanitized["output_files"] == [] and strict_sanitized["writes"] == []
+    assert strict_sanitized["done_check"] == {"mode": "none"}, "严格禁建不得保留被禁止的 file done_check"
+    assert ds._declared_output_paths(strict) == []
+    older = dict(scoped_read_only, output_files=["old.md"], status="done")
+    changed = dict(older, output_files=["new.md"])
+    assert ds.step_statement_hash(older) != ds.step_statement_hash(changed), "output_files 必须进入 settled 不可变哈希"
+    assert ds._validate_done_steps_preserved([older], [changed]), "replan 不得替换已结算交付物"
+
+    sanitized = ds._sanitize_step_file_contract(read_only)
+    assert sanitized["kind"] == read_only["kind"], "严格禁建也不得改写原步骤语义"
+    assert sanitized["expected_output"] == read_only["expected_output"]
+    assert sanitized["verification_method"] == read_only["verification_method"]
+    assert sanitized["evidence_spec"]["kind"] == "tool_output"
+    assert sanitized["evidence_spec"]["receipt"]["outputs"] == []
+    assert sanitized["done_check"] == {"mode": "none"}, "严格禁建时不得保留矛盾 file done_check"
+    assert ds._validate_plan_protocol({"steps": [sanitized]}) == []
+
+    conv = _conv(deathmatch_plan={"steps": [sanitized]})
+    conv.deathmatch_acceptance_criteria = criteria
+    issues = asyncio.run(DeathmatchManager(conv)._run_goal_comparator(str(tmp_path)))
+    assert issues == [], f"tool-output 无文件核验不得被 ob1 反 block：{issues}"
+
+    mixed_step = dict(read_only, evidence_spec={"kind": "compute", "receipt": {"cmds": ["python compute.py"], "outputs": []}})
+    conv_mixed = _conv(deathmatch_plan={"steps": [sanitized, mixed_step]})
+    conv_mixed.deathmatch_acceptance_criteria = criteria
+    mixed_issues = asyncio.run(DeathmatchManager(conv_mixed)._run_goal_comparator(str(tmp_path)))
+    assert mixed_issues, "混合 compute/tool_output 计划不得被单个 tool_output 免除 ob1"
+
+    invalid = dict(sanitized, evidence_spec={"kind": "tool_output", "receipt": {"cmds": ["python verify.py"], "outputs": ["verify.json"]}})
+    assert ds._validate_plan_protocol({"steps": [invalid]}), "tool_output.outputs 非空必须被协议拒绝"
+    assert ds._safe_workspace_path("<s1解析出的绝对路径>/dm.txt") == "", "占位路径不得成为机械交付门"
+
+
+def test_placeholder_prompt_does_not_require_process_evidence_inside_artifact():
+    from app.services.deathmatch_service import _PLACEHOLDER_JUDGE_PROMPT
+    assert "不得把绝对路径、回读日志、命令输出" in _PLACEHOLDER_JUDGE_PROMPT
+    assert "不得据此判占位" in _PLACEHOLDER_JUDGE_PROMPT
+
+
+def test_criteria_and_planning_use_original_baseline_not_recommendation_background():
+    original = "【原始用户要求（基线）】\n文件必须恰好 17 字节"
+    conv = _conv(
+        deathmatch_goal=original + "\n\n【实际盘问决策】\n推荐背景：改为 18 字节",
+        deathmatch_grilling_qa_history=[{"round": 1, "qa_pairs": [
+            {"question": "如何写？", "answer": "按推荐执行，保持原始要求"},
+        ]}],
+    )
+    mgr = DeathmatchManager(conv)
+    captured = {}
+
+    async def fake_generate(llm, system_prompt, user_prompt, **kwargs):
+        captured["prompt"] = user_prompt
+        return '{"criteria": [{"text": "文件为17字节", "type": "judgmental", "check": {"kind": "none"}}]}'
+
+    mgr._make_llm = lambda **kwargs: object()
+    mgr._llm_generate = fake_generate
+    asyncio.run(mgr._synthesize_acceptance_criteria())
+    assert "17 字节" in captured["prompt"]
+    assert "18 字节" not in captured["prompt"], "推荐背景不得污染机械验收标准"
+    planning = mgr._build_plan_user_prompt()
+    assert "17 字节" in planning
+    assert "18 字节" not in planning
+    from app.services.deathmatch_workspace import _goal_baseline_for_contract
+    legacy = "【实际盘问决策】旧问答\n\n【原始用户要求（基线）】\n文件必须恰好 17 字节"
+    assert "17 字节" in _goal_baseline_for_contract(legacy), "QA-first 旧目标不得丢原始基线"
+
+
+def test_criteria_exact_gate_uses_program_bytes_and_repairs_conflicting_minimum(monkeypatch):
+    monkeypatch.setitem(ds.config.deathmatch, "verify_command_gate_enabled", False)
+    conv = _conv(deathmatch_goal="创建 target.txt，内容恰好为 ALPHA\\nBETA\\nGAMMA\\n")
+    mgr = DeathmatchManager(conv)
+    raw = json.dumps({"criteria": [
+        {
+            "id": "c1", "text": "target.txt 至少 18 字节", "type": "mechanical",
+            "check": {"kind": "file", "path": "sub//target.txt", "min_bytes": 18},
+        },
+        {
+            "id": "c2", "text": "target.txt 与精确三行内容一致", "type": "mechanical",
+            "check": {
+                "kind": "exact_file", "path": "sub/target.txt",
+                "content": "ALPHA\nBETA\nGAMMA\n",
+            },
+        },
+        {
+            "id": "c3", "text": "不得改动另一个文件", "type": "mechanical",
+            "check": {"kind": "file", "path": "other.txt", "min_bytes": 99},
+        },
+    ]}, ensure_ascii=False)
+
+    async def fake_generate(*args, **kwargs):
+        return raw
+
+    mgr._make_llm = lambda **kwargs: object()
+    mgr._llm_generate = fake_generate
+    crit = asyncio.run(mgr._synthesize_acceptance_criteria())
+    assert [c["id"] for c in crit] == ["c1", "c2", "c3"], "不得借正规化删除机械检查"
+    assert crit[0]["check"]["min_bytes"] == 17, "命令门关闭时也须保留纠正后的机械文件检查"
+    assert "18" not in crit[0]["text"] and "17" in crit[0]["text"]
+    normalized = [e for e in conv.deathmatch_events or [] if e.get("type") == "criteria_normalized"]
+    assert normalized and normalized[-1].get("exact_bytes") == 17, "字节数必须由程序从精确 printf 负载计算"
+    assert normalized[-1].get("min_bytes") == 18
+
+
+@pytest.mark.parametrize("cmd", [
+    "printf 'A' | cmp -s - target.txt || true",
+    "printf 'A' | cmp -s - target.txt | cat",
+    "echo printf 'A' | cmp -s - target.txt",
+    "printf \"$HOME\" | cmp -s - target.txt",
+    "f=target.txt; printf 'A' | cmp -s - \"$f\"",
+    "printf '\ud800' | cmp -s - target.txt",
+])
+def test_criteria_legacy_cmp_candidate_is_rejected_not_weakened(cmd):
+    conv = _conv(deathmatch_goal="创建 target.txt")
+    mgr = DeathmatchManager(conv)
+    raw = json.dumps({"criteria": [
+        {"id": "c1", "text": "target 至少 18B", "type": "mechanical",
+         "check": {"kind": "file", "path": "target.txt", "min_bytes": 18}},
+        {"id": "c2", "text": "target 精确内容", "type": "mechanical",
+         "check": {"kind": "gate", "cmd": cmd}},
+        {"id": "c3", "text": "其他文件保留", "type": "mechanical",
+         "check": {"kind": "file", "path": "other.txt", "min_bytes": 99}},
+    ]}, ensure_ascii=False)
+
+    async def fake_generate(*args, **kwargs):
+        return raw
+
+    mgr._make_llm = lambda **kwargs: object()
+    mgr._llm_generate = fake_generate
+    crit = asyncio.run(mgr._synthesize_acceptance_criteria())
+    assert crit == [], "legacy cmp 候选必须整体重生成/失败，不得留下被削弱的残余合同"
+    assert conv.deathmatch_acceptance_criteria is None
+    assert any(e.get("type") == "criteria_rejected" for e in conv.deathmatch_events or [])
+
+
+def test_criteria_any_legacy_gate_pauses_instead_of_persisting():
+    conv = _conv(deathmatch_goal="保留其他文件检查")
+    mgr = DeathmatchManager(conv)
+    raw = json.dumps({"criteria": [
+        {"id": "c1", "text": "other 至少 1B", "type": "mechanical",
+         "check": {"kind": "file", "path": "other.txt", "min_bytes": 1}},
+        {"id": "c2", "text": "target 精确内容", "type": "mechanical",
+         "check": {"kind": "gate", "cmd": "test -f target.txt"}},
+    ]}, ensure_ascii=False)
+
+    async def fake_generate(*args, **kwargs):
+        return raw
+
+    mgr._make_llm = lambda **kwargs: object()
+    mgr._llm_generate = fake_generate
+    crit = asyncio.run(mgr._synthesize_acceptance_criteria())
+    assert crit == [] and conv.deathmatch_status == "paused", "新 criteria 不再接受任何 legacy gate，包括非 cmp gate"
+
+
+def test_criteria_structured_exact_content_handles_percent_deterministically():
+    conv = _conv(deathmatch_goal="创建 target.txt")
+    mgr = DeathmatchManager(conv)
+    raw = json.dumps({"criteria": [
+        {"id": "c1", "text": "target 至少 6B", "type": "mechanical",
+         "check": {"kind": "file", "path": "target.txt", "min_bytes": 6}},
+        {"id": "c2", "text": "target 精确内容", "type": "mechanical",
+         "check": {"kind": "exact_file", "path": "target.txt", "content": "100%\n"}},
+    ]}, ensure_ascii=False)
+
+    async def fake_generate(*args, **kwargs):
+        return raw
+
+    mgr._make_llm = lambda **kwargs: object()
+    mgr._llm_generate = fake_generate
+    crit = asyncio.run(mgr._synthesize_acceptance_criteria())
+    assert crit[0]["check"]["min_bytes"] == 5, "结构化 content 必须由 Python 按 UTF-8 实际字节计算"
+
+
+def test_criteria_conflicting_exact_payloads_reject_entire_candidate():
+    conv = _conv(deathmatch_goal="创建 target.txt")
+    mgr = DeathmatchManager(conv)
+    raw = json.dumps({"criteria": [
+        {"id": "c1", "text": "精确 A", "type": "mechanical",
+         "check": {"kind": "exact_file", "path": "target.txt", "content": "A"}},
+        {"id": "c2", "text": "精确 BB", "type": "mechanical",
+         "check": {"kind": "exact_file", "path": "./target.txt", "content": "BB"}},
+        {"id": "c3", "text": "其他文件保留", "type": "mechanical",
+         "check": {"kind": "file", "path": "other.txt", "min_bytes": 99}},
+    ]}, ensure_ascii=False)
+
+    async def fake_generate(*args, **kwargs):
+        return raw
+
+    mgr._make_llm = lambda **kwargs: object()
+    mgr._llm_generate = fake_generate
+    crit = asyncio.run(mgr._synthesize_acceptance_criteria())
+    assert crit == [] and conv.deathmatch_acceptance_criteria is None, "同路径互斥精确内容必须拒绝整个候选，不能后写覆盖先写或保留残余"
+
+
+def test_exact_file_comparator_always_checks_real_bytes(tmp_path, monkeypatch):
+    monkeypatch.setitem(ds.config.deathmatch, "verify_command_gate_enabled", False)
+    target = tmp_path / "target.txt"
+    target.write_bytes(b"ALPHA\nBETA\nGAMMA\n")
+    conv = _conv(deathmatch_acceptance_criteria=[{
+        "id": "exact", "text": "精确 17B", "type": "mechanical", "source": "system",
+        "check": {"kind": "exact_file", "path": "target.txt", "content": "ALPHA\nBETA\nGAMMA\n"},
+    }])
+    mgr = DeathmatchManager(conv)
+    assert asyncio.run(mgr._run_goal_comparator(str(tmp_path))) == []
+    target.write_bytes(b"ALPHA\nBETA\nGAMMA")
+    issues = asyncio.run(mgr._run_goal_comparator(str(tmp_path)))
+    assert issues and "exact" in issues[0], "exact_file 不依赖 shell 命令门，必须直接比较真实文件字节"
+
+
+def test_criteria_standalone_legacy_cmp_is_rejected():
+    conv = _conv(deathmatch_goal="创建 target.txt")
+    mgr = DeathmatchManager(conv)
+    raw = '{"criteria": [{"id": "c1", "text": "精确内容", "type": "mechanical", "check": {"kind": "gate", "cmd": "printf \'A\' | cmp -s - target.txt"}}]}'
+
+    async def fake_generate(*args, **kwargs):
+        return raw
+
+    mgr._make_llm = lambda **kwargs: object()
+    mgr._llm_generate = fake_generate
+    assert asyncio.run(mgr._synthesize_acceptance_criteria()) == []
+    assert conv.deathmatch_acceptance_criteria is None, "standalone cmp 在命令门关闭时也是无效残余，必须整体拒绝"
+    assert conv.deathmatch_status == "paused" and conv.deathmatch_reason, "无效合同不得 fail-open 继续计划"
+
+
+def test_criteria_cmp_filename_gate_also_pauses_without_command_guessing():
+    conv = _conv(deathmatch_goal="保留检查")
+    mgr = DeathmatchManager(conv)
+    raw = json.dumps({"criteria": [
+        {"id": "c1", "text": "target 至少 1B", "type": "mechanical",
+         "check": {"kind": "file", "path": "target.txt", "min_bytes": 1}},
+        {"id": "c2", "text": "cmp.txt 存在", "type": "mechanical",
+         "check": {"kind": "gate", "cmd": "test -f cmp.txt"}},
+    ]}, ensure_ascii=False)
+
+    async def fake_generate(*args, **kwargs):
+        return raw
+
+    mgr._make_llm = lambda **kwargs: object()
+    mgr._llm_generate = fake_generate
+    crit = asyncio.run(mgr._synthesize_acceptance_criteria())
+    assert crit == [] and conv.deathmatch_status == "paused", "不再猜测命令位置：任何 gate 都不得进入新合同"
+
+
+def test_criteria_rooted_backslash_exact_path_is_rejected():
+    conv = _conv(deathmatch_goal="创建 target.txt")
+    mgr = DeathmatchManager(conv)
+    raw = json.dumps({"criteria": [{
+        "id": "c1", "text": "非法 rooted path", "type": "mechanical",
+        "check": {"kind": "exact_file", "path": "\\etc\\passwd", "content": "A"},
+    }]}, ensure_ascii=False)
+
+    async def fake_generate(*args, **kwargs):
+        return raw
+
+    mgr._make_llm = lambda **kwargs: object()
+    mgr._llm_generate = fake_generate
+    assert asyncio.run(mgr._synthesize_acceptance_criteria()) == []
+    assert conv.deathmatch_acceptance_criteria is None, "必须先 normalize 再做 absolute 校验，不得留下不可满足合同"
+
+
+def test_criteria_empty_or_reduced_repair_pauses_instead_of_failing_open():
+    conv = _conv(deathmatch_goal="创建 target.txt")
+    mgr = DeathmatchManager(conv)
+    initial = json.dumps({"criteria": [
+        {"id": "c1", "text": "target 至少 1B", "type": "mechanical",
+         "check": {"kind": "file", "path": "target.txt", "min_bytes": 1}},
+        {"id": "c2", "text": "精确 A", "type": "mechanical",
+         "check": {"kind": "gate", "cmd": "printf 'A' | cmp -s - target.txt"}},
+    ]}, ensure_ascii=False)
+    replies = iter([initial, '{"criteria": []}'])
+
+    async def fake_generate(*args, **kwargs):
+        return next(replies)
+
+    mgr._make_llm = lambda **kwargs: object()
+    mgr._llm_generate = fake_generate
+    assert asyncio.run(mgr._synthesize_acceptance_criteria()) == []
+    assert conv.deathmatch_status == "paused" and conv.deathmatch_reason, "空/缩水重试不得清除机械验收后继续执行"
+
+
+def test_exact_file_comparator_rejects_workspace_symlink_escape(tmp_path):
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    outside = tmp_path / "outside.txt"
+    outside.write_text("A", encoding="utf-8")
+    (workspace / "target.txt").symlink_to(outside)
+    conv = _conv(deathmatch_acceptance_criteria=[{
+        "id": "exact", "text": "精确 A", "type": "mechanical", "source": "system",
+        "check": {"kind": "exact_file", "path": "target.txt", "content": "A"},
+    }])
+    issues = asyncio.run(DeathmatchManager(conv)._run_goal_comparator(str(workspace)))
+    assert issues and "工作区" in issues[0], "workspace symlink 指向外部文件不得满足 exact_file"
+
+
+def test_plain_file_comparator_enforces_workspace_containment(tmp_path):
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    outside = tmp_path / "outside.txt"
+    outside.write_text("A", encoding="utf-8")
+    mgr = DeathmatchManager(_conv())
+    assert mgr._check_file_condition(str(outside), 1, str(workspace)), "普通 file 不得接受 workspace 外绝对路径"
+    (workspace / "target.txt").symlink_to(outside)
+    assert mgr._check_file_condition("target.txt", 1, str(workspace)), "普通 file 不得接受 symlink 逃逸"
+    inside = workspace / "inside.txt"
+    inside.write_text("A", encoding="utf-8")
+    assert mgr._check_file_condition(str(inside), 1, str(workspace)) == [], "workspace 内绝对路径仍应允许"
+
+
+def test_criteria_surrogate_path_rejects_and_pauses():
+    conv = _conv(deathmatch_goal="创建 target.txt")
+    mgr = DeathmatchManager(conv)
+    raw = json.dumps({"criteria": [{
+        "id": "c1", "text": "非法 path", "type": "mechanical",
+        "check": {"kind": "exact_file", "path": "\ud800", "content": "A"},
+    }]}, ensure_ascii=True)
+
+    async def fake_generate(*args, **kwargs):
+        return raw
+
+    mgr._make_llm = lambda **kwargs: object()
+    mgr._llm_generate = fake_generate
+    assert asyncio.run(mgr._synthesize_acceptance_criteria()) == []
+    assert conv.deathmatch_status == "paused" and conv.deathmatch_reason, "非法 Unicode path 也必须走结构化重试/暂停而非通用异常清合同"
+
+
 def _conv(**over):
     base = dict(
         id="conv-w1a",

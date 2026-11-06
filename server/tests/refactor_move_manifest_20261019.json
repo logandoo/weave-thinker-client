@@ -1,0 +1,1690 @@
+{
+  "base": "883ac883",
+  "methods": {
+    "is_active": {
+      "group": "deathmatch",
+      "file": "backend/app/services/deathmatch_service.py",
+      "class": "DeathmatchManager",
+      "body_hash": "49d1f3ad4ab4f744f371796b790a04acaf75dd03af437b9eea30adbfce746965",
+      "args": [
+        "self"
+      ],
+      "decorators": [
+        "Name(id='property', ctx=Load())"
+      ]
+    },
+    "deactivate": {
+      "group": "deathmatch",
+      "file": "backend/app/services/deathmatch_service.py",
+      "class": "DeathmatchManager",
+      "body_hash": "bcaf3779131656cfbc4b6f1ed35b1a5a8b6c9aa3edaa202405b76919991930c7",
+      "args": [
+        "self"
+      ],
+      "decorators": []
+    },
+    "pause": {
+      "group": "deathmatch",
+      "file": "backend/app/services/deathmatch_service.py",
+      "class": "DeathmatchManager",
+      "body_hash": "37f55a9bcb14d701836e19bf4beff6361fc513f1cc7f844d98a3d2c876a395e3",
+      "args": [
+        "self",
+        "reason"
+      ],
+      "decorators": []
+    },
+    "resume": {
+      "group": "deathmatch",
+      "file": "backend/app/services/deathmatch_service.py",
+      "class": "DeathmatchManager",
+      "body_hash": "c96e3889fa52ffb7a4df469bbe22dd1312b2ea12e4d9dea3752dc865fc88f99c",
+      "args": [
+        "self"
+      ],
+      "decorators": []
+    },
+    "resume_from_partial": {
+      "group": "deathmatch",
+      "file": "backend/app/services/deathmatch_service.py",
+      "class": "DeathmatchManager",
+      "body_hash": "abc23b66855eda17b6547d74f916901aa6864758a773e302b5cba5d5e151317b",
+      "args": [
+        "self"
+      ],
+      "decorators": []
+    },
+    "begin_revision": {
+      "group": "deathmatch",
+      "file": "backend/app/services/deathmatch_service.py",
+      "class": "DeathmatchManager",
+      "body_hash": "6f66de55a4a0bcded34aa97087cc088802ce283574e81f0431d75fdb6621b474",
+      "args": [
+        "self",
+        "user_query"
+      ],
+      "decorators": []
+    },
+    "_accumulate_wall_time": {
+      "group": "deathmatch",
+      "file": "backend/app/services/deathmatch_service.py",
+      "class": "DeathmatchManager",
+      "body_hash": "6b90e20bbc45763c3e12809604eb3415736368bff2016787b1c778bff5cc451e",
+      "args": [
+        "self"
+      ],
+      "decorators": []
+    },
+    "_freeze_wall_time": {
+      "group": "deathmatch",
+      "file": "backend/app/services/deathmatch_service.py",
+      "class": "DeathmatchManager",
+      "body_hash": "044b8f6068a82ffbe3dccf2e5f0f2f40025d27ae3132e3d83c1bd1d4d18aeb04",
+      "args": [
+        "self"
+      ],
+      "decorators": []
+    },
+    "_maybe_harness_repair": {
+      "group": "deathmatch",
+      "file": "backend/app/services/deathmatch_service.py",
+      "class": "DeathmatchManager",
+      "body_hash": "433ef0a0c95bf90998246ecd52dc6b882991e4bfb7ef1079bbe11118648c91c0",
+      "args": [
+        "self",
+        "reason",
+        "verify_result",
+        "last_response"
+      ],
+      "decorators": []
+    },
+    "_pick_harness_repair": {
+      "group": "deathmatch",
+      "file": "backend/app/services/deathmatch_service.py",
+      "class": "DeathmatchManager",
+      "body_hash": "773a769ffd6470e773c56a193f94bfd184fac75be49bd34621fab706eafd1ae9",
+      "args": [
+        "self",
+        "reason",
+        "verify_result"
+      ],
+      "decorators": []
+    },
+    "_triage_stall_actions": {
+      "group": "deathmatch",
+      "file": "backend/app/services/deathmatch_service.py",
+      "class": "DeathmatchManager",
+      "body_hash": "4f7130aeb98d903ce57934d4418ecd31b18dc5781ebddfe70be48a53379b180a",
+      "args": [
+        "self",
+        "reason",
+        "verify_result",
+        "last_response"
+      ],
+      "decorators": []
+    },
+    "_handle_stall": {
+      "group": "deathmatch",
+      "file": "backend/app/services/deathmatch_service.py",
+      "class": "DeathmatchManager",
+      "body_hash": "0c544344ef02e9ca168d6daaeb9d6f7405814e8d80fe5af26a53e57631a36d60",
+      "args": [
+        "self",
+        "reason",
+        "verify_result",
+        "last_response"
+      ],
+      "decorators": []
+    },
+    "_handle_stall_autonomy": {
+      "group": "deathmatch",
+      "file": "backend/app/services/deathmatch_service.py",
+      "class": "DeathmatchManager",
+      "body_hash": "a45f05d3a5c7e3aa55a91da67977db222e3a58e1241348bf08f1db1b6f1d7320",
+      "args": [
+        "self",
+        "reason",
+        "verify_result",
+        "last_response"
+      ],
+      "decorators": []
+    },
+    "_user_facing_stall_reason": {
+      "group": "deathmatch",
+      "file": "backend/app/services/deathmatch_service.py",
+      "class": "DeathmatchManager",
+      "body_hash": "9e89188f53c072339153e1e638d160fdd9e8bbd1d6643d443489b6382b2ae950",
+      "args": [
+        "stall_reason",
+        "judge_reason",
+        "verify_result"
+      ],
+      "decorators": [
+        "Name(id='staticmethod', ctx=Load())",
+        "Name(id='staticmethod', ctx=Load())"
+      ]
+    },
+    "_build_partial_complete_message": {
+      "group": "deathmatch",
+      "file": "backend/app/services/deathmatch_service.py",
+      "class": "DeathmatchManager",
+      "body_hash": "846e1106567b157c24f487d15a61dd85dee752976d08b293b25803c5fda60955",
+      "args": [
+        "self",
+        "count",
+        "has_attachments"
+      ],
+      "decorators": []
+    },
+    "get_continuation_prompt": {
+      "group": "deathmatch",
+      "file": "backend/app/services/deathmatch_service.py",
+      "class": "DeathmatchManager",
+      "body_hash": "913f45c3bab4180784f124bef9e2f9aa1ce1ce1e39bc8b3abcea5530db0383a9",
+      "args": [
+        "self",
+        "last_response"
+      ],
+      "decorators": []
+    },
+    "_build_telemetry_block": {
+      "group": "deathmatch",
+      "file": "backend/app/services/deathmatch_service.py",
+      "class": "DeathmatchManager",
+      "body_hash": "f19c164589c667f68ea41936848e793545272062a30d2ae8f8bdcbd7919cec11",
+      "args": [
+        "self"
+      ],
+      "decorators": []
+    },
+    "_effective_wall_limit": {
+      "group": "deathmatch",
+      "file": "backend/app/services/deathmatch_service.py",
+      "class": "DeathmatchManager",
+      "body_hash": "c0ce7344b5a8328cc57b150a2ea919533cb322761397208329e833fd3b8bd341",
+      "args": [
+        "self"
+      ],
+      "decorators": []
+    },
+    "wall_time_exceeded": {
+      "group": "deathmatch",
+      "file": "backend/app/services/deathmatch_service.py",
+      "class": "DeathmatchManager",
+      "body_hash": "23caedbc84ba0d54f36dffa7363acb8df9a8224f1db2a9c75383b5a8ee8cf01e",
+      "args": [
+        "self"
+      ],
+      "decorators": []
+    },
+    "trigger_human_gate": {
+      "group": "deathmatch",
+      "file": "backend/app/services/deathmatch_service.py",
+      "class": "DeathmatchManager",
+      "body_hash": "7196e4856c6fb996c0e4ee7f7111e93c13a724fd154fa93322fb3111482634dc",
+      "args": [
+        "self",
+        "reason"
+      ],
+      "decorators": []
+    },
+    "_reconcile_completion": {
+      "group": "deathmatch",
+      "file": "backend/app/services/deathmatch_service.py",
+      "class": "DeathmatchManager",
+      "body_hash": "5a36f8a8be9ff0d1c43377cc4be857a107b772193d06a2587876d0d6328a8a5d",
+      "args": [
+        "self",
+        "last_response",
+        "judge_reason",
+        "verify_result",
+        "unfinished_steps",
+        "consensus_findings"
+      ],
+      "decorators": []
+    },
+    "_record_reflection": {
+      "group": "deathmatch",
+      "file": "backend/app/services/deathmatch_service.py",
+      "class": "DeathmatchManager",
+      "body_hash": "bb5bf38f76e55ded300a497b13dea0f49d1f354743e7d3ca4c1a51163852eb2b",
+      "args": [
+        "self",
+        "last_response",
+        "verdict",
+        "verify_result"
+      ],
+      "decorators": []
+    },
+    "_settled_ledger": {
+      "group": "deathmatch",
+      "file": "backend/app/services/deathmatch_service.py",
+      "class": "DeathmatchManager",
+      "body_hash": "c52c4e77981c919af60893ee62b209b5e418d734a7329fd20ee102395643f32a",
+      "args": [
+        "self"
+      ],
+      "decorators": []
+    },
+    "_record_settled": {
+      "group": "deathmatch",
+      "file": "backend/app/services/deathmatch_service.py",
+      "class": "DeathmatchManager",
+      "body_hash": "3d6f4445e1d9b5caca5340f1db566242e3d7ab07cc75e89b7b33b2485abf8fc8",
+      "args": [
+        "self",
+        "entry"
+      ],
+      "decorators": []
+    },
+    "_build_settled_block": {
+      "group": "deathmatch",
+      "file": "backend/app/services/deathmatch_service.py",
+      "class": "DeathmatchManager",
+      "body_hash": "230a51b5894233725da74e1acaaf96b1f6168822e0233e7e91a3b3b7acc5549d",
+      "args": [
+        "self"
+      ],
+      "decorators": []
+    },
+    "get_verdict_dict": {
+      "group": "deathmatch",
+      "file": "backend/app/services/deathmatch_service.py",
+      "class": "DeathmatchManager",
+      "body_hash": "887f00f0d8a8410dcfb0fc9675aef08dd8b9ab8bce6de2774b38e5255df417f0",
+      "args": [
+        "self"
+      ],
+      "decorators": []
+    },
+    "generate_final_summary_table": {
+      "group": "deathmatch",
+      "file": "backend/app/services/deathmatch_service.py",
+      "class": "DeathmatchManager",
+      "body_hash": "c9721da82d00415ad470a93b9f4fd4ebe2bd321ee0b1e497878d1d9b2584eb2a",
+      "args": [
+        "self"
+      ],
+      "decorators": []
+    },
+    "_deduplicate_attachments": {
+      "group": "deathmatch",
+      "file": "backend/app/services/deathmatch_service.py",
+      "class": "DeathmatchManager",
+      "body_hash": "672dec1f298684825fd98ebe37dd179981f8520a3be527d2e9c5318b84cafc43",
+      "args": [
+        "all_atts"
+      ],
+      "decorators": [
+        "Name(id='staticmethod', ctx=Load())"
+      ]
+    },
+    "_collect_from_provide_file_only": {
+      "group": "deathmatch",
+      "file": "backend/app/services/deathmatch_service.py",
+      "class": "DeathmatchManager",
+      "body_hash": "594d6bb70311392a6788620ab069f785ebd0ddc6aaa52d765fd4515c082dc121",
+      "args": [
+        "self"
+      ],
+      "decorators": []
+    },
+    "_collect_all_attachments_legacy": {
+      "group": "deathmatch",
+      "file": "backend/app/services/deathmatch_service.py",
+      "class": "DeathmatchManager",
+      "body_hash": "30565c74ba18feb61231d27af1e2adafbc537d7c51a62317f64a7264c97cdaf9",
+      "args": [
+        "self"
+      ],
+      "decorators": []
+    },
+    "_collect_generated_files_from_tool_outputs": {
+      "group": "deathmatch",
+      "file": "backend/app/services/deathmatch_service.py",
+      "class": "DeathmatchManager",
+      "body_hash": "88858119ee7eb9131658c3a2a8dad3d86635c9bc23ba3e021725a3e1d9181ae2",
+      "args": [
+        "self"
+      ],
+      "decorators": []
+    },
+    "_expand_numbered_set": {
+      "group": "deathmatch",
+      "file": "backend/app/services/deathmatch_service.py",
+      "class": "DeathmatchManager",
+      "body_hash": "ca7e2d4a348a23e6ed67a745ea316c75ac9bf1c8cddd06b6434decf99b96a737",
+      "args": [
+        "att"
+      ],
+      "decorators": [
+        "Name(id='staticmethod', ctx=Load())"
+      ]
+    },
+    "_filter_cited_deliverables": {
+      "group": "deathmatch",
+      "file": "backend/app/services/deathmatch_service.py",
+      "class": "DeathmatchManager",
+      "body_hash": "2ea81e6c1c0af3cefbcab805ec81f8e9aa81858327745fdd7e9ef9e562873c64",
+      "args": [
+        "candidates",
+        "citation_texts"
+      ],
+      "decorators": [
+        "Name(id='staticmethod', ctx=Load())"
+      ]
+    },
+    "collect_final_deliverables_from_messages": {
+      "group": "deathmatch",
+      "file": "backend/app/services/deathmatch_service.py",
+      "class": "DeathmatchManager",
+      "body_hash": "920e9fd1a3150a2e3ed9ffe0d70838a59c01c6a3f87f82adac8a4f079bbc74c9",
+      "args": [
+        "self",
+        "citation_texts"
+      ],
+      "decorators": []
+    },
+    "_tts_consumer": {
+      "group": "voice",
+      "file": "backend/app/services/voice_service.py",
+      "class": "VoiceDuplexSession",
+      "body_hash": "a9c44d0f3f601e257b109a8f5fa9c7a1b2c0f925e41bf87146f542edc1b25d3c",
+      "args": [
+        "self"
+      ],
+      "decorators": []
+    },
+    "_synth_segment": {
+      "group": "voice",
+      "file": "backend/app/services/voice_service.py",
+      "class": "VoiceDuplexSession",
+      "body_hash": "3203e67ed23fe43c5c326c18a0823d5e06fdf95449d75f7403b41ad263700642",
+      "args": [
+        "self",
+        "text",
+        "epoch",
+        "out",
+        "ignore_paused",
+        "notification_id"
+      ],
+      "decorators": []
+    },
+    "_peek_next_text_item": {
+      "group": "voice",
+      "file": "backend/app/services/voice_service.py",
+      "class": "VoiceDuplexSession",
+      "body_hash": "e5b6374e6ce6a08a95da4cd846047972c067e88ba8c4e8e8ac56b9ed1708b784",
+      "args": [
+        "self"
+      ],
+      "decorators": []
+    },
+    "_spawn_synth": {
+      "group": "voice",
+      "file": "backend/app/services/voice_service.py",
+      "class": "VoiceDuplexSession",
+      "body_hash": "39f866fc322f9973087d732875b18b88a4166c017b347331577926c11ff1eae0",
+      "args": [
+        "self",
+        "text",
+        "epoch",
+        "q",
+        "ignore_paused",
+        "notification_id"
+      ],
+      "decorators": []
+    },
+    "_speak_text": {
+      "group": "voice",
+      "file": "backend/app/services/voice_service.py",
+      "class": "VoiceDuplexSession",
+      "body_hash": "f87b300299cdba94fb595ea4529728b62c63267e46eb9b9a93e4f13452c37dad",
+      "args": [
+        "self",
+        "text",
+        "wait",
+        "aux",
+        "notification_id",
+        "turn_complete",
+        "stale_approved",
+        "reply_text",
+        "inherit_current_notice"
+      ],
+      "decorators": []
+    },
+    "_drain_tts_queue": {
+      "group": "voice",
+      "file": "backend/app/services/voice_service.py",
+      "class": "VoiceDuplexSession",
+      "body_hash": "4a05f8e52fbe7234536cdd1d9fbb5493aaacf3455249f40e3712f435e3482bc9",
+      "args": [
+        "self"
+      ],
+      "decorators": []
+    },
+    "_reset_turn_playback": {
+      "group": "voice",
+      "file": "backend/app/services/voice_service.py",
+      "class": "VoiceDuplexSession",
+      "body_hash": "f0338b49179835d8164508de9a98e8c20b3cdf1ff98a2130f2ad78dc291a7bd8",
+      "args": [
+        "self"
+      ],
+      "decorators": []
+    },
+    "_completed_chars_in_burst": {
+      "group": "voice",
+      "file": "backend/app/services/voice_service.py",
+      "class": "VoiceDuplexSession",
+      "body_hash": "63fdcaf15391052068f3de0a57322ba5c86cd2c2d3f78260133f80be3f47ede2",
+      "args": [
+        "self"
+      ],
+      "decorators": []
+    },
+    "_spoken_text_so_far": {
+      "group": "voice",
+      "file": "backend/app/services/voice_service.py",
+      "class": "VoiceDuplexSession",
+      "body_hash": "13de5cd57d584628a5cb208f8af3f376d58cf2c13acadd0e6a1a8cf4fa5abdd4",
+      "args": [
+        "self",
+        "played_sec"
+      ],
+      "decorators": []
+    },
+    "_mark_speaking_end": {
+      "group": "voice",
+      "file": "backend/app/services/voice_service.py",
+      "class": "VoiceDuplexSession",
+      "body_hash": "572b137aeb7f95ba4dfc618997aab20bfce08ad0e40d1f1e9eb90c9d85002d41",
+      "args": [
+        "self"
+      ],
+      "decorators": []
+    },
+    "_enqueue_turn": {
+      "group": "voice",
+      "file": "backend/app/services/voice_service.py",
+      "class": "VoiceDuplexSession",
+      "body_hash": "af32df9f8cb77f7b8f726f6e755dcc26c8cccb62fc6f07629359001acd1678ca",
+      "args": [
+        "self",
+        "text",
+        "semantic_complete"
+      ],
+      "decorators": []
+    },
+    "_queued_turn_is_backchannel": {
+      "group": "voice",
+      "file": "backend/app/services/voice_service.py",
+      "class": "VoiceDuplexSession",
+      "body_hash": "25a68f023206968fc5568b720c871cca5537dd46ee74c0dfded6c34424cf4150",
+      "args": [
+        "self",
+        "text"
+      ],
+      "decorators": []
+    },
+    "_asr_pipeline": {
+      "group": "voice",
+      "file": "backend/app/services/voice_service.py",
+      "class": "VoiceDuplexSession",
+      "body_hash": "118ef17c71bfd14ced496112e1f1cb1e49b89a3a7a811b1dbe06d9065b8946d9",
+      "args": [
+        "self"
+      ],
+      "decorators": []
+    },
+    "_eot_watchdog": {
+      "group": "voice",
+      "file": "backend/app/services/voice_service.py",
+      "class": "VoiceDuplexSession",
+      "body_hash": "7a87964c241c048b2a668575fe921d3f049613bf7081deaf0a123d33999a109b",
+      "args": [
+        "self"
+      ],
+      "decorators": []
+    },
+    "_run_eot_semantic_check": {
+      "group": "voice",
+      "file": "backend/app/services/voice_service.py",
+      "class": "VoiceDuplexSession",
+      "body_hash": "8cdeccc76a39a0bc746ef71fbf4ea4055ba8febd7211d5df3a6bb376d85e5e5f",
+      "args": [
+        "self",
+        "text"
+      ],
+      "decorators": []
+    },
+    "_prox_is_near": {
+      "group": "voice",
+      "file": "backend/app/services/voice_service.py",
+      "class": "VoiceDuplexSession",
+      "body_hash": "01337cd22a63bc218daed5bb859a44f5815fe9d3547e4b2d41483e97381a5717",
+      "args": [
+        "self"
+      ],
+      "decorators": []
+    },
+    "_prox_evidence_near": {
+      "group": "voice",
+      "file": "backend/app/services/voice_service.py",
+      "class": "VoiceDuplexSession",
+      "body_hash": "fde20f9ac315de66478a54c8ae7d32eb075e087d45fb4080f8441d6e60a4605a",
+      "args": [
+        "self"
+      ],
+      "decorators": []
+    },
+    "_track_mic_energy": {
+      "group": "voice",
+      "file": "backend/app/services/voice_service.py",
+      "class": "VoiceDuplexSession",
+      "body_hash": "9b20121ae7e682b88fcb1123d0506b1231777c4f20a4ea39c936d8c62156a4b6",
+      "args": [
+        "self",
+        "pcm16"
+      ],
+      "decorators": []
+    },
+    "_hold_flush_for_mic_activity": {
+      "group": "voice",
+      "file": "backend/app/services/voice_service.py",
+      "class": "VoiceDuplexSession",
+      "body_hash": "922d066178e3c02aea00ad57a2a94ec840848b4a91903a0bc1c43aef2f532d45",
+      "args": [
+        "self"
+      ],
+      "decorators": []
+    },
+    "_on_user_turn_locked": {
+      "group": "voice",
+      "file": "backend/app/services/voice_service.py",
+      "class": "VoiceDuplexSession",
+      "body_hash": "f69d6da8f98f78f00ccf63aefa7d3137f06064d7f799683837fd1f39e2574ee9",
+      "args": [
+        "self",
+        "text"
+      ],
+      "decorators": []
+    },
+    "_on_user_turn": {
+      "group": "voice",
+      "file": "backend/app/services/voice_service.py",
+      "class": "VoiceDuplexSession",
+      "body_hash": "6399e04fc5d9708c07b92e51e277a01e18de4b3cf76dbe8ed83762660160477c",
+      "args": [
+        "self",
+        "text"
+      ],
+      "decorators": []
+    },
+    "_handle_user_turn": {
+      "group": "voice",
+      "file": "backend/app/services/voice_service.py",
+      "class": "VoiceDuplexSession",
+      "body_hash": "fa3692a2714389dbb7af19fe1c474fb13b1f999c0516002ce3566132398df9a2",
+      "args": [
+        "self",
+        "text",
+        "input_seq"
+      ],
+      "decorators": []
+    },
+    "_responder": {
+      "group": "voice",
+      "file": "backend/app/services/voice_service.py",
+      "class": "VoiceDuplexSession",
+      "body_hash": "70d6e21f86a8fcf103cf933154ef90bc7c733046802c2283b78a543cd1246db7",
+      "args": [
+        "self"
+      ],
+      "decorators": []
+    },
+    "_coalesce_fragments": {
+      "group": "voice",
+      "file": "backend/app/services/voice_service.py",
+      "class": "VoiceDuplexSession",
+      "body_hash": "54d15c5c15a1a052da0a5e7b33051c7cc45fe3d21fa3d9e403657764caf668bb",
+      "args": [
+        "self",
+        "text",
+        "skip_wait",
+        "input_seq"
+      ],
+      "decorators": []
+    },
+    "_generate_reply_text": {
+      "group": "voice",
+      "file": "backend/app/services/voice_service.py",
+      "class": "VoiceDuplexSession",
+      "body_hash": "3f96b81fbf9b98441564b7e9b234995fb8e860531e468becfc45e826d6180b4c",
+      "args": [
+        "self",
+        "text"
+      ],
+      "decorators": []
+    },
+    "_request_interrupt": {
+      "group": "voice",
+      "file": "backend/app/services/voice_service.py",
+      "class": "VoiceDuplexSession",
+      "body_hash": "8b870147a28e4195446d82275ec08db1da4d328e1c904e31896288952bc197c3",
+      "args": [
+        "self"
+      ],
+      "decorators": []
+    },
+    "_pause_playback": {
+      "group": "voice",
+      "file": "backend/app/services/voice_service.py",
+      "class": "VoiceDuplexSession",
+      "body_hash": "9c263eba2aaa289a999e57e74d8e218d7b30815e1c940036646d56e282379fb5",
+      "args": [
+        "self"
+      ],
+      "decorators": []
+    },
+    "_resume_playback": {
+      "group": "voice",
+      "file": "backend/app/services/voice_service.py",
+      "class": "VoiceDuplexSession",
+      "body_hash": "7cbda5d3d5762c1c8bc5abee404c8e5d373398be057df00f8a2954821feaa998",
+      "args": [
+        "self"
+      ],
+      "decorators": []
+    },
+    "_run_pre_classify": {
+      "group": "voice",
+      "file": "backend/app/services/voice_service.py",
+      "class": "VoiceDuplexSession",
+      "body_hash": "f26f490cbdb9edf6ca29aff96ae78fcc12eaf69a79b3eba874ac61873292622a",
+      "args": [
+        "self",
+        "text"
+      ],
+      "decorators": []
+    },
+    "_generate_and_speak": {
+      "group": "voice",
+      "file": "backend/app/services/voice_service.py",
+      "class": "VoiceDuplexSession",
+      "body_hash": "b54c765d2573f7f7d7b105045c005e401cf64c0751095067789937180c1b8450",
+      "args": [
+        "self",
+        "text",
+        "allow_tools",
+        "prefetched",
+        "allow_filler",
+        "user_turn",
+        "input_seq",
+        "prefetched_summary_note"
+      ],
+      "decorators": []
+    },
+    "_generate_and_speak_cancellable": {
+      "group": "voice",
+      "file": "backend/app/services/voice_service.py",
+      "class": "VoiceDuplexSession",
+      "body_hash": "7ea5f3e4ec4f916f2dcc3521b094d9776dfa4f3fc0eedd91f7c3494a9d0afcea",
+      "args": [
+        "self",
+        "text",
+        "prefetched",
+        "input_seq",
+        "prefetched_summary_note"
+      ],
+      "decorators": []
+    },
+    "_clarification_shadow": {
+      "group": "voice",
+      "file": "backend/app/services/voice_service.py",
+      "class": "VoiceDuplexSession",
+      "body_hash": "6ee016e1dd647f17eec7351887396ed59ed829932d6bdd214d2e1714903b41cf",
+      "args": [
+        "self",
+        "text"
+      ],
+      "decorators": []
+    },
+    "_check_interjection": {
+      "group": "voice",
+      "file": "backend/app/services/voice_service.py",
+      "class": "VoiceDuplexSession",
+      "body_hash": "05d2369592f54a492beba44ec60bd9fc569dff55563e1ac6792030674f278546",
+      "args": [
+        "self",
+        "full_text"
+      ],
+      "decorators": []
+    },
+    "_run_interjection_check": {
+      "group": "voice",
+      "file": "backend/app/services/voice_service.py",
+      "class": "VoiceDuplexSession",
+      "body_hash": "e0d572fcd062d9345b4bf3bac4dc55130e78e301c9bfa0a1d5ab6322890c89ad",
+      "args": [
+        "self",
+        "sentence"
+      ],
+      "decorators": []
+    },
+    "_start_prefetch": {
+      "group": "voice",
+      "file": "backend/app/services/voice_service.py",
+      "class": "VoiceDuplexSession",
+      "body_hash": "019fe297abdaffff68d1f12268c3c67aa3953f6a20dddd7b889ff52b2b1249bf",
+      "args": [
+        "self",
+        "text"
+      ],
+      "decorators": []
+    },
+    "_synthesize_acceptance_criteria": {
+      "group": "deathmatch_workspace",
+      "file": "backend/app/services/deathmatch_service.py",
+      "class": "DeathmatchManager",
+      "body_hash": "e90ec7a3d188f8eba015f561754228e27544f4423dcd792ed5c8bbfc94986e58",
+      "args": [
+        "self"
+      ],
+      "decorators": []
+    },
+    "_audit_plan_core": {
+      "group": "deathmatch_workspace",
+      "file": "backend/app/services/deathmatch_service.py",
+      "class": "DeathmatchManager",
+      "body_hash": "297c2333c5019899d5836da6a862cc01f0239643b314b58b12b8d83a7f98377a",
+      "args": [
+        "self",
+        "plan"
+      ],
+      "decorators": []
+    },
+    "_check_file_condition": {
+      "group": "deathmatch_workspace",
+      "file": "backend/app/services/deathmatch_service.py",
+      "class": "DeathmatchManager",
+      "body_hash": "e7970325a818979e15054fb4209df3417fa4bf3ef53ec866c7a1548c5bc5e791",
+      "args": [
+        "self",
+        "path",
+        "min_bytes",
+        "workspace_path"
+      ],
+      "decorators": []
+    },
+    "_declared_output_files": {
+      "group": "deathmatch_workspace",
+      "file": "backend/app/services/deathmatch_service.py",
+      "class": "DeathmatchManager",
+      "body_hash": "c9515b55d29845c1bf8518e947148abc76f387555cc2c3ec1c924d3db3fdb692",
+      "args": [
+        "self"
+      ],
+      "decorators": []
+    },
+    "_judge_unexecuted_placeholders": {
+      "group": "deathmatch_workspace",
+      "file": "backend/app/services/deathmatch_service.py",
+      "class": "DeathmatchManager",
+      "body_hash": "5bfa15b2ae64d08265638ef2bb2953b079614491b747faa9733f74e843b8988a",
+      "args": [
+        "self",
+        "workspace_path",
+        "files",
+        "obligation_context"
+      ],
+      "decorators": []
+    },
+    "_challenge_completion_consensus": {
+      "group": "deathmatch_workspace",
+      "file": "backend/app/services/deathmatch_service.py",
+      "class": "DeathmatchManager",
+      "body_hash": "29c1987ebb77a2892da734e087e42950bfd0db03ec9e14c159937860f52f4a53",
+      "args": [
+        "self",
+        "last_response",
+        "workspace_path"
+      ],
+      "decorators": []
+    },
+    "_obligation_criteria": {
+      "group": "deathmatch_workspace",
+      "file": "backend/app/services/deathmatch_service.py",
+      "class": "DeathmatchManager",
+      "body_hash": "88b70e0e94ef526a840f7dc578e10f2dcd4b541808da6f2b20e36c8a19ed057a",
+      "args": [
+        "self"
+      ],
+      "decorators": []
+    },
+    "_judge_steps_needing_evidence_spec": {
+      "group": "deathmatch_workspace",
+      "file": "backend/app/services/deathmatch_service.py",
+      "class": "DeathmatchManager",
+      "body_hash": "f58501522ac2a4a1095dc9e39f20e7b9521342a95c59958a9fe52ec0ffd58a56",
+      "args": [
+        "self",
+        "steps"
+      ],
+      "decorators": []
+    },
+    "_apply_obligations": {
+      "group": "deathmatch_workspace",
+      "file": "backend/app/services/deathmatch_service.py",
+      "class": "DeathmatchManager",
+      "body_hash": "b98f32a757d5532285493e102b9834578bd4c5d8956909aa606582429179405e",
+      "args": [
+        "self"
+      ],
+      "decorators": []
+    },
+    "_run_gate_command": {
+      "group": "deathmatch_workspace",
+      "file": "backend/app/services/deathmatch_service.py",
+      "class": "DeathmatchManager",
+      "body_hash": "bdd2e61e46c1c8c3170f79aae72b6e58213e4c43b74280054e7d0de75a40918d",
+      "args": [
+        "self",
+        "command",
+        "workspace_path"
+      ],
+      "decorators": []
+    },
+    "_run_goal_comparator": {
+      "group": "deathmatch_workspace",
+      "file": "backend/app/services/deathmatch_service.py",
+      "class": "DeathmatchManager",
+      "body_hash": "a37d1f9b615f81c71909e2de0adfce4635af59c7d3e3e757f591f5c7e6f026af",
+      "args": [
+        "self",
+        "workspace_path"
+      ],
+      "decorators": []
+    },
+    "_run_step_done_checks": {
+      "group": "deathmatch_workspace",
+      "file": "backend/app/services/deathmatch_service.py",
+      "class": "DeathmatchManager",
+      "body_hash": "8b21665d91dad4f8469bef9249c1719c8e6a6eb00c7c7b7ae6168e046248b4a3",
+      "args": [
+        "self",
+        "step",
+        "workspace_path"
+      ],
+      "decorators": []
+    },
+    "_local_patch_step": {
+      "group": "deathmatch_workspace",
+      "file": "backend/app/services/deathmatch_service.py",
+      "class": "DeathmatchManager",
+      "body_hash": "d9f04ea9a3fdc5ceb622c999e822d0f17fceaef7f64a058f3fa512edf5f6799a",
+      "args": [
+        "self",
+        "step",
+        "issues"
+      ],
+      "decorators": []
+    },
+    "_maybe_node_recovery": {
+      "group": "deathmatch_workspace",
+      "file": "backend/app/services/deathmatch_service.py",
+      "class": "DeathmatchManager",
+      "body_hash": "3e2708356069f28f6250e5586eca3de857d3b15851fc66d72b876d40635ae29b",
+      "args": [
+        "self",
+        "verify_result",
+        "last_response"
+      ],
+      "decorators": []
+    },
+    "_build_plan_user_prompt": {
+      "group": "deathmatch_workspace",
+      "file": "backend/app/services/deathmatch_service.py",
+      "class": "DeathmatchManager",
+      "body_hash": "2bd84fa5cacf5985dc9ddcb4e2d102141ac37562784c3e5b3ebd8c86f113f28a",
+      "args": [
+        "self"
+      ],
+      "decorators": []
+    },
+    "_parse_plan": {
+      "group": "deathmatch_workspace",
+      "file": "backend/app/services/deathmatch_service.py",
+      "class": "DeathmatchManager",
+      "body_hash": "4a0b0480c81ef397cbf4ad6883565e601c450517d9928be4307407cb49ab4b19",
+      "args": [
+        "self",
+        "raw"
+      ],
+      "decorators": []
+    },
+    "_plan_with_citation_style": {
+      "group": "deathmatch_workspace",
+      "file": "backend/app/services/deathmatch_service.py",
+      "class": "DeathmatchManager",
+      "body_hash": "480ae4074f72452cba98fc86ac747dcd2f5b24013fc115854721e3764a3d23cb",
+      "args": [
+        "obj",
+        "steps_norm"
+      ],
+      "decorators": [
+        "Name(id='staticmethod', ctx=Load())"
+      ]
+    },
+    "_parse_plan_with_repair": {
+      "group": "deathmatch_workspace",
+      "file": "backend/app/services/deathmatch_service.py",
+      "class": "DeathmatchManager",
+      "body_hash": "e6c73d5986b28a2c5858c5a92a726a6eac11a22b6231663f842278ba7cfe13c5",
+      "args": [
+        "self",
+        "raw",
+        "user_prompt",
+        "llm"
+      ],
+      "decorators": []
+    },
+    "get_plan_summary_for_prompt": {
+      "group": "deathmatch_workspace",
+      "file": "backend/app/services/deathmatch_service.py",
+      "class": "DeathmatchManager",
+      "body_hash": "6442ba1f3a471076209d559a2446bd69364865fc1dc5955ebda3a2cbc516de4e",
+      "args": [
+        "self"
+      ],
+      "decorators": []
+    },
+    "current_step_tool_subset": {
+      "group": "deathmatch_workspace",
+      "file": "backend/app/services/deathmatch_service.py",
+      "class": "DeathmatchManager",
+      "body_hash": "18e137da952427518f45e97d4a8a0f7abe916378990ccaa3c4e19f9e65360c18",
+      "args": [
+        "self"
+      ],
+      "decorators": []
+    },
+    "_get_next_pending_step": {
+      "group": "deathmatch_workspace",
+      "file": "backend/app/services/deathmatch_service.py",
+      "class": "DeathmatchManager",
+      "body_hash": "a17aee607ce32029212100e44b353419dfc253614883814aa84e018908b7d775",
+      "args": [
+        "self"
+      ],
+      "decorators": []
+    },
+    "_unmet_dependencies": {
+      "group": "deathmatch_workspace",
+      "file": "backend/app/services/deathmatch_service.py",
+      "class": "DeathmatchManager",
+      "body_hash": "eaa32b20f0b40a725fd494feaaa9a22432032b9c586158a56cd13b7fc0ebe5d7",
+      "args": [
+        "self",
+        "step"
+      ],
+      "decorators": []
+    },
+    "_step_precondition_block": {
+      "group": "deathmatch_workspace",
+      "file": "backend/app/services/deathmatch_service.py",
+      "class": "DeathmatchManager",
+      "body_hash": "6eddd59f5603630bea0d27289a6262f882e104eaa1ab3bf4a0a7e1b14da642dd",
+      "args": [
+        "self",
+        "step"
+      ],
+      "decorators": []
+    },
+    "_format_prior_steps_context": {
+      "group": "deathmatch_workspace",
+      "file": "backend/app/services/deathmatch_service.py",
+      "class": "DeathmatchManager",
+      "body_hash": "1bb997106b97d4d162137cfdefb06dc9b41147d0fbbeb5336491f9453b08c634",
+      "args": [
+        "self",
+        "current_step"
+      ],
+      "decorators": []
+    },
+    "_capture_baseline_paths": {
+      "group": "deathmatch_workspace",
+      "file": "backend/app/services/deathmatch_service.py",
+      "class": "DeathmatchManager",
+      "body_hash": "376e5e37ddf74fa33fa8608e1cc6ed6ae09f512bdd0e6f7a900b2851f6f56d46",
+      "args": [
+        "self",
+        "workspace_path"
+      ],
+      "decorators": []
+    },
+    "_workspace_file_snapshot": {
+      "group": "deathmatch_workspace",
+      "file": "backend/app/services/deathmatch_service.py",
+      "class": "DeathmatchManager",
+      "body_hash": "4d6a016f2435928e850318c28e3523be5f53e8157fc0f94602dd9d7e55b32434",
+      "args": [
+        "self",
+        "workspace_path"
+      ],
+      "decorators": []
+    },
+    "_format_workspace_listing": {
+      "group": "deathmatch_workspace",
+      "file": "backend/app/services/deathmatch_service.py",
+      "class": "DeathmatchManager",
+      "body_hash": "db53b90f8e096779feaf1e7f477ada3c54828a350715ea7de9fcbd623d0b8711",
+      "args": [
+        "files",
+        "total"
+      ],
+      "decorators": [
+        "Name(id='staticmethod', ctx=Load())"
+      ]
+    },
+    "_is_text_file": {
+      "group": "deathmatch_workspace",
+      "file": "backend/app/services/deathmatch_service.py",
+      "class": "DeathmatchManager",
+      "body_hash": "bf65168d9611184272a931299835c60b65a356514d94ebc771e0446dc6241c8c",
+      "args": [
+        "path"
+      ],
+      "decorators": [
+        "Name(id='staticmethod', ctx=Load())"
+      ]
+    },
+    "_read_prior_file_snippets": {
+      "group": "deathmatch_workspace",
+      "file": "backend/app/services/deathmatch_service.py",
+      "class": "DeathmatchManager",
+      "body_hash": "6208ace82710bfdecccfe88acc7517d47ba27671aad9339f6f6ee7d5fdb7f364",
+      "args": [
+        "self",
+        "steps",
+        "workspace_path",
+        "max_files",
+        "snippet_chars",
+        "tail_chars",
+        "new_files"
+      ],
+      "decorators": []
+    },
+    "_parse_json_object": {
+      "group": "deathmatch_workspace",
+      "file": "backend/app/services/deathmatch_service.py",
+      "class": "DeathmatchManager",
+      "body_hash": "d1efbe19cf672ef51f587d0118cd1bda96d5e1cd04ceb20aa7c6ff623afee797",
+      "args": [
+        "self",
+        "raw"
+      ],
+      "decorators": []
+    },
+    "set_assistant_llm": {
+      "group": "deathmatch_evidence",
+      "file": "backend/app/services/deathmatch_service.py",
+      "class": "DeathmatchManager",
+      "body_hash": "6f8fd4018005745facecdf3d945db82f31393276e4e7411e302c8f5ba9e1c02c",
+      "args": [
+        "self",
+        "llm"
+      ],
+      "decorators": []
+    },
+    "_make_llm": {
+      "group": "deathmatch_evidence",
+      "file": "backend/app/services/deathmatch_service.py",
+      "class": "DeathmatchManager",
+      "body_hash": "7551e08c01ae9c0ce70dfc8a7e6f1a6e00b99734213269d0ae633b4d6561c4f6",
+      "args": [
+        "self"
+      ],
+      "decorators": []
+    },
+    "_llm_generate_once": {
+      "group": "deathmatch_evidence",
+      "file": "backend/app/services/deathmatch_service.py",
+      "class": "DeathmatchManager",
+      "body_hash": "caa121d5ae5325b936c92e8be7b09f7ec93a19439fbce980f9226b1ba3b98f2d",
+      "args": [
+        "self",
+        "llm",
+        "system_prompt",
+        "user_prompt"
+      ],
+      "decorators": []
+    },
+    "_same_provider": {
+      "group": "deathmatch_evidence",
+      "file": "backend/app/services/deathmatch_service.py",
+      "class": "DeathmatchManager",
+      "body_hash": "5fa3847c741ef75220d7b76eabb2783a1f1bd7eaa273ac4f1f324f4e62dc796b",
+      "args": [
+        "a",
+        "b"
+      ],
+      "decorators": [
+        "Name(id='staticmethod', ctx=Load())"
+      ]
+    },
+    "_llm_generate": {
+      "group": "deathmatch_evidence",
+      "file": "backend/app/services/deathmatch_service.py",
+      "class": "DeathmatchManager",
+      "body_hash": "9f9790d0d6212ffd7c80cb6f697a0f55af3dee36a7b86987aded80c34e62b1fe",
+      "args": [
+        "self",
+        "llm",
+        "system_prompt",
+        "user_prompt"
+      ],
+      "decorators": []
+    },
+    "_record_evidence_unit": {
+      "group": "deathmatch_evidence",
+      "file": "backend/app/services/deathmatch_service.py",
+      "class": "DeathmatchManager",
+      "body_hash": "ad554d6684138d7a98ae9460666f1a2905f512243e1b24497c48aabca3dd76de",
+      "args": [
+        "self",
+        "kind",
+        "source",
+        "text"
+      ],
+      "decorators": []
+    },
+    "_seed_evidence_units_round_robin": {
+      "group": "deathmatch_evidence",
+      "file": "backend/app/services/deathmatch_service.py",
+      "class": "DeathmatchManager",
+      "body_hash": "5aaa6719383f5f2212e90e30b3dcee8232a2bac1bbe5270f30611548b9bddf10",
+      "args": [
+        "self",
+        "chain_source",
+        "limit"
+      ],
+      "decorators": []
+    },
+    "_build_evidence_units_block": {
+      "group": "deathmatch_evidence",
+      "file": "backend/app/services/deathmatch_service.py",
+      "class": "DeathmatchManager",
+      "body_hash": "357f1f2c6bbc7d291f770b9ee5c1be7030ed9aec3a17fd2abe202b3c8b67ed3b",
+      "args": [
+        "self",
+        "chain_source",
+        "current_step_id"
+      ],
+      "decorators": []
+    },
+    "_record_event": {
+      "group": "deathmatch_evidence",
+      "file": "backend/app/services/deathmatch_service.py",
+      "class": "DeathmatchManager",
+      "body_hash": "cb1b05598b15fc15acdc59213f76d7cd67f8a5a6d0eb56ebca2ada19610e554e",
+      "args": [
+        "self",
+        "event_type"
+      ],
+      "decorators": []
+    },
+    "_record_step_transition": {
+      "group": "deathmatch_evidence",
+      "file": "backend/app/services/deathmatch_service.py",
+      "class": "DeathmatchManager",
+      "body_hash": "c6ac55b7949c97e6c2e4317fb793c4d30e172f827a15a02274bc6730824ed884",
+      "args": [
+        "self",
+        "step_id",
+        "from_status",
+        "to_status",
+        "cause"
+      ],
+      "decorators": []
+    },
+    "_execution_state_or_none": {
+      "group": "deathmatch_evidence",
+      "file": "backend/app/services/deathmatch_service.py",
+      "class": "DeathmatchManager",
+      "body_hash": "d9fad6839657f8c501841fc634f2ecbf737ef852b49ec1e17a34693f846a758c",
+      "args": [
+        "self"
+      ],
+      "decorators": []
+    },
+    "_set_step_status": {
+      "group": "deathmatch_evidence",
+      "file": "backend/app/services/deathmatch_service.py",
+      "class": "DeathmatchManager",
+      "body_hash": "f91ac3b15bc2f0477403f4b5cd362ffb708b16c540fb24a77fdf6d67fc4ba092",
+      "args": [
+        "self",
+        "step",
+        "to_status",
+        "cause",
+        "force_event"
+      ],
+      "decorators": []
+    },
+    "_write_pause_packet": {
+      "group": "deathmatch_evidence",
+      "file": "backend/app/services/deathmatch_service.py",
+      "class": "DeathmatchManager",
+      "body_hash": "46685c956f88e59c0f1ad0add63cfdd7e891e30d0bead3fdf5d5e4b76f0f69a3",
+      "args": [
+        "self"
+      ],
+      "decorators": []
+    },
+    "_failed_directions": {
+      "group": "deathmatch_evidence",
+      "file": "backend/app/services/deathmatch_service.py",
+      "class": "DeathmatchManager",
+      "body_hash": "7d81537a6281fb9e1625ba193cd57e759a2e54cebc38157497237a84cd74e23f",
+      "args": [
+        "self"
+      ],
+      "decorators": []
+    },
+    "_record_failed_direction": {
+      "group": "deathmatch_evidence",
+      "file": "backend/app/services/deathmatch_service.py",
+      "class": "DeathmatchManager",
+      "body_hash": "af6f1e2516bcf29a7f67c21171be5a9f0844428a0009d9e80f0b78932048762a",
+      "args": [
+        "self",
+        "reason",
+        "family"
+      ],
+      "decorators": []
+    },
+    "_failed_directions_block": {
+      "group": "deathmatch_evidence",
+      "file": "backend/app/services/deathmatch_service.py",
+      "class": "DeathmatchManager",
+      "body_hash": "d5e06567c377c2a9f7cf1353a6b2a891be5e5c4144c6d675b18d5add425ae087",
+      "args": [
+        "self"
+      ],
+      "decorators": []
+    },
+    "_retracted_claims": {
+      "group": "deathmatch_evidence",
+      "file": "backend/app/services/deathmatch_service.py",
+      "class": "DeathmatchManager",
+      "body_hash": "b5c3c329847ecbda61970767291564f767eede762c76332e890d72c154da84d3",
+      "args": [
+        "self"
+      ],
+      "decorators": []
+    },
+    "_record_retracted_claim": {
+      "group": "deathmatch_evidence",
+      "file": "backend/app/services/deathmatch_service.py",
+      "class": "DeathmatchManager",
+      "body_hash": "166d94bf9f8e7ee68f7a3d97a694900a97c7e0c5994c47af82585503c136011c",
+      "args": [
+        "self",
+        "summary"
+      ],
+      "decorators": []
+    },
+    "_retracted_claims_block": {
+      "group": "deathmatch_evidence",
+      "file": "backend/app/services/deathmatch_service.py",
+      "class": "DeathmatchManager",
+      "body_hash": "b77d1ea8687c057417e83171dce74b2a758b62d91ffff4711334874892cf3954",
+      "args": [
+        "self"
+      ],
+      "decorators": []
+    },
+    "_retract_reopened_step_claims": {
+      "group": "deathmatch_evidence",
+      "file": "backend/app/services/deathmatch_service.py",
+      "class": "DeathmatchManager",
+      "body_hash": "4e554ff0151af6540f927b9c401afc3c5ba7d861d6a23838bb50337a28f0cd47",
+      "args": [
+        "self",
+        "reopened",
+        "deleted",
+        "detail"
+      ],
+      "decorators": []
+    },
+    "_build_llm": {
+      "group": "voice_session_setup",
+      "file": "backend/app/services/voice_service.py",
+      "class": "VoiceDuplexSession",
+      "body_hash": "7459fc9d72f0ca94fd62fdb05274f8fc67d7e9d2a23ba7529fdd74e1b97db1f2",
+      "args": [
+        "self",
+        "purpose"
+      ],
+      "decorators": []
+    },
+    "_system_prompt": {
+      "group": "voice_session_setup",
+      "file": "backend/app/services/voice_service.py",
+      "class": "VoiceDuplexSession",
+      "body_hash": "59c90f4948c12216d6035d89bd5722a201b778053f72cee52e6dae36ab44f931",
+      "args": [
+        "self"
+      ],
+      "decorators": []
+    },
+    "_load_identity": {
+      "group": "voice_session_setup",
+      "file": "backend/app/services/voice_service.py",
+      "class": "VoiceDuplexSession",
+      "body_hash": "18ef78fe8c098e9eaa88c5f5e20a5c6624660a0e4e982c4adb36b41c4a3da443",
+      "args": [
+        "self"
+      ],
+      "decorators": []
+    },
+    "_load_identity_with_db": {
+      "group": "voice_session_setup",
+      "file": "backend/app/services/voice_service.py",
+      "class": "VoiceDuplexSession",
+      "body_hash": "400f9be164e58b5d1e13d7a8c5bbfc551e14ba0f967ce53fe87baae6fa863346",
+      "args": [
+        "self",
+        "db"
+      ],
+      "decorators": []
+    },
+    "_ensure_conversation": {
+      "group": "voice_session_setup",
+      "file": "backend/app/services/voice_service.py",
+      "class": "VoiceDuplexSession",
+      "body_hash": "e1cff0d02e2fcf668fc24fdade9f840e733c37fdac9b670870e2a582d067db50",
+      "args": [
+        "self"
+      ],
+      "decorators": []
+    },
+    "_load_history": {
+      "group": "voice_session_setup",
+      "file": "backend/app/services/voice_service.py",
+      "class": "VoiceDuplexSession",
+      "body_hash": "e794de318f25663150f95075cbe34fb50106515378ac9e9886f86a96a5de0589",
+      "args": [
+        "self"
+      ],
+      "decorators": []
+    },
+    "_persist_turn_progress": {
+      "group": "voice_session_setup",
+      "file": "backend/app/services/voice_service.py",
+      "class": "VoiceDuplexSession",
+      "body_hash": "d5623a41e2645486f399f6bcb92464391bae6d4c4a295126c5cb1539bda361f0",
+      "args": [
+        "self",
+        "content",
+        "tool_calls",
+        "tool_results",
+        "final"
+      ],
+      "decorators": []
+    },
+    "_persist_message": {
+      "group": "voice_session_setup",
+      "file": "backend/app/services/voice_service.py",
+      "class": "VoiceDuplexSession",
+      "body_hash": "d6b432e6c2fe774aab0aea253e3fda7997d5354d02cef5c806e8fe1203911455",
+      "args": [
+        "self",
+        "role",
+        "content",
+        "tool_calls",
+        "tool_results"
+      ],
+      "decorators": []
+    },
+    "_rollback_last_user_message": {
+      "group": "voice_session_setup",
+      "file": "backend/app/services/voice_service.py",
+      "class": "VoiceDuplexSession",
+      "body_hash": "479e25caaaeae559742618759e7a72f499dab68ec4fa197bc9bfdc38801dfa51",
+      "args": [
+        "self",
+        "text"
+      ],
+      "decorators": []
+    },
+    "_generate_voice_title": {
+      "group": "voice_session_setup",
+      "file": "backend/app/services/voice_service.py",
+      "class": "VoiceDuplexSession",
+      "body_hash": "d5ca8253d4529287ea1a41c6e5405448d84d52ad4122b7ee0b86ef5eaf0a616f",
+      "args": [
+        "self",
+        "assistant_response"
+      ],
+      "decorators": []
+    },
+    "_thinking_off_body": {
+      "group": "voice_session_setup",
+      "file": "backend/app/services/voice_service.py",
+      "class": "VoiceDuplexSession",
+      "body_hash": "cf5dfaa50f069941a45a3fc3d35c9350d8202aee4fb43196e4951aa71911556b",
+      "args": [
+        "self",
+        "svc"
+      ],
+      "decorators": []
+    },
+    "_extra_body": {
+      "group": "voice_session_setup",
+      "file": "backend/app/services/voice_service.py",
+      "class": "VoiceDuplexSession",
+      "body_hash": "8bda8de5c4f8785e021a059e36dfd0d543ef6d93f9c9db7e8e4a084c94894281",
+      "args": [
+        "self",
+        "svc"
+      ],
+      "decorators": []
+    },
+    "_trimmed_history": {
+      "group": "voice_session_setup",
+      "file": "backend/app/services/voice_service.py",
+      "class": "VoiceDuplexSession",
+      "body_hash": "77709018038f8539baa9e4ac9f70fdeacd90fe062b85c82961e0779f07772c91",
+      "args": [
+        "self"
+      ],
+      "decorators": []
+    },
+    "_system_messages": {
+      "group": "voice_session_setup",
+      "file": "backend/app/services/voice_service.py",
+      "class": "VoiceDuplexSession",
+      "body_hash": "449d3f1b47b1ba41d4d0427fe8cca6c51af9f9ef6667804d539eebe24662411e",
+      "args": [
+        "self"
+      ],
+      "decorators": []
+    },
+    "_generation_messages": {
+      "group": "voice_session_setup",
+      "file": "backend/app/services/voice_service.py",
+      "class": "VoiceDuplexSession",
+      "body_hash": "3da184e83f98fd9de7b6d7a618f325ea419ed4359b6fce8afad913b6bed9c7a2",
+      "args": [
+        "self",
+        "extra_user"
+      ],
+      "decorators": []
+    },
+    "_set_state": {
+      "group": "voice_memory",
+      "file": "backend/app/services/voice_service.py",
+      "class": "VoiceDuplexSession",
+      "body_hash": "8a9bef46ea3278f63f3215c125046040c7271e2dc76ba794c1d59c13335d86eb",
+      "args": [
+        "self",
+        "state"
+      ],
+      "decorators": []
+    },
+    "_speak_interjection": {
+      "group": "voice_memory",
+      "file": "backend/app/services/voice_service.py",
+      "class": "VoiceDuplexSession",
+      "body_hash": "22fa1a070d7d6b1c34d1b1519d06c22e6d7fb8c478f61f3b46abaca69d20e628",
+      "args": [
+        "self",
+        "text",
+        "emotion"
+      ],
+      "decorators": []
+    },
+    "_reset_interjection_state": {
+      "group": "voice_memory",
+      "file": "backend/app/services/voice_service.py",
+      "class": "VoiceDuplexSession",
+      "body_hash": "26aa05dd43948f3d9652f295772d15e32c61e96808f6dba69bf057c1f996be0e",
+      "args": [
+        "self"
+      ],
+      "decorators": []
+    },
+    "_apply_vmem_block": {
+      "group": "voice_memory",
+      "file": "backend/app/services/voice_service.py",
+      "class": "VoiceDuplexSession",
+      "body_hash": "6a115dfc537b47b130de08c2768f23cae0b5e9aac24c11e0559cebdd717cbf7a",
+      "args": [
+        "self",
+        "ctx"
+      ],
+      "decorators": []
+    },
+    "_start_memory_recall": {
+      "group": "voice_memory",
+      "file": "backend/app/services/voice_service.py",
+      "class": "VoiceDuplexSession",
+      "body_hash": "a917d34ece140acffc1dda1303de626d43bd0e3011c71bd2f2c7d0b18b2e74b7",
+      "args": [
+        "self",
+        "turn_epoch",
+        "text",
+        "history_snapshot"
+      ],
+      "decorators": []
+    },
+    "_vmem_recall_run": {
+      "group": "voice_memory",
+      "file": "backend/app/services/voice_service.py",
+      "class": "VoiceDuplexSession",
+      "body_hash": "c33eb6688b6c8eb0a574b4f10f2c91dfd2e183aa25f4be5de126609379bf41f4",
+      "args": [
+        "self",
+        "turn_epoch",
+        "text",
+        "history_snapshot",
+        "uid"
+      ],
+      "decorators": []
+    },
+    "_vmem_queue_has_answer_epoch": {
+      "group": "voice_memory",
+      "file": "backend/app/services/voice_service.py",
+      "class": "VoiceDuplexSession",
+      "body_hash": "577e45bd26e75a11fa3e3a4c395effc128af7b9856dd2cf1cf694b2cd28c481c",
+      "args": [
+        "self",
+        "epoch"
+      ],
+      "decorators": []
+    },
+    "_vmem_pick_window": {
+      "group": "voice_memory",
+      "file": "backend/app/services/voice_service.py",
+      "class": "VoiceDuplexSession",
+      "body_hash": "c3afce8f3c17d73b9c30dc8c6508b1c94728674a2b6625301189f98647b0bfd5",
+      "args": [
+        "self",
+        "turn_epoch"
+      ],
+      "decorators": []
+    },
+    "_vmem_maybe_judge": {
+      "group": "voice_memory",
+      "file": "backend/app/services/voice_service.py",
+      "class": "VoiceDuplexSession",
+      "body_hash": "4735f8f774e080c9b753d730826b1627986a7c43cef821146267f3d2ffc302ab",
+      "args": [
+        "self",
+        "turn_epoch",
+        "ctx",
+        "ids",
+        "top"
+      ],
+      "decorators": []
+    },
+    "_speak_memory_remark": {
+      "group": "voice_memory",
+      "file": "backend/app/services/voice_service.py",
+      "class": "VoiceDuplexSession",
+      "body_hash": "e0054c451f5a04dbb7097d689c25a024c645609af2d143c23da8bb3e99676626",
+      "args": [
+        "self",
+        "line",
+        "kind",
+        "emotion",
+        "window"
+      ],
+      "decorators": []
+    },
+    "_decay_emotion": {
+      "group": "voice_memory",
+      "file": "backend/app/services/voice_service.py",
+      "class": "VoiceDuplexSession",
+      "body_hash": "620ca0924c25d9971fbc7dc1b204d7a9c2546962eb751894001682383ba1d104",
+      "args": [
+        "self"
+      ],
+      "decorators": []
+    },
+    "_build_interjection_context_note": {
+      "group": "voice_memory",
+      "file": "backend/app/services/voice_service.py",
+      "class": "VoiceDuplexSession",
+      "body_hash": "84b28a8808061ddcca4d602bec4b8d183ed70833f0a94fdbd9f907b6886588f6",
+      "args": [
+        "self"
+      ],
+      "decorators": []
+    }
+  },
+  "loop": {
+    "file": "backend/app/services/agent_loop.py",
+    "args": [
+      "self",
+      "state",
+      "session_factory",
+      "user",
+      "conversation",
+      "assistant"
+    ],
+    "body_hash": "ab520795c8ebe200d456d512fd188c2a066748051987b7337db587c5f2aa4038"
+  },
+  "chat": {
+    "file": "backend/app/api/chat.py",
+    "args": [
+      "request",
+      "req",
+      "db",
+      "current_user"
+    ],
+    "body_hash": "d8e81a425024ea8915304ef90315b0be274f6816fa0e1cacd382e528464f7f58"
+  }
+}

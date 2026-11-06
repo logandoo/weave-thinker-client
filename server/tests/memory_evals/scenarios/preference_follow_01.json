@@ -1,0 +1,24 @@
+{
+  "id": "preference_follow_01",
+  "category": "preference_follow",
+  "title": "偏好遵循：按编辑器偏好推荐",
+  "query": "帮我推荐一个代码编辑器，按我的偏好来",
+  "stage0": {"query_type": "semantic", "keywords": ["编辑器", "偏好"]},
+  "seed": {
+    "concepts": [{"id": "p-editor", "canonical_name": "编辑器偏好", "content": "用户偏好 Vim 系编辑器", "memory_type": "profile"}],
+    "episodic": [{"id": "e-old", "content": "[2026-09-01] 曾讨论过 VSCode"}],
+    "subconscious": []
+  },
+  "fake_retrieval": {
+    "candidates": [
+      {"id": "p-editor", "tier": "concept", "score": 0.66, "content": "用户偏好 Vim 系编辑器", "metadata": {"canonical_name": "编辑器偏好", "memory_type": "profile"}},
+      {"id": "e-old", "tier": "episodic", "score": 0.5, "content": "[2026-09-01] 曾讨论过 VSCode", "metadata": {"valid_from": "2026-09-01"}}
+    ]
+  },
+  "expect": {
+    "hit_ids": ["p-editor"],
+    "hit_k": 3,
+    "forbidden_ids": [],
+    "llm_checks": [{"type": "answer_follows_preference", "value": "vim"}]
+  }
+}

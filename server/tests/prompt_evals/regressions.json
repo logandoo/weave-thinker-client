@@ -1,0 +1,15 @@
+[
+ {
+  "key": "reg-seed-cal28",
+  "id": "reg-seed-cal28",
+  "prompt_id": "audit.response",
+  "source": "audit_reject",
+  "input": "cal-28：草稿有 [N] 但评测上下文无来源列表，judge 与人工分歧",
+  "expected": "reject",
+  "must_contain": [
+   "对照表条目即来源条目"
+  ],
+  "note": "human calibration disagreement; keep audit mapping rule under regression",
+  "created": "2026-10-18"
+ }
+]

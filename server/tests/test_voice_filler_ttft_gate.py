@@ -343,7 +343,7 @@ def test_generation_fast_stream_marks_content_epoch_no_filler():
             async def fake_persist(role, content, **kw):
                 pass
 
-            async def fake_speak(text, wait=True, aux=False):
+            async def fake_speak(text, wait=True, aux=False, **kwargs):
                 pass
 
             s._persist_message = fake_persist
@@ -380,7 +380,7 @@ def test_prefetched_fast_path_clears_pending_and_marks_epoch():
             async def fake_persist(role, content, **kw):
                 pass
 
-            async def fake_speak(text, wait=True, aux=False):
+            async def fake_speak(text, wait=True, aux=False, **kwargs):
                 pass
 
             s._persist_message = fake_persist

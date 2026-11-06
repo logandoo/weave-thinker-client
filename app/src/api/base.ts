@@ -9,6 +9,17 @@ const RUNTIME = /^https?:\/\/(127\.0\.0\.1|localhost)(:\d{1,5})?$/.test(RUNTIME_
 
 export const API_ORIGIN = (RUNTIME || BAKED || '').replace(/\/+$/, '')
 
+// W26 客户端执行模式分层（云端/本地）：'local' = 本地栈实启（本机后端+
+// 本机执行）；'cloud' = 云端服务器 / Web 同源部署。权威源=桌面壳运行时注入
+// （本地栈实际启动结果，desktop/main.cjs 仅在 runtimeApiBase 分支注入），
+// 非 URL 嗅探；无注入时按烘焙 base 推断（loopback=local，远端/空=cloud）。
+const RUNTIME_MODE_RAW = ((globalThis as any).weaveRuntime?.execMode as string | undefined) || ''
+const LOOPBACK_RE = /^https?:\/\/(127\.0\.0\.1|localhost)(:\d{1,5})?$/
+export const EXECUTION_MODE: 'local' | 'cloud' =
+  RUNTIME_MODE_RAW === 'local' || LOOPBACK_RE.test(BAKED || '')
+    ? 'local'
+    : 'cloud'
+
 export function apiUrl(path: string): string {
   return API_ORIGIN ? `${API_ORIGIN}${path}` : path
 }

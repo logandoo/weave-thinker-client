@@ -13,8 +13,10 @@ class TestBuildThinkingExtraBodyGolden:
         assert build_thinking_extra_body("deepseek", True) == {"thinking": {"type": "enabled"}}
 
     def test_deepseek_enable_with_effort_and_budget(self):
+        # 2026-10-18: DeepSeek documents effort only; thinking_budget is not
+        # a wire field (harness-aligned). Budget is accepted but not emitted.
         assert build_thinking_extra_body("deepseek", True, "high", thinking_budget=8192) == {
-            "thinking": {"type": "enabled"}, "reasoning_effort": "high", "thinking_budget": 8192,
+            "thinking": {"type": "enabled"}, "reasoning_effort": "high",
         }
 
     def test_deepseek_invalid_effort_dropped(self):

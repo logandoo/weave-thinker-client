@@ -4,8 +4,8 @@
 （超时/坏 JSON）时旧行为回退 backchannel —— 播放中可能真实的新 query 被静默
 丢弃（只播报 backchannel，不入队）。确定性噪声/回声预过滤已在分类器之前运行，
 基础设施失败不应吞掉可能真实的文本：回退 defer 入队（播报结束后回答），
-并用 deferred 事件告知用户，文本永不丢失。短应和（嗯/对/哦…）仍回退
-backchannel（避免把应和声当问题回答）。
+并用 deferred 事件告知用户，文本永不丢失。2026-11-05 起分类器故障对短应和也
+统一 defer；不得再用字符表猜测语义（用户明确禁止，见 tests/decisions.md）。
 
 Run from backend/:  ../.venv/bin/python -m pytest tests/test_voice_barge_in_failsafe.py -v
 """
@@ -68,8 +68,8 @@ def test_classifier_timeout_falls_back_to_defer(monkeypatch):
     asyncio.run(run())
 
 
-def test_classifier_timeout_short_ack_stays_backchannel(monkeypatch):
-    """A short acknowledgement must still fall back to backchannel."""
+def test_classifier_timeout_short_ack_also_defers_without_regex(monkeypatch):
+    """No semantic character fallback: classifier outage preserves the turn as defer."""
 
     async def run():
         s, ws = _make_session()
@@ -80,7 +80,7 @@ def test_classifier_timeout_short_ack_stays_backchannel(monkeypatch):
         s._quick_classify = _empty_classify
         for ack in ("嗯", "好的", "对对对"):
             verdict = await s._classify_barge_in(ack)
-            assert verdict == "backchannel", f"{ack!r} → expected backchannel, got {verdict!r}"
+            assert verdict == "defer", f"{ack!r} → expected fail-safe defer, got {verdict!r}"
 
     asyncio.run(run())
 

@@ -294,3 +294,12 @@ def test_terminal_dotted_names_and_deep_cwd_not_flagged(bypass_on, ws_root):
             "cd ..", str(sub), str(ws_root)) is None, "深层 cwd 的 cd .. 仍在工作区内"
         assert _command_accesses_outside_workspace(
             "ls ../..", str(sub), str(ws_root)), "越过工作区根的穿越必须 flag"
+        # W27 评审 B 补锚：open/read 函数形与 cat 相对穿越腿（快照期盲区）
+        assert _command_accesses_outside_workspace(
+            'cat ../../bob/secret.txt', str(sub), str(ws_root)), "cat 相对穿越必须 flag"
+        assert _command_accesses_outside_workspace(
+            'open("../etc/passwd")', str(ws_root), str(ws_root)), "open() 相对穿越必须 flag"
+        assert _command_accesses_outside_workspace(
+            'read("/etc/passwd")', str(sub), str(ws_root)), "read() 绝对越界必须 flag"
+        assert _command_accesses_outside_workspace(
+            'open("file..txt")', str(ws_root), str(ws_root)) is None, "open() 点点子串不得误伤"

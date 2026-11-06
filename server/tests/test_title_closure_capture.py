@@ -15,6 +15,7 @@ import ast
 from pathlib import Path
 
 CHAT_PY = Path(__file__).resolve().parents[1] / "app" / "api" / "chat.py"
+TRANSPORT_PY = Path(__file__).resolve().parents[1] / "app" / "api" / "chat_stream_transport.py"
 
 _SCOPE_DEF = (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.Lambda)
 
@@ -77,11 +78,13 @@ def _function_own_bound(func):
 
 
 def test_cap_vars_loaded_in_title_closure_are_scope_visible():
-    tree = ast.parse(CHAT_PY.read_text())
+    chat_tree = ast.parse(CHAT_PY.read_text())
+    transport_tree = ast.parse(TRANSPORT_PY.read_text())
     target = next(
-        f for f in ast.walk(tree) if getattr(f, "name", None) == "_generate_title_bg"
+        f for f in ast.walk(transport_tree)
+        if getattr(f, "name", None) == "_generate_title_bg"
     )
-    chain = _enclosing_chain(tree, target.lineno)
+    chain = _enclosing_chain(transport_tree, target.lineno)
     assert chain and chain[-1] is target, "enclosing chain must end at the closure itself"
 
     loaded = {
@@ -94,7 +97,9 @@ def test_cap_vars_loaded_in_title_closure_are_scope_visible():
     visible = set()
     for func in chain[:-1]:
         visible |= _function_own_bound(func)
-    visible |= _store_names(_own_scope_walk(tree))  # module scope
+    # Module-scope names live in chat.py (the transport syncs them at call time).
+    visible |= _store_names(_own_scope_walk(chat_tree))
+    visible |= _store_names(_own_scope_walk(transport_tree))
 
     missing = sorted(loaded - visible)
     assert not missing, (

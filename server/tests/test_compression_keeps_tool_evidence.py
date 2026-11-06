@@ -31,13 +31,14 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 _CHAT_SRC = open(
-    os.path.join(os.path.dirname(__file__), "..", "app", "api", "chat.py"),
+    os.path.join(os.path.dirname(__file__), "..", "app", "api",
+                 "chat_stream_transport.py"),
     encoding="utf-8",
 ).read()
 
 # 压缩事件处理块（到下一个同级 elif 之前）
 _COMP_BLOCK_RE = re.compile(
-    r'elif "compression" in event:(.*?)(?=\n                            elif ")',
+    r'elif "compression" in event:(.*?)(?=\n\s+elif ")',
     re.DOTALL,
 )
 
@@ -128,7 +129,7 @@ def test_display_sequence_no_tool_drops_all_text():
     assert [it.get("type") for it in kept] == ["reasoning_step"]
 
 
-def test_incident_invariant_results_size_gates_sanitize():
+def test_incident_invariant_results_size_gates_sanitize(monkeypatch):
     """事故不变量（行为测试）：落库 results[] 条数决定合法 [N] 是否被剥。
     live ledger 30 条 + results[] 30 条 → [11][17][22] 存活；results[] 10 条
     → 越界被 sanitize_texts 判真引用剥掉（conv 038e837a 事故形态）。"""
@@ -166,20 +167,36 @@ def test_incident_invariant_results_size_gates_sanitize():
     }])
     assert shrunk.size == 10
     assert shrunk.verify(draft).unknown == {11, 17, 22}
+    # W25 上游测试卫生缺口：sanitize_texts 走活 LLM 判官（judge_json 真调
+    # 60s×retries，联网慢即挂——三次全量卡死实证）。桩签名适配（断言零动，
+    # deathmatch 同域 _call_judge_llm 桩同款先例）：判官返回期望裁决，
+    # 被测=结构化删除路径，确定性可测。
+    import app.services.agentic_judge as _aj
+
+    async def _fake_judge(*_a, **_kw):
+        return {"citation_ids": [11, 17, 22]}
+
+    monkeypatch.setattr(_aj, "judge_json", _fake_judge)
     out = asyncio.run(shrunk.sanitize_texts([draft]))[0]
     assert "[11]" not in out and "[17]" not in out and "[22]" not in out
 
 
 def test_released_pre_tool_prose_tracked():
-    """A4.9 R2 N1：cap_released 预工具散文需有快照位（压缩只保留它，
-    其后草稿仍丢弃——否则「散文+旧稿+重答」三段拼接落库）。"""
+    """输出单元契约（2026-10-14 用户裁定，取代 A4.9 R2 N1 的快照位设计）：
+    预工具散文停车进 display_sequence（keep_evidence 保留工具卡之前的 text
+    项=压缩后存活），压缩块不再把散文拼回 content——「散文+旧稿+重答」三段
+    拼接病形从构造上消灭。test-change 依据：spec 变更（用户裁定）；散文
+    存活通道由 tests/test_output_unit_boundaries.py 位序契约钉住。"""
     blk = _compression_block()
-    assert "_released_prose" in blk
     assert "_keep_prose" in blk
+    # 新契约：压缩后 content 不携带散文（_keep_prose 恒空）——散文在
+    # display_sequence（停车单元）侧存活。
+    assert '_keep_prose = ""' in blk
 
 
 def test_audit_reset_suppressed_in_deathmatch_multiturn():
     """A4.9 R2 N3：死磕多轮流不下发 audit_reset（清创非 turn 作用域，
     会连带删掉上一轮已落库答案文本）——已知边界。"""
     blk = _compression_block()
-    assert "_deathmatch_mgr is None" in blk
+    # C-02c: the deathmatch manager now lives on the run state object.
+    assert "run.dm is None" in blk

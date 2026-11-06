@@ -112,12 +112,25 @@ class TestKindRouting:
 
 class TestFactory:
     def test_build_llm_service_from_endpoint(self):
+        # 2026-10-18: hermetic — the old assertion hardcoded the operator's
+        # live `main` URL (DeepSeek), which broke whenever `main` moved to
+        # MiMo. The factory contract is "preserve the endpoint's URL and
+        # is_custom flag", not "main is DeepSeek".
         from app.model_gateway import factory
-        reg = _registry()
-        svc = factory.build_llm_service(reg.get("main"))
-        assert str(svc.client.base_url).rstrip("/") == "https://api.deepseek.com/v1"
-        # main: is_custom=False → 应用全局默认采样
+        from app.model_gateway.schemas import KIND_LLM, ModelEndpoint
+        ep = ModelEndpoint(
+            alias="main", kind=KIND_LLM,
+            base_url="https://api.deepseek.com/v1",
+            api_key="test-key", model_name="deepseek-flash",
+            is_custom=False,
+        )
+        svc = factory.build_llm_service(ep)
+        # is_custom=False keeps the legacy bare-constructor semantics: the
+        # global [api] base URL, not the endpoint's base_url. Assert the
+        # contract, not the operator's current main provider.
         assert svc.is_custom_provider is False
+        assert svc.endpoint is ep
+        assert str(svc.client.base_url).rstrip("/") == str(svc.config.api_base_url).rstrip("/")
 
     def test_build_llm_service_custom_endpoint(self):
         from app.model_gateway import factory

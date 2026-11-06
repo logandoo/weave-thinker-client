@@ -1,0 +1,70 @@
+{
+  "id": "procedural_02",
+  "category": "procedural",
+  "title": "程序性：发布流程四步骤（技能类记忆按序召回）",
+  "query": "发布新版本的流程是怎样的？",
+  "stage0": {
+    "query_type": "semantic",
+    "keywords": [
+      "发布",
+      "流程"
+    ]
+  },
+  "seed": {
+    "concepts": [
+      {
+        "id": "proc-release",
+        "canonical_name": "发布流程",
+        "content": "发布流程：① 跑测试 ② 打 tag ③ 起 Docker 栈 ④ 冒烟验证",
+        "memory_type": "procedural"
+      }
+    ],
+    "episodic": [
+      {
+        "id": "e-release-noise",
+        "content": "[2026-09-28] 发布日踩过镜像拉取的坑"
+      }
+    ],
+    "subconscious": []
+  },
+  "fake_retrieval": {
+    "candidates": [
+      {
+        "id": "proc-release",
+        "tier": "concept",
+        "score": 0.82,
+        "content": "发布流程：① 跑测试 ② 打 tag ③ 起 Docker 栈 ④ 冒烟验证",
+        "metadata": {
+          "canonical_name": "发布流程",
+          "memory_type": "procedural"
+        }
+      },
+      {
+        "id": "e-release-noise",
+        "tier": "episodic",
+        "score": 0.55,
+        "content": "[2026-09-28] 发布日踩过镜像拉取的坑",
+        "metadata": {
+          "valid_from": "2026-09-28"
+        }
+      }
+    ]
+  },
+  "expect": {
+    "hit_ids": [
+      "proc-release"
+    ],
+    "hit_k": 3,
+    "forbidden_ids": [],
+    "llm_checks": [
+      {
+        "type": "answer_lists_all",
+        "value": "4"
+      },
+      {
+        "type": "answer_contains",
+        "value": "冒烟"
+      }
+    ]
+  }
+}

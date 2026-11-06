@@ -157,21 +157,36 @@ def test_t3_provider_time_params():
     asyncio.run(svc._search_serper(serper_client, "q", time_sensitive=False))
     assert "tbs" not in serper_client.last_json, serper_client.last_json
 
-    # Bocha: freshness oneMonth / noLimit
-    bocha_client = RecordingClient({
-        "code": 200,
-        "data": {"webPages": {"value": [
-            {"url": "https://e.com/b", "name": "B", "snippet": "c",
-             "datePublished": "2026-08-10T00:00:00Z"},
-        ]}},
+    # DeepSeek Search: time_sensitive → `after:` syntax, model-facing summary
+    ds_client = RecordingClient({
+        "results": [
+            {"title": "DS", "url": "https://e.com/ds", "summary": "长摘要",
+             "snippet": "短摘要", "date": "2026-08-10T00:00:00+00:00",
+             "rerank_score": 2.4, "site_name": "Example"},
+        ],
     })
-    with patch.dict(config.web_search, {"bocha_api_key": "test-key"}), \
+    with patch.dict(config.web_search, {"deepseek_api_key": "test-key"}), \
          patch("app.services.search_service.get_shared_async_client",
-               return_value=bocha_client):
-        asyncio.run(svc._search_bocha("q", time_sensitive=True))
-        assert bocha_client.last_json.get("freshness") == "oneMonth", bocha_client.last_json
-        asyncio.run(svc._search_bocha("q", time_sensitive=False))
-        assert bocha_client.last_json.get("freshness") == "noLimit", bocha_client.last_json
+               return_value=ds_client):
+        hits = asyncio.run(svc._search_deepseek("q", time_sensitive=True))
+        assert ds_client.last_json.get("need_content") is False, ds_client.last_json
+        assert "after:" in ds_client.last_json.get("query", ""), ds_client.last_json
+        assert hits and hits[0].published_date == "2026-08-10", hits
+        assert hits[0].snippet == "长摘要", hits[0]
+        asyncio.run(svc._search_deepseek("q", time_sensitive=False))
+        assert "after:" not in ds_client.last_json.get("query", ""), ds_client.last_json
+
+    # Bing RSS: keyless aggregation + RFC822 pubDate normalization
+    bing_xml = (
+        '<rss version="2.0"><channel><item>'
+        '<title>Bing Result</title><link>https://e.com/bing</link>'
+        '<description>&lt;b&gt;Bing&lt;/b&gt; snippet</description>'
+        '<pubDate>Wed, 01 Oct 2026 10:00:00 GMT</pubDate>'
+        '</item></channel></rss>'
+    )
+    bing_hits = WebSearchService._parse_bing_rss(bing_xml)
+    assert bing_hits and bing_hits[0].published_date == "2026-10-01", bing_hits
+    assert bing_hits[0].snippet == "Bing snippet", bing_hits[0]
 
     # Firecrawl: tbs=qdr:m (and absent when not time-sensitive)
     fc_client = RecordingClient({

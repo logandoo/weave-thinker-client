@@ -268,7 +268,18 @@ _MEMORY_V2_SUFFIX = frozenset({
     "idx_sub_content_hash",
     "mrl_create",
     "mrl_idx_user_created",
+    "mrl_miss",
+    "mrl_providers_queried",
     "me_participants",
     "me_locations",
     "cr_edge_source",
+    # 记忆/长程 v2（2026-10-23）：memory_v2 列变更（W0-2/W3-2/W5-3）。
+    # 用户权利/基础设施表（cpc_/dm_/drr_/sc_/mer_/conv_artifacts_deleted_at）
+    # 刻意置于 pgvector 标记之前，不进本白名单。
+    "mc_retention_score",
+    "mc_fidelity_state",
+    "idx_concepts_user_retention",
+    "ad_provenance_taint",
+    "ad_scanned",
+    "mrl_rejects_json",
 })

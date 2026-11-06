@@ -336,6 +336,7 @@ def test_weight_service_cold_resurrect_orm():
 
 def test_chat_regenerate_sort_order_value_guard():
     src = open(os.path.join(_API_DIR, "api/chat.py"), encoding="utf-8").read()
+    src += open(os.path.join(_API_DIR, "api/chat_stream_transport.py"), encoding="utf-8").read()
     assert re.search(
         r"if conversation\.sort_order:\s*\n\s+conversation\.sort_order = 0", src
     ), "regenerate 应值守卫 sort_order=0（同值零事件，A4.9 R1 M-5+§3.1 双合规）"

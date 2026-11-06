@@ -1,0 +1,27 @@
+{
+  "id": "contradiction_update_01",
+  "category": "contradiction_update",
+  "title": "矛盾更新：编辑器偏好已换代",
+  "query": "我现在用的编辑器是什么？",
+  "stage0": {"query_type": "semantic", "keywords": ["编辑器"]},
+  "seed": {
+    "concepts": [
+      {"id": "c-editor-old", "canonical_name": "编辑器（旧）", "content": "用户使用 Atom", "memory_type": "profile"},
+      {"id": "c-editor-new", "canonical_name": "编辑器（现行）", "content": "用户现在使用 Neovim", "memory_type": "profile"}
+    ],
+    "episodic": [],
+    "subconscious": []
+  },
+  "fake_retrieval": {
+    "candidates": [
+      {"id": "c-editor-old", "tier": "concept", "score": 0.8, "content": "用户使用 Atom", "metadata": {"canonical_name": "编辑器（旧）", "superseded": true}},
+      {"id": "c-editor-new", "tier": "concept", "score": 0.75, "content": "用户现在使用 Neovim", "metadata": {"canonical_name": "编辑器（现行）"}}
+    ]
+  },
+  "expect": {
+    "hit_ids": ["c-editor-new"],
+    "hit_k": 3,
+    "forbidden_ids": ["c-editor-old"],
+    "llm_checks": [{"type": "answer_not_contains", "value": "Atom"}]
+  }
+}

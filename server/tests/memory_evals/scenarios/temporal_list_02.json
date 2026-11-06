@@ -1,0 +1,29 @@
+{
+  "id": "temporal_list_02",
+  "category": "temporal_list",
+  "title": "时间型列表：上周聊过的三件事",
+  "query": "上周聊过的三件事，帮我列一下",
+  "stage0": {"query_type": "temporal_list", "keywords": ["上周"]},
+  "seed": {
+    "concepts": [],
+    "episodic": [
+      {"id": "e-t1", "content": "[2026-10-06] 讨论了知识库迁移"},
+      {"id": "e-t2", "content": "[2026-10-07] 约定了周报节奏"},
+      {"id": "e-t3", "content": "[2026-10-08] 评审了检索阈值"}
+    ],
+    "subconscious": []
+  },
+  "fake_retrieval": {
+    "candidates": [
+      {"id": "e-t1", "tier": "episodic", "score": 0.75, "content": "[2026-10-06] 讨论了知识库迁移", "metadata": {"valid_from": "2026-10-06"}},
+      {"id": "e-t2", "tier": "episodic", "score": 0.72, "content": "[2026-10-07] 约定了周报节奏", "metadata": {"valid_from": "2026-10-07"}},
+      {"id": "e-t3", "tier": "episodic", "score": 0.71, "content": "[2026-10-08] 评审了检索阈值", "metadata": {"valid_from": "2026-10-08"}}
+    ]
+  },
+  "expect": {
+    "hit_ids": ["e-t1", "e-t2", "e-t3"],
+    "hit_k": 3,
+    "forbidden_ids": [],
+    "llm_checks": [{"type": "answer_lists_all", "value": "3"}]
+  }
+}

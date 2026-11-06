@@ -16,7 +16,7 @@ logging.basicConfig(
 
 from app.api import chat, conversation, auth, assistant, asr, admin, sessions, notes, scheduled_tasks, files, agent_tasks, export_tasks, file_upload, image_upload, models as models_api, skills, voice, system, memory as memory_api, skins as skins_api, user_settings, sync as sync_api, sync_workspace as sync_workspace_api, citations as citations_api, server_admin, client_exec as client_exec_api
 from app.db.database import init_db, AsyncSessionLocal
-from app.core.config import get_config, clear_config_cache
+from app.core.config import get_config, clear_config_cache, production_security_errors
 from app.services.agent_scheduler import agent_scheduler
 from app.services.agent_worker import agent_worker
 from app.services.export_worker import export_worker
@@ -53,6 +53,24 @@ config = get_config()
 
 app = FastAPI(title="Weave Thinker API", version="0.0.1")
 
+# W32 执行环境云端联动（方案 A）：云端中继中间件——「云端/其他绑定客户端」目标的
+# /api/chat/stream* 与 /api/devices/{id}/fs/* 以云端账户身份代理云端执行（SSE 逐块
+# 透传）；本机/本地注册表/无云端链接原样放行。fail-closed：云端不可达→502 明确报错。
+# ⚠ 注册顺序关键（评审 A Critical + 复核 #4）：必须**先于** CORSMiddleware 注册——
+# Starlette add_middleware 后加者更外层，CORS 须包住中继，否则中继直发的响应缺
+# access-control-allow-origin，app:// 渲染器跨源读不到（SSE/502 全部不可读）。
+class CloudRelayMiddleware:
+    def __init__(self, asgi_app):
+        self.asgi_app = asgi_app
+
+    async def __call__(self, scope, receive, send):
+        from app.services.cloud_relay_service import relay_asgi
+
+        await relay_asgi(scope, receive, send, self.asgi_app)
+
+
+app.add_middleware(CloudRelayMiddleware)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=config.security_cors_allow_origins,
@@ -70,7 +88,9 @@ app.include_router(chat.router)
 app.include_router(conversation.router)
 app.include_router(server_admin.router)
 from app.api import message_payloads as message_payloads_api
+from app.api import mcp as mcp_api
 app.include_router(message_payloads_api.router)
+app.include_router(mcp_api.router)
 app.include_router(assistant.router)
 app.include_router(asr.router)
 app.include_router(admin.router)
@@ -94,6 +114,10 @@ app.include_router(sync_api.router)
 app.include_router(sync_workspace_api.router)
 app.include_router(client_exec_api.router)
 app.include_router(citations_api.router)
+from app.api import client_devices as client_devices_api
+from app.api import device_ws as device_ws_api
+app.include_router(client_devices_api.router)
+app.include_router(device_ws_api.router)
 
 
 async def _memory_reprobe_after_reload() -> None:
@@ -124,11 +148,75 @@ _durable_job_worker = None  # durable job worker 句柄（lifespan 启停）
 async def startup_event():
     if not config.security_jwt_secret_key:
         raise RuntimeError("JWT secret key is not configured")
+    # F2（2026-10-26）：启动清扫上一代遗留的工具子进程组（SIGKILL/崩溃后兜底；
+    # 签名不匹配 fail-safe 不杀，见 spawn_registry）
+    try:
+        from app.services.spawn_registry import sweep_orphans as _spawn_sweep
+        await _spawn_sweep()
+    except Exception:
+        logging.getLogger(__name__).warning("spawn sweep_orphans failed", exc_info=True)
+    # P0 TMA-NM: a tenant id without the experimental opt-in is a refusal —
+    # the filesystem segment is not an isolation guarantee (no DB/RLS).
+    from app.services.tenant_service import (
+        multi_tenant_experimental as tenant_mode_enabled,
+        tenant_config_errors,
+    )
+    _tenant_errors = tenant_config_errors()
+    if _tenant_errors:
+        raise RuntimeError("Unsafe tenant configuration: " + "; ".join(_tenant_errors))
+    if (
+        (config.memory_provenance_strict or tenant_mode_enabled())
+        and not config.memory_authority_key_ready
+    ):
+        raise RuntimeError(
+            "memory authority flags require a non-dev >=32-char "
+            "[security].memory_hmac_key (or a strong JWT secret): "
+            "the tracked dev key can forge origin=user"
+        )
+    if not str(config.security.get("memory_hmac_key", "") or "").strip():
+        logger.warning(
+            "SECURITY: memory provenance HMAC derives from jwt_secret_key; "
+            "set [security].memory_hmac_key for independent rotation"
+        )
+    if config.tma_mode != "off":
+        try:
+            from app.services.verdict_log_service import verdict_key_status
+            if verdict_key_status() == "dev":
+                logger.warning(
+                    "SECURITY: TMA verdict chain uses a dev/public HMAC key "
+                    "(key_id=v1-dev); the audit chain is structurally valid but forgeable"
+                )
+        except Exception:
+            logger.debug("verdict key status check failed", exc_info=True)
+    # P0 S2: production-only fail-closed guard.  Local dev (WT_ENV unset)
+    # keeps the tracked single-user bypass choice; a public deployment opts in
+    # with WT_ENV=production and must not boot from the unsafe template.
+    _prod_errors = production_security_errors(config)
+    if _prod_errors:
+        raise RuntimeError("Unsafe production configuration: " + "; ".join(_prod_errors))
+    if config.super_admin_bypass and not os.environ.get("WT_ENV"):
+        logger.warning(
+            "SECURITY: super_admin_bypass=true is active with WT_ENV unset. "
+            "This is a single-user/local-dev choice; public deployments must set "
+            "WT_ENV=production (the startup guard then rejects host-level bypass)."
+        )
+
+    # W18 G8（PLAN §11）：多 worker 自检——设备执行注册表/配对码为进程内态，
+    # workers>1 即禁用 client_exec 并 ERROR 告警。
+    from app.services.device_session_service import guard_multiworker_client_exec
+    guard_multiworker_client_exec()
 
     # conv-open 性能治理 P1-1（DESIGN_conv_open_performance）：所有 Message 写点
     # 的超限 tool_results/reasoning_content/tool_calls 自动外置到 message_payloads。
     from app.services.message_payload_service import install_message_payload_hook
     install_message_payload_hook()
+
+    # 2026-11-01: [mcp.servers.*] hot reload (config.toml watch; no restart).
+    try:
+        from app.tools.mcp_client import start_mcp_hot_reload
+        start_mcp_hot_reload()
+    except Exception:
+        logger.warning("MCP hot reload startup failed (tools still load once)", exc_info=True)
 
     def _on_sighup_reload_config(signum, frame):
         clear_config_cache()
@@ -145,22 +233,28 @@ async def startup_event():
     if sys.platform != "win32":
         signal.signal(signal.SIGHUP, _on_sighup_reload_config)
 
-    audio_files_dir = os.path.join(os.path.dirname(__file__), "audio_files")
+    # 可写运行时目录基址（LINUX_DEB_UPSTREAM_FIXES 缺陷 1）：冻结/安装形态下
+    # __file__ 位于只读安装目录（如 /opt/…），直接落盘会 PermissionError 使后端
+    # 启动失败。backend_root 是既定的可写基址（打包态=<userData>/localstack/app；
+    # 开发态=server/，路径逐字节不变）。
+    data_root = str(config.backend_root)
+    os.makedirs(data_root, exist_ok=True)
+    audio_files_dir = os.path.join(data_root, "audio_files")
     os.makedirs(audio_files_dir, exist_ok=True)
-    output_files_dir = os.path.join(os.path.dirname(__file__), "output_files")
+    output_files_dir = os.path.join(data_root, "output_files")
     os.makedirs(output_files_dir, exist_ok=True)
     fonts_dir = os.path.join(os.path.dirname(__file__), "Fonts")
     os.makedirs(fonts_dir, exist_ok=True)
     await init_db()
 
     # 部署排空令牌（2026-10-06，A4.9 r1 I5）：每启动生成随机令牌落盘
-    # backend/.drain_token（0600）——stop.sh 读取后经 X-Drain-Token 头调用
-    # drain 端点；令牌闸使本机恶意网页/反代拓扑无法打进 drain。
+    # backend_root/.drain_token（0600；LINUX_DEB 缺陷 1 同基址）——stop.sh 读取后经
+    # X-Drain-Token 头调用 drain 端点；令牌闸使本机恶意网页/反代拓扑无法打进 drain。
     try:
         from app.api import server_admin as _server_admin
         _drain_tok = _server_admin.new_drain_token()
         _server_admin.set_drain_token(_drain_tok)
-        _tok_path = os.path.join(os.path.dirname(__file__), ".drain_token")
+        _tok_path = os.path.join(data_root, ".drain_token")
         # scoped 复审 Minor：写即 0600（os.open mode 原子生效），消除
         # write-then-chmod 的权限窗口。
         _fd = os.open(_tok_path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
@@ -312,8 +406,19 @@ async def startup_event():
         from app.services.vibeweaver_audit_service import install_hooks as _vw_audit_install
         _vw_audit_summary = _vw_audit_install()
         logger.info("vibeweaver audit hooks: %s", _vw_audit_summary)
+        # D3：stop-guard 第三只 stop 钩子（gate/audit 之后 = when-would-allow）
+        from app.services.vibeweaver_stop_guard import install_hooks as _vw_sg_install
+        _vw_sg_summary = _vw_sg_install()
+        logger.info("vibeweaver stop-guard hooks: %s", _vw_sg_summary)
     except Exception:
         logger.exception("vibeweaver hook installation failed (fail-open)")
+    # 循环 Governor v2（设计 docs/DESIGN_20261025_loop_guard_v2.md §A5）：
+    # Tier A 运行时防线**无条件挂载**——关掉 vibeweaver 不再连产品防线一起关掉。
+    try:
+        from app.services.loop_governor_service import install as _lgov_install
+        logger.info("loop governor: %s", _lgov_install())
+    except Exception:
+        logger.exception("loop governor installation failed (fail-open)")
 
 
 @app.on_event("shutdown")
@@ -356,6 +461,24 @@ async def shutdown_event():
     try:
         from app.services.process_session_service import process_manager
         await process_manager.shutdown_all()
+    except Exception:
+        pass
+    # F2（2026-10-26）：回收登记在案的工具子进程组（terminal/code_exec 后台子孙）
+    try:
+        from app.services.spawn_registry import shutdown_all as _spawn_shutdown_all
+        await _spawn_shutdown_all()
+    except Exception:
+        logging.getLogger(__name__).warning("spawn shutdown_all failed", exc_info=True)
+    # fix-round I3：死亡模式写-through drain 接停机——在飞目标列 UPDATE
+    # 不得因停机丢失（B-8/D-15 落库面）；5s 超时兜底，drain 挂死不拖停机。
+    try:
+        from app.services.deathmatch_write_through import drain_write_through
+        await asyncio.wait_for(drain_write_through(), timeout=5)
+    except Exception:
+        pass
+    try:
+        from app.tools.mcp_client import stop_mcp_hot_reload
+        stop_mcp_hot_reload()
     except Exception:
         pass
     await close_shared_async_client()

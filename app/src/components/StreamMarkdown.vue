@@ -28,6 +28,7 @@ import {
 import MediaLightbox from './MediaLightbox.vue'
 import { INLINE_SOURCE_REGEX } from '@/utils/citations'
 import { useInlineImageZoom } from '@/composables/useInlineImageZoom'
+import { useChatStore } from '@/stores/chat'
 
 const props = defineProps<{
   content: string
@@ -47,7 +48,8 @@ function renderMarkdown(content: string): string {
   // Strip bibliography section and inline source prefixes for clean streaming display
   processed = processed.replace(BIBLIOGRAPHY_SECTION_REGEX, '')
   processed = processed.replace(INLINE_SOURCE_REGEX, '[$1]')
-  const html = renderMarkdownToHtml(processed)
+  // W18 G4：流式渲染按活跃会话执行环境签名内联图/媒体（设备→代理）
+  const html = renderMarkdownToHtml(processed, { deviceId: useChatStore().activeDeviceId })
   if (props.hasSearchResults) {
     return addCitationSuperscripts(html, true)
   }

@@ -24,6 +24,7 @@ from fastapi.responses import PlainTextResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import get_config
 from app.core.deps import get_current_user
 from app.db.database import User, get_db
 from app.schemas.skin import UiPreferencesResponse, UiPreferencesUpdate
@@ -38,7 +39,7 @@ MAX_SKIN_CSS_BYTES = 300_000
 SKIN_ID_RE = re.compile(r"[a-z0-9][a-z0-9-]{0,49}\Z")
 _FORBIDDEN_PATTERNS = ("expression(", "javascript:")
 
-CUSTOM_SKINS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "skins_custom")
+CUSTOM_SKINS_DIR = os.path.join(str(get_config().backend_root), "skins_custom")
 
 SKIN_CATALOG = [
     {
@@ -259,9 +260,25 @@ def _read_skin_preference(user: User) -> str:
     return skin_id if skin_id in _user_known_skin_ids(user) else DEFAULT_SKIN_ID
 
 
+def _read_prefs_dict(user: User) -> dict:
+    try:
+        raw = json.loads(user.ui_preferences) if user.ui_preferences else {}
+        return raw if isinstance(raw, dict) else {}
+    except Exception:
+        return {}
+
+
+def _read_exec_target_preference(user: User) -> str | None:
+    target = _read_prefs_dict(user).get("default_execution_target")
+    return target if isinstance(target, str) and target else None
+
+
 @router.get("/api/users/me/preferences", response_model=UiPreferencesResponse)
 async def get_ui_preferences(user: User = Depends(get_current_user)):
-    return UiPreferencesResponse(skin_id=_read_skin_preference(user))
+    return UiPreferencesResponse(
+        skin_id=_read_skin_preference(user),
+        default_execution_target=_read_exec_target_preference(user),
+    )
 
 
 @router.put("/api/users/me/preferences", response_model=UiPreferencesResponse)
@@ -270,16 +287,45 @@ async def update_ui_preferences(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    if payload.skin_id not in _user_known_skin_ids(user):
-        raise HTTPException(
-            status_code=http_status.HTTP_400_BAD_REQUEST,
-            detail=f"unknown skin_id: {payload.skin_id}",
-        )
+    # W18 G7：合并语义——只覆盖提交的键（旧实现整对象覆写会抹掉并存键）。
+    # 本地 hunk：写点走 user_preferences.apply_prefs_patch（W12 P2#10 合并写服务，None=删除键）。
+    patch: dict = {}
+    if payload.skin_id is not None:
+        if payload.skin_id not in _user_known_skin_ids(user):
+            raise HTTPException(
+                status_code=http_status.HTTP_400_BAD_REQUEST,
+                detail=f"unknown skin_id: {payload.skin_id}",
+            )
+        patch["skin_id"] = payload.skin_id
+    if payload.default_execution_target is not None:
+        from app.services import client_device_service as cds
+
+        try:
+            target = cds.normalize_execution_target(payload.default_execution_target)
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=http_status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+            )
+        if target is None:
+            patch["default_execution_target"] = None
+        else:
+            # A4.9 M2：PUT 时校验设备属主/未撤销——避免幽灵默认值卡住建会话
+            try:
+                await cds.assert_device_usable(db, user.id, target)
+            except LookupError:
+                raise HTTPException(
+                    status_code=http_status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail="设备不存在或已解绑",
+                )
+            patch["default_execution_target"] = target
     from app.services.user_preferences import apply_prefs_patch
-    apply_prefs_patch(user, {"skin_id": payload.skin_id})
+    current = apply_prefs_patch(user, patch)
     db.add(user)
     await db.commit()
-    return UiPreferencesResponse(skin_id=payload.skin_id)
+    return UiPreferencesResponse(
+        skin_id=_read_skin_preference(user),
+        default_execution_target=current.get("default_execution_target"),
+    )
 
 
 # 供未来其他模块复用（例如导出/个性化读取偏好）

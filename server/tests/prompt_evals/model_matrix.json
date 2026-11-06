@@ -1,0 +1,19 @@
+{
+  "generated_at": "2026-10-18T04:25:43.010497+00:00",
+  "mode": "offline-deterministic",
+  "live": false,
+  "aliases": [
+    "deepseek",
+    "doubao",
+    "main",
+    "mimo",
+    "qwen3.8"
+  ],
+  "golden": {
+    "cases": 62,
+    "failures": []
+  },
+  "prompt_count": 45,
+  "release_fingerprint": "8090048c47bb387e",
+  "note": "offline report validates prompt/contract structure per alias; use --live for bounded real-call smoke"
+}

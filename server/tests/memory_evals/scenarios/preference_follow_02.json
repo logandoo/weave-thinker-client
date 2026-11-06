@@ -1,0 +1,23 @@
+{
+  "id": "preference_follow_02",
+  "category": "preference_follow",
+  "title": "偏好遵循：主题配色偏好",
+  "query": "我喜欢的主题配色是深色还是浅色？",
+  "stage0": {"query_type": "semantic", "keywords": ["主题", "配色"]},
+  "seed": {
+    "concepts": [{"id": "p-theme", "canonical_name": "主题偏好", "content": "用户喜欢深色主题", "memory_type": "profile"}],
+    "episodic": [],
+    "subconscious": []
+  },
+  "fake_retrieval": {
+    "candidates": [
+      {"id": "p-theme", "tier": "concept", "score": 0.7, "content": "用户喜欢深色主题", "metadata": {"canonical_name": "主题偏好", "memory_type": "profile"}}
+    ]
+  },
+  "expect": {
+    "hit_ids": ["p-theme"],
+    "hit_k": 3,
+    "forbidden_ids": [],
+    "llm_checks": [{"type": "answer_follows_preference", "value": "深色"}]
+  }
+}

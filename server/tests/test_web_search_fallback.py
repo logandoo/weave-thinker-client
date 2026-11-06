@@ -4,10 +4,11 @@ Run (project venv, PostgreSQL + backend running or DB reachable):
     source .venv/bin/activate
     python backend/tests/test_web_search_fallback.py
 
-Covers:
-  1. Provider chain: exa first, no duckduckgo anywhere.
-  2. _provider_ready('exa') is keyless (True with empty exa_api_key).
-  3. Exa MCP failure -> falls through to next configured provider (bocha).
+Covers (2026-10-18 provider order: deepseek → exa → tavily → bing):
+  1. Provider chain: deepseek first, Bocha removed entirely.
+  2. _provider_ready('exa') is keyless (True with empty exa_api_key);
+     _provider_ready('bing') is keyless (public RSS).
+  3. DeepSeek no-hit / Exa MCP failure -> Tavily fills the chain.
   4. Hits carry provider/query attribution (persist_hits reads them).
   5. persist_hits opens its OWN session: rows written (query/provider/rank/
      title/url/snippet/published_date); multi-query persists serially.
@@ -42,6 +43,9 @@ class FakeResponse:
     def json(self):
         return self._payload
 
+    def raise_for_status(self):
+        return None
+
 
 class FakeClient:
     def __init__(self, response=None, payload_builder=None):
@@ -55,31 +59,26 @@ class FakeClient:
         return self._response
 
 
-def bocha_payload(marker):
+def tavily_payload(marker):
     return {
-        "code": 200,
-        "data": {
-            "webPages": {
-                "value": [
-                    {
-                        "url": f"https://example.com/{marker}-1",
-                        "name": f"{marker} 标题一",
-                        "snippet": f"{marker} 摘要一。",
-                        "datePublished": "2026-01-05T00:00:00Z",
-                    },
-                    {
-                        "url": f"https://example.com/{marker}-2",
-                        "name": f"{marker} 标题二",
-                        "snippet": f"{marker} 摘要二。",
-                    },
-                ]
-            }
-        },
+        "results": [
+            {
+                "title": f"{marker} 标题一",
+                "url": f"https://example.com/{marker}-1",
+                "content": f"{marker} 摘要一。",
+                "published_date": "2026-01-05",
+            },
+            {
+                "title": f"{marker} 标题二",
+                "url": f"https://example.com/{marker}-2",
+                "content": f"{marker} 摘要二。",
+            },
+        ],
     }
 
 
 def per_query_payload(query):
-    return bocha_payload(query)
+    return tavily_payload(query)
 
 
 async def run_checks(log):
@@ -89,15 +88,18 @@ async def run_checks(log):
         print(s)
         log.write(s + "\n")
 
-    # ---- 1. chain order: exa first, no duckduckgo ----
+    # ---- 1. chain order: deepseek first, Bocha removed ----
     chain = svc._provider_chain()
-    assert chain[0] == "exa", f"exa must be primary, got {chain}"
+    assert chain[0] == "deepseek", f"deepseek must be primary, got {chain}"
     assert "duckduckgo" not in chain, f"duckduckgo must be removed, got {chain}"
+    assert "bocha" not in chain, f"bocha must be removed, got {chain}"
+    assert chain[1:] == ["exa", "tavily", "bing"], f"fallback order wrong: {chain}"
     line(f"PASS chain = {chain}")
 
-    # ---- 2. exa ready keyless ----
+    # ---- 2. keyless providers ----
     assert svc._provider_ready("exa") is True, "_provider_ready('exa') must be True without a key"
-    line("PASS _provider_ready('exa') is True with empty exa_api_key (keyless)")
+    assert svc._provider_ready("bing") is True, "_provider_ready('bing') must be True (public RSS)"
+    line("PASS exa/bing ready without keys (exa MCP keyless, bing RSS keyless)")
 
     async with AsyncSessionLocal() as db:
         from sqlalchemy import select, text
@@ -109,25 +111,30 @@ async def run_checks(log):
 
         exa_down = patch("app.tools.mcp_client.call_mcp_tool",
                          AsyncMock(side_effect=RuntimeError("exa mcp down")))
+        deepseek_down = patch.object(WebSearchService, "_search_deepseek",
+                                     AsyncMock(return_value=None))
         fake_http = patch("app.services.search_service.get_shared_async_client",
                           return_value=FakeClient(payload_builder=per_query_payload))
-        only_exa_bocha = patch.object(WebSearchService, "_provider_ready",
-                                      side_effect=lambda p: p in ("exa", "bocha"))
+        only_deepseek_exa_tavily = patch.object(
+            WebSearchService, "_provider_ready",
+            side_effect=lambda p: p in ("deepseek", "exa", "tavily"))
 
-        # ---- 3+4. exa MCP fails -> bocha succeeds; hits carry attribution ----
-        with patch.dict(config.web_search, {"bocha_api_key": "test-key"}), \
-             exa_down, fake_http, only_exa_bocha:
+        # ---- 3+4. deepseek no hit + exa down -> tavily succeeds ----
+        with patch.dict(config.web_search, {
+                "deepseek_api_key": "test-key", "api_key": "test-key"}), \
+             deepseek_down, exa_down, fake_http, only_deepseek_exa_tavily:
             hits = await svc.search_multiple(["测试exa失败回退"])
 
-        assert hits, "bocha fallback must return hits after exa failure"
+        assert hits, "tavily fallback must return hits after deepseek/exa failure"
         assert hits[0].title == "测试exa失败回退 标题一", hits[0].title
-        assert hits[0].provider == "bocha" and hits[0].query == "测试exa失败回退", (
+        assert hits[0].provider == "tavily" and hits[0].query == "测试exa失败回退", (
             hits[0].provider, hits[0].query)
-        line(f"PASS exa fail -> bocha returned {len(hits)} hits with provider/query attribution")
+        line(f"PASS deepseek/exa fail -> tavily returned {len(hits)} hits with provider/query attribution")
 
         # ---- 5. persist_hits: own session, serial after gather ----
-        with patch.dict(config.web_search, {"bocha_api_key": "test-key"}), \
-             exa_down, fake_http, only_exa_bocha:
+        with patch.dict(config.web_search, {
+                "deepseek_api_key": "test-key", "api_key": "test-key"}), \
+             deepseek_down, exa_down, fake_http, only_deepseek_exa_tavily:
             multi = await svc.search_multiple(["测试query甲", "测试query乙"])
         assert len(multi) >= 2, f"multi-query must return hits, got {len(multi)}"
         await svc.persist_hits(multi)
@@ -143,12 +150,12 @@ async def run_checks(log):
         assert "测试query甲" in by_query and "测试query乙" in by_query, sorted(by_query)
         assert len(by_query["测试query甲"]) == 2 and len(by_query["测试query乙"]) == 2
         for r in rows:
-            assert r.provider == "bocha", r.provider
+            assert r.provider == "tavily", r.provider
             assert r.url.startswith("https://example.com/"), r.url
         qa = by_query["测试query甲"]
         assert [r.result_rank for r in qa] == [1, 2], [r.result_rank for r in qa]
         assert qa[0].published_date == "2026-01-05", qa[0].published_date
-        line(f"PASS persisted {len(rows)} rows across 3 queries (own session, provider=bocha, "
+        line(f"PASS persisted {len(rows)} rows across 3 queries (own session, provider=tavily, "
              f"per-query rank 1/2, published_date kept; serial commit after gather)")
 
     # ---- 6. empty hits: no-op without crash ----

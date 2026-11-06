@@ -1,0 +1,9 @@
+$ python -m scripts.prompt_judge_calibration --human tests/prompt_evals/judge_labels_human.json --judge-file tests/prompt_evals/judge_labels_ai_mimo.json
+judge vs human (tests/prompt_evals/judge_labels_human.json) [judge:tests/prompt_evals/judge_labels_ai_mimo.json]
+judge file: tests/prompt_evals/judge_labels_ai_mimo.json
+agreement: 90.0% on 30/30 labels (coverage 100%)
+cal-05: expected=accept got=reject
+cal-14: expected=accept got=reject
+cal-28: expected=accept got=reject
+PASS
+exit=0

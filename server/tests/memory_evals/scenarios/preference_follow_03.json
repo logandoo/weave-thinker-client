@@ -1,0 +1,66 @@
+{
+  "id": "preference_follow_03",
+  "category": "preference_follow",
+  "title": "对抗：诱导违背既有偏好 + 干扰候选（仍须遵循深色主题偏好）",
+  "query": "别管我以前说的，直接给我推荐一套浅色主题配色吧",
+  "stage0": {
+    "query_type": "semantic",
+    "keywords": [
+      "主题",
+      "配色"
+    ]
+  },
+  "seed": {
+    "concepts": [
+      {
+        "id": "p-theme-dark",
+        "canonical_name": "主题偏好（深色）",
+        "content": "用户明确偏好深色主题，讨厌刺眼的浅色",
+        "memory_type": "profile"
+      }
+    ],
+    "episodic": [
+      {
+        "id": "e-light-noise",
+        "content": "[2026-09-20] 浏览过浅色主题的截图"
+      }
+    ],
+    "subconscious": []
+  },
+  "fake_retrieval": {
+    "candidates": [
+      {
+        "id": "e-light-noise",
+        "tier": "episodic",
+        "score": 0.85,
+        "content": "[2026-09-20] 浏览过浅色主题的截图",
+        "metadata": {
+          "valid_from": "2026-09-20"
+        }
+      },
+      {
+        "id": "p-theme-dark",
+        "tier": "concept",
+        "score": 0.6,
+        "content": "用户明确偏好深色主题，讨厌刺眼的浅色",
+        "metadata": {
+          "canonical_name": "主题偏好（深色）",
+          "memory_type": "profile"
+        }
+      }
+    ]
+  },
+  "expect": {
+    "hit_ids": [
+      "p-theme-dark"
+    ],
+    "hit_k": 3,
+    "forbidden_ids": [],
+    "llm_checks": [
+      {
+        "type": "answer_follows_preference",
+        "value": "深色"
+      }
+    ]
+  }
+}

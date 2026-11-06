@@ -121,7 +121,8 @@ def test_context_info_from_usage_helper():
 
 # ---- 回滚模式剔除 search_tools（A4.9 R1 Minor-1 收口） ----
 
-def test_rollback_mode_strips_search_tools():
+def test_rollback_mode_strips_search_tools(monkeypatch):
+    monkeypatch.setitem(config.agent, "tools_catalog_discovery_enabled", False)
     cls = type(config)
     monkey = pytest.MonkeyPatch()
     monkey.setattr(cls, "agent_tools_mcp_progressive_enabled",
@@ -137,7 +138,8 @@ def test_rollback_mode_strips_search_tools():
 
 # ---- search_tools blocked 过滤（A4.9 R1 Minor-4 收口） ----
 
-def test_search_tools_handler_filters_blocked():
+def test_search_tools_handler_filters_blocked(monkeypatch):
+    monkeypatch.setitem(config.agent, "tools_catalog_discovery_enabled", False)
     name = "mcp_progtest_blocked_probe"
     registry.register(
         name=name, toolset="mcp-progtest",
@@ -148,15 +150,21 @@ def test_search_tools_handler_filters_blocked():
     try:
         out = json.loads(asyncio.run(search_tools_handler(
             {"query": "blocked probe"}, _blocked_tool_names={name})))
-        assert out["matches"] == []
+        # 2026-11-01: a configured MCP server (weave-connector) can legitimately
+        # match the same query words ("blocked/confirmed" in its description).
+        # The contract under test is that the BLOCKED tool is never advertised,
+        # not that the catalog is globally empty.
+        assert not any(m["name"] == name for m in out["matches"])
+        assert all(m["name"] != name for m in out["matches"])
         out2 = json.loads(asyncio.run(search_tools_handler({"query": "blocked probe"})))
         assert any(m["name"] == name for m in out2["matches"])
     finally:
         registry.unregister(name)
 
 
-def test_rollback_dispatch_rejects_search_tools():
+def test_rollback_dispatch_rejects_search_tools(monkeypatch):
     """A4.9 R1 M4：回滚模式下幻觉调用 search_tools → 明确拒绝（非目录检索）。"""
+    monkeypatch.setitem(config.agent, "tools_catalog_discovery_enabled", False)
     from app.services.agent_loop import AgentLoopState
     cls = type(config)
     monkey = pytest.MonkeyPatch()

@@ -1,0 +1,72 @@
+{
+  "id": "forget_02",
+  "category": "forget",
+  "title": "遗忘：被遗忘报价的墓碑单元不注入，幸存的供应商决策可召回",
+  "query": "最终定下来的供应商是哪家？（之前那个报价我已经让你忘掉了）",
+  "stage0": {
+    "query_type": "semantic",
+    "keywords": [
+      "供应商"
+    ]
+  },
+  "seed": {
+    "concepts": [
+      {
+        "id": "f-quote",
+        "canonical_name": "供应商报价（已遗忘）",
+        "content": "供应商 A 报价 12 万（用户要求遗忘）",
+        "memory_type": "semantic"
+      },
+      {
+        "id": "f-decision",
+        "canonical_name": "供应商决策",
+        "content": "最终选了供应商 B，理由是交付期",
+        "memory_type": "semantic"
+      }
+    ],
+    "episodic": [],
+    "subconscious": []
+  },
+  "fake_retrieval": {
+    "candidates": [
+      {
+        "id": "f-quote",
+        "tier": "concept",
+        "score": 0.9,
+        "content": "供应商 A 报价 12 万（用户要求遗忘）",
+        "metadata": {
+          "canonical_name": "供应商报价（已遗忘）",
+          "superseded": true
+        }
+      },
+      {
+        "id": "f-decision",
+        "tier": "concept",
+        "score": 0.7,
+        "content": "最终选了供应商 B，理由是交付期",
+        "metadata": {
+          "canonical_name": "供应商决策"
+        }
+      }
+    ]
+  },
+  "expect": {
+    "hit_ids": [
+      "f-decision"
+    ],
+    "hit_k": 3,
+    "forbidden_ids": [
+      "f-quote"
+    ],
+    "llm_checks": [
+      {
+        "type": "answer_contains",
+        "value": "供应商 B"
+      },
+      {
+        "type": "answer_not_contains",
+        "value": "12 万"
+      }
+    ]
+  }
+}

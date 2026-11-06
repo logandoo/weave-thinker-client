@@ -87,7 +87,9 @@ backend_start() {
 _drain_wait() {
   local base tok_header active deadline
   base="http://127.0.0.1:$BPORT"
-  tok_header="X-Drain-Token: $(cat "$SERVER/.drain_token" 2>/dev/null || echo '')"
+  # 令牌基址=写侧 backend_root（config.toml 所在 CONFDIR；W23 评审 I3：打包态
+  # CONFDIR≠SERVER，读 SERVER 拿不到令牌→drain 403 fail-open 杀在途）；SERVER 兜底=旧布局。
+  tok_header="X-Drain-Token: $(cat "$CONFDIR/.drain_token" 2>/dev/null || cat "$SERVER/.drain_token" 2>/dev/null || echo '')"
   curl -s -m 5 -X POST "$base/api/server/drain" \
     -H 'Content-Type: application/json' -H "$tok_header" -d '{"on": true}' >/dev/null 2>&1 || true
   deadline=$(( $(date +%s) + ${WT_DRAIN_TIMEOUT:-120} ))

@@ -1,0 +1,73 @@
+{
+  "id": "contradiction_update_03",
+  "category": "contradiction_update",
+  "title": "对抗：诱导沿用旧配置 + 高分过时候选（现行日志级别是 info）",
+  "query": "我记得好像是 debug，就按这个来吧——现在生产日志级别到底是什么？",
+  "stage0": {
+    "query_type": "semantic",
+    "keywords": [
+      "日志",
+      "级别"
+    ]
+  },
+  "seed": {
+    "concepts": [
+      {
+        "id": "c-log-old",
+        "canonical_name": "日志级别（旧）",
+        "content": "日志级别为 debug（早期调试配置）",
+        "memory_type": "semantic"
+      },
+      {
+        "id": "c-log-new",
+        "canonical_name": "日志级别（现行）",
+        "content": "日志级别现为 info",
+        "memory_type": "semantic"
+      }
+    ],
+    "episodic": [],
+    "subconscious": []
+  },
+  "fake_retrieval": {
+    "candidates": [
+      {
+        "id": "c-log-old",
+        "tier": "concept",
+        "score": 0.9,
+        "content": "日志级别为 debug（早期调试配置）",
+        "metadata": {
+          "canonical_name": "日志级别（旧）",
+          "superseded": true
+        }
+      },
+      {
+        "id": "c-log-new",
+        "tier": "concept",
+        "score": 0.6,
+        "content": "日志级别现为 info",
+        "metadata": {
+          "canonical_name": "日志级别（现行）"
+        }
+      }
+    ]
+  },
+  "expect": {
+    "hit_ids": [
+      "c-log-new"
+    ],
+    "hit_k": 3,
+    "forbidden_ids": [
+      "c-log-old"
+    ],
+    "llm_checks": [
+      {
+        "type": "answer_contains",
+        "value": "info"
+      },
+      {
+        "type": "answer_not_contains",
+        "value": "debug"
+      }
+    ]
+  }
+}

@@ -29,6 +29,8 @@ import uuid
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
+from app.prompts.fragments import spotlight
+
 logger = logging.getLogger(__name__)
 
 DEFAULT_DIGEST_TOOLS = frozenset({
@@ -356,6 +358,7 @@ async def _generate_digest_text(messages: list, child_llm: Any, config: DigestCo
                     messages,
                     temperature=config.temperature,
                     max_tokens=config.max_tokens,
+                    prompt_id="tool.digest",
                     # Digest subagents never think: thinking-mode responses can
                     # come back with empty content (DeepSeek returns reasoning
                     # only), which would silently disable the digest layer.
@@ -368,6 +371,7 @@ async def _generate_digest_text(messages: list, child_llm: Any, config: DigestCo
                 messages,
                 temperature=config.temperature,
                 max_tokens=config.max_tokens,
+                prompt_id="tool.digest",
                 extra_body=build_thinking_extra_body(provider_type, False),
             )
     except Exception as e:
@@ -421,7 +425,7 @@ async def digest_one_result(result: Any, config: DigestConfig, parent_llm: Any,
                     else ""
                 )
                 + "===== 工具输出原文开始 =====\n"
-                f"{content}\n"
+                f"{spotlight(content, source='tool')}\n"
                 "===== 工具输出原文结束 ====="
             ),
         },

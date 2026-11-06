@@ -324,8 +324,11 @@ def test_deterministic_gates_consume_full_corpus_not_display_budget():
     display——防止未来回归到「机械闸门吃裁剪文本」（M1 复发面）。"""
     from pathlib import Path
 
-    src = Path(__file__).resolve().parent.parent / "app" / "services" / "agent_loop.py"
-    text = src.read_text(encoding="utf-8")
+    base = Path(__file__).resolve().parent.parent / "app" / "services"
+    text = "\n".join(
+        (base / name).read_text(encoding="utf-8")
+        for name in ("agent_loop.py", "agent_loop_audit.py", "agent_loop_orchestrator.py")
+    )
     assert 'evidence_text=_evidence_full or ""' in text
     assert "_apply_numeric_gate(verdict, problem, _evidence_full)" in text
     assert "_apply_claim_grounding_gate(verdict, problem, _claims, _evidence_full)" in text

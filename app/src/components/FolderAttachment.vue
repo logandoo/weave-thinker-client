@@ -11,7 +11,7 @@
     </div>
     <button class="folder-download" title="下载文件夹 (zip)" @click.stop="downloadZip">⬇</button>
   </div>
-  <FolderBrowserDialog v-if="open" :folder="folder" @close="open = false" />
+  <FolderBrowserDialog v-if="open" :folder="folder" :device-id="deviceId" @close="open = false" />
 </template>
 
 <script setup lang="ts">
@@ -21,15 +21,18 @@ import FolderBrowserDialog from './FolderBrowserDialog.vue'
 import { buildZipUrl } from '@/api/workspaceFiles'
 import { downloadUrl } from '@/composables/useDownload'
 import { formatSize, workspaceRelPath } from '@/composables/filePreview'
+import { useToast } from '@/composables/useToast'
 
-const props = defineProps<{ folder: FolderAttachment }>()
+const props = defineProps<{ folder: FolderAttachment; deviceId?: string | null }>()
 
+const { show: showToast } = useToast()
 const open = ref(false)
 
 async function downloadZip() {
+  // W19 P1：设备端 fs/zip 代理已通——两态同链；workspaceRelPath=绝对路径归一化（本地 hunk 保留）
   const rel = workspaceRelPath(props.folder.rel_path || props.folder.path)
   if (!rel) return
-  await downloadUrl(buildZipUrl(rel), `${props.folder.name || 'folder'}.zip`)
+  await downloadUrl(buildZipUrl(rel, props.deviceId), `${props.folder.name || 'folder'}.zip`)
 }
 </script>
 

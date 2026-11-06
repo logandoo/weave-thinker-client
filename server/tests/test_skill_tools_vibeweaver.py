@@ -175,3 +175,27 @@ def test_config_resolve_resource_frozen_priority(monkeypatch, tmp_path):
     (local / "skills" / "x.txt").write_text("local", encoding="utf-8")
     assert cfg.resolve_resource("skills") == (local / "skills").resolve()
     assert cfg.resolve_resource("skills", bundled_first=True) == (bundled / "skills").resolve()
+
+
+def test_force_inject_delivery_contract_present(monkeypatch):
+    """判据#3（2026-10-17，conv 6871cf68 退化出货事故）：force-inject 注入块
+    必须携带交付契约——工作流仪式产物（[Verification Gate] 行 / 验收完成表 /
+    cap=5 行 / [Convergence] 等）是流程证据，绝不作为用户可见最终回答正文。
+
+    事故：旅行问答被 NPG 误伤打回后，模型把 vibeweaver 的 [Verification Gate]
+    完成表当最终回答出货（用户看到仪式表格而非路线答案）。"""
+    async def scenario():
+        skill_tools._SKILL_PROMPT_CACHE.clear()
+        monkeypatch.setattr(
+            "app.tools.skill_tools.get_config",
+            lambda: type("C", (), {
+                "agent_skills_force_inject": ["vibeweaver"],
+                "agent_skills_force_inject_max_chars": 60000,
+            })(),
+        )
+        return await skill_tools.build_skills_system_prompt(None)
+
+    p = asyncio.run(scenario())
+    assert "交付契约" in p, "注入块缺交付契约（仪式产物不得作为用户可见回答）"
+    assert "不得作为用户可见" in p and "最终回答" in p, "交付契约缺核心禁令"
+    assert "[Verification Gate]" in p, "交付契约未点名仪式产物"

@@ -40,9 +40,20 @@ const um = S('src/composables/useMarkdown.ts');
 check('P4 useMarkdown import apiUrl', /import\s*\{[^}]*\bapiUrl\b[^}]*\}\s*from\s*'@\/api\/base'/.test(um));
 check('P4b useMarkdown callsite apiUrl(', um.includes('apiUrl(`'));
 
-// 5) useVoiceDuplex：settle 守卫（1013 不挂起）
+// 5) useVoiceDuplex：连接 close/timeout 的 per-promise settled 守卫（1013 不挂起）。
+// W36 上游 connect 重写后旧的 settleErr 辅助函数被内联 settled 取代；语义守卫改为
+// “有 per-promise settled + onclose 拒绝 + 统一 handleSocketClose（重连/1013 分流）”。
 const voice = S('src/composables/useVoiceDuplex.ts');
-check('P5 useVoiceDuplex settleErr 守卫在行', voice.includes('settleErr'));
+check('P5 useVoiceDuplex close/timeout per-promise settled 守卫在行',
+  voice.includes('handleSocketClose') && voice.includes('if (!settled)') && voice.includes('ws.onclose'));
+
+// 5b) 笔记保存/导出/刷新必须覆盖「图片仍在上传」窗口（W36 评审 Minor #2）
+const noteEditor = S('src/components/NoteEditor.vue');
+const zenNote = S('src/components/ZenNotePanel.vue');
+check('P7 NoteEditor export+refresh 含 hasPendingImageUpload 守卫',
+  (noteEditor.match(/hasPendingImageUpload/g) || []).length >= 6);
+check('P8 ZenNotePanel export+refresh 含 hasPendingImageUpload 守卫',
+  (zenNote.match(/hasPendingImageUpload/g) || []).length >= 3);
 
 // 6) package.json：本地测试入口在位
 const pkg = S('package.json');

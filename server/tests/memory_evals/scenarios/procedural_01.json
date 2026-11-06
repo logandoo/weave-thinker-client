@@ -1,0 +1,70 @@
+{
+  "id": "procedural_01",
+  "category": "procedural",
+  "title": "程序性：记忆备份三步骤（步骤型记忆须整段召回）",
+  "query": "记忆库备份的步骤是什么？",
+  "stage0": {
+    "query_type": "semantic",
+    "keywords": [
+      "备份",
+      "步骤"
+    ]
+  },
+  "seed": {
+    "concepts": [
+      {
+        "id": "proc-backup",
+        "canonical_name": "记忆备份步骤",
+        "content": "记忆备份步骤：① 导出 agent_memories ② 校验哈希 ③ 归档到 output_files",
+        "memory_type": "procedural"
+      }
+    ],
+    "episodic": [
+      {
+        "id": "e-backup-noise",
+        "content": "[2026-10-01] 聊过备份话题"
+      }
+    ],
+    "subconscious": []
+  },
+  "fake_retrieval": {
+    "candidates": [
+      {
+        "id": "proc-backup",
+        "tier": "concept",
+        "score": 0.8,
+        "content": "记忆备份步骤：① 导出 agent_memories ② 校验哈希 ③ 归档到 output_files",
+        "metadata": {
+          "canonical_name": "记忆备份步骤",
+          "memory_type": "procedural"
+        }
+      },
+      {
+        "id": "e-backup-noise",
+        "tier": "episodic",
+        "score": 0.5,
+        "content": "[2026-10-01] 聊过备份话题",
+        "metadata": {
+          "valid_from": "2026-10-01"
+        }
+      }
+    ]
+  },
+  "expect": {
+    "hit_ids": [
+      "proc-backup"
+    ],
+    "hit_k": 3,
+    "forbidden_ids": [],
+    "llm_checks": [
+      {
+        "type": "answer_lists_all",
+        "value": "3"
+      },
+      {
+        "type": "answer_contains",
+        "value": "校验"
+      }
+    ]
+  }
+}

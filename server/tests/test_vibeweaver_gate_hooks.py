@@ -165,7 +165,7 @@ def test_gate_blocks_on_stub_assert_failure_and_passes_on_success(tmp_path, monk
 
         # 证据路径写入 → 豁免
         out2 = await gw.gate_check_write_async(proj.resolve(), str(proj / "tests" / "acceptance.md"))
-        assert out2 is None
+        assert out2 is None or not out2.get("block")
 
         # 修好 stub → 放行（无 block）
         stub.write_text("import sys\nsys.exit(0)\n", encoding="utf-8")

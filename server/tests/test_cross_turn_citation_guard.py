@@ -484,7 +484,9 @@ def test_map_gate_wrong_kind_left_to_llm():
 def test_audit_template_clarifies_entry_kind():
     """结构修复：审计模板已澄清「对照表条目即来源条目，细节在证据台账」。"""
     import app.services.agent_loop as m
+    import app.prompts.audit as audit_mod
     src = open(m.__file__, encoding="utf-8").read()
+    src += open(audit_mod.__file__, encoding="utf-8").read()
     assert "对照表条目即来源条目" in src
     assert "不构成编号错误" in src
 

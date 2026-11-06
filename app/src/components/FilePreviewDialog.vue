@@ -199,11 +199,22 @@ function releaseOfficeHtml() {
 // Guards the async HTML fetch: incremented on every content (re)load and on
 // unmount so a late-resolving response can never store a blob URL on a dead
 // or superseded component (each unrevoked URL pins the whole document).
+// W23 评审 C1：设备 URL 嗅探必须容错绝对（apiUrl 包裹后）形式——
+// /api/devices/<id>/... 出现在任意 origin 的 path 里都算设备上下文。
+function deviceIdOfUrl(url: string | undefined | null): string | null {
+  const m = (url || '').match(/\/api\/devices\/([^/]+)\//)
+  return m ? decodeURIComponent(m[1]) : null
+}
+
 let officeHtmlLoadId = 0
 let unmounted = false
 
 const renderedHtml = computed(() =>
-  kind.value === 'markdown' ? renderMarkdownToHtml(textContent.value) : ''
+  kind.value === 'markdown'
+    ? renderMarkdownToHtml(textContent.value, {
+        deviceId: deviceIdOfUrl(props.url),
+      })
+    : ''
 )
 
 async function loadText() {
@@ -239,11 +250,14 @@ async function loadOfficeComponent(): Promise<Component> {
  */
 async function loadOffice() {
   const source = officeSource.value
+  // W19 P1：设备上下文走设备端 LibreOffice 转换代理（fs/office-* RPC）；
+  // 失败仍回退客户端渲染器（fetch(props.url) 取设备字节）。
+  const deviceId = deviceIdOfUrl(props.url)
   if (source) {
     if (kind.value === 'excel') {
       const loadId = ++officeHtmlLoadId
       try {
-        const res = await fetch(buildOfficeHtmlUrl(source))
+        const res = await fetch(buildOfficeHtmlUrl(source, deviceId))
         if (res.ok) {
           const html = await res.text()
           if (unmounted || loadId !== officeHtmlLoadId) return
@@ -261,7 +275,7 @@ async function loadOffice() {
       if (unmounted || loadId !== officeHtmlLoadId) return
     }
     try {
-      const res = await fetch(buildOfficePdfUrl(source))
+      const res = await fetch(buildOfficePdfUrl(source, deviceId))
       if (res.ok) {
         pdfBytes.value = await res.arrayBuffer()
         officeMode.value = 'server'

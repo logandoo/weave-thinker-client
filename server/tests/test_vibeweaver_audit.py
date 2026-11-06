@@ -113,7 +113,10 @@ def test_loop_finding_clean_text():
 def _mk_root(tmp_path):
     root = tmp_path / "proj"
     (root / "tests").mkdir(parents=True)
-    (root / "tests" / "verification_log.md").write_text("- iter 1 PASS: c1\n", encoding="utf-8")
+    (root / "tests" / "verification_log.md").write_text(
+        "- iter 1 PASS: c1\n- final-run: --final — pass=5/fail=0\n"
+        "- assert-run: assert_artifacts.py: pass=5/fail=0\n", encoding="utf-8"
+    )
     return root
 
 
@@ -130,7 +133,10 @@ def _gate_content(extra=""):
 
 def test_audit_final_output_ok_bad_skip(tmp_path):
     root = _mk_root(tmp_path)
-    (root / "tests" / "verification_log.md").write_text("- iter 1 PASS: c1\n", encoding="utf-8")
+    (root / "tests" / "verification_log.md").write_text(
+        "- iter 1 PASS: c1\n- final-run: --final — pass=5/fail=0\n"
+        "- assert-run: assert_artifacts.py: pass=5/fail=0\n", encoding="utf-8"
+    )
     (root / "tests" / "assert_artifacts.py").write_text("print(1)\n", encoding="utf-8")
     ok = aw.audit_final_output(_gate_content(), root)
     assert ok["verdict"] == "ok", ok

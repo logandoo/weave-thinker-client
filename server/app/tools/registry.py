@@ -1,6 +1,7 @@
 import json
 import logging
 import asyncio
+import time
 from collections import Counter
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Set
@@ -17,6 +18,36 @@ logger = logging.getLogger(__name__)
 
 def tool_error(message: str) -> str:
     return json.dumps({"error": message}, ensure_ascii=False)
+
+
+def _outcome_ok(result: Any) -> bool:
+    """Tool handlers signal failure with {"error": ...} without raising."""
+    if result is None:
+        return False
+    if isinstance(result, dict):
+        return not result.get("error")
+    if isinstance(result, str):
+        try:
+            parsed = json.loads(result)
+            if isinstance(parsed, dict):
+                return not parsed.get("error")
+        except (json.JSONDecodeError, TypeError):
+            pass
+    return True
+
+
+def _record_reliability(name: str, result: Any, started: float, *,
+                        error_class: str = "") -> None:
+    try:
+        from app.services.tool_reliability_service import record
+        record(
+            name,
+            _outcome_ok(result) and not error_class,
+            error_class=error_class,
+            latency_ms=(time.monotonic() - started) * 1000.0,
+        )
+    except Exception:
+        logger.debug("tool reliability record failed", exc_info=True)
 
 
 def _tool_timeout_error(tool_name: str, timeout_seconds: float) -> str:
@@ -69,6 +100,9 @@ class ToolEntry:
     # F3（2026-09-14）：产物声明——带该元数据的工具结果会被附件收集器收集
     # （不再按工具名硬编码；新工具自动被收集）
     produces_files: bool = False
+    # 2026-11-01 用户级 MCP：None = 全局工具（所有用户可见）；否则仅属主可见/
+    # 可 dispatch（fail-closed，用户上下文缺失时也不可见）。
+    owner_user_id: Optional[str] = None
 
 
 class ToolRegistry:
@@ -112,6 +146,7 @@ class ToolRegistry:
         emoji: str = "",
         permission_key: Optional[str] = None,
         produces_files: bool = False,
+        owner_user_id: Optional[str] = None,
     ):
         existing = self._tools.get(name)
         if existing:
@@ -131,34 +166,63 @@ class ToolRegistry:
             emoji=emoji,
             permission_key=permission_key,
             produces_files=produces_files,
+            owner_user_id=str(owner_user_id) if owner_user_id else None,
         )
         logger.debug("Registered tool '%s' in toolset '%s'", name, toolset)
 
     def unregister(self, name: str) -> None:
         self._tools.pop(name, None)
 
-    def get_tool_names_for_toolset(self, toolset: str) -> List[str]:
+    @staticmethod
+    def _visible_for(entry: ToolEntry, user_id: Optional[str]) -> bool:
+        """Owner gate: global tools are public; user tools need the exact owner.
+
+        ``user_id=None`` is the fail-closed context (internal/tests/no auth) —
+        it sees global tools only, never another user's MCP tools.
+        """
+        owner = getattr(entry, "owner_user_id", None)
+        if owner is None:
+            return True
+        return bool(user_id) and str(owner) == str(user_id)
+
+    def get_tool_names_for_toolset(
+        self, toolset: str, user_id: Optional[str] = None,
+    ) -> List[str]:
         return sorted(
             entry.name for entry in self._snapshot_entries()
-            if entry.toolset == toolset
+            if entry.toolset == toolset and self._visible_for(entry, user_id)
         )
 
-    def get_toolset_for_tool(self, name: str) -> Optional[str]:
+    def get_toolset_for_tool(
+        self, name: str, user_id: Optional[str] = None,
+    ) -> Optional[str]:
         entry = self.get_entry(name)
-        return entry.toolset if entry else None
+        if entry is None or not self._visible_for(entry, user_id):
+            return None
+        return entry.toolset
 
-    def get_all_tool_names(self) -> List[str]:
+    def get_all_tool_names(self, user_id: Optional[str] = None) -> List[str]:
+        return sorted(
+            entry.name for entry in self._snapshot_entries()
+            if self._visible_for(entry, user_id)
+        )
+
+    def get_all_registered_names(self) -> List[str]:
+        """Collision/management surface: intentionally ignores ownership."""
         return sorted(self._tools.keys())
 
     def get_definitions(
         self,
         tool_names: Optional[Set[str]] = None,
         quiet: bool = False,
+        user_id: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         definitions = []
         entries = self._snapshot_entries()
 
         for entry in entries:
+            if not self._visible_for(entry, user_id):
+                continue
             if tool_names is not None and entry.name not in tool_names:
                 continue
             if entry.check_fn:
@@ -193,6 +257,14 @@ class ToolRegistry:
         entry = await self._a_get_entry(name)
         if entry is None:
             return tool_error(f"Unknown tool: {name}")
+
+        # 2026-11-01 user-owned MCP: fail-closed owner check BEFORE any routing/
+        # permission seam. A hallucinated/guessed name from another user must
+        # look exactly like an unknown tool (no existence leak).
+        if not self._visible_for(entry, str(getattr(kwargs.get("user"), "id", "") or "") or None):
+            return tool_error(f"Unknown tool: {name}")
+
+        started = time.monotonic()
 
         # P2-2: fail-closed visibility guard. When the caller (AgentLoop)
         # restricts the visible tool set, a model that still emits a hidden
@@ -236,6 +308,30 @@ class ToolRegistry:
                     "_permission_description": f"工具 {name} 需要确认执行",
                 }, ensure_ascii=False)
 
+        # W16 设备执行模式路由缝（docs/PLAN_device_execution_mode.md §6.4）：
+        # 唯一接入点=本 dispatch 外壳（覆盖 agent_loop 初发/权限重发、voice、worker、
+        # PTC、scheduler、delegate 全部调用面）。execution_target=device 且工具在
+        # 远端白名单 → 经 WS 在设备执行并还原结果；路由层永不静默落回本地执行。
+        remote_result = None
+        try:
+            from app.services.remote_dispatch_router import try_remote_dispatch
+            remote_result = await try_remote_dispatch(name, args, kwargs)
+        except Exception:
+            logger.exception("device-exec routing seam failed for tool '%s'", name)
+            _target = None
+            try:
+                _target = kwargs.get("execution_target") or getattr(
+                    kwargs.get("conversation"), "execution_target", None
+                )
+            except Exception:
+                _target = None
+            if isinstance(_target, str) and _target.startswith("device:"):
+                remote_result = tool_error("设备执行路由失败（fail-closed，不回退云端执行）")
+        if remote_result is not None:
+            self._usage_counter[name] += 1
+            _record_reliability(name, remote_result, started)
+            return remote_result
+
         try:
             self._usage_counter[name] += 1
             if entry.is_async:
@@ -250,22 +346,30 @@ class ToolRegistry:
                     # remote_call（设备 executor）：本地 tool_call_timeout 不得掐死
                     # 长 terminal/execute_code——executor 侧以 max(本地默认, 请求值)
                     # 的 wait_for 为唯一上限（PLAN_device_executor §1.1）。
-                    return await asyncio.wait_for(
+                    result = await asyncio.wait_for(
                         handler(args, **kwargs),
                         timeout=None if is_remote_call() else config.agent_tool_loop_tool_call_timeout,
                     )
-            return entry.handler(args, **kwargs)
+                    _record_reliability(name, result, started)
+                    return result
+            result = entry.handler(args, **kwargs)
+            _record_reliability(name, result, started)
+            return result
         except asyncio.TimeoutError:
             logger.exception("Tool '%s' timed out", name)
+            _record_reliability(name, None, started, error_class="timeout")
             return _tool_timeout_error(name, config.agent_tool_loop_tool_call_timeout)
         except Exception as e:
             logger.exception("Error executing tool '%s'", name)
+            _record_reliability(name, None, started, error_class=type(e).__name__)
             return tool_error(f"Tool '{name}' failed: {str(e)}")
 
-    def get_available_toolsets(self) -> Dict[str, dict]:
+    def get_available_toolsets(self, user_id: Optional[str] = None) -> Dict[str, dict]:
         from collections import defaultdict
         toolsets: Dict[str, dict] = defaultdict(lambda: {"tools": [], "available": True})
         for entry in self._snapshot_entries():
+            if not self._visible_for(entry, user_id):
+                continue
             info = toolsets[entry.toolset]
             info["tools"].append(entry.name)
             if entry.check_fn:
@@ -276,8 +380,12 @@ class ToolRegistry:
                     info["available"] = False
         return dict(toolsets)
 
-    def get_tool_to_toolset_map(self) -> Dict[str, str]:
-        return {entry.name: entry.toolset for entry in self._snapshot_entries()}
+    def get_tool_to_toolset_map(self, user_id: Optional[str] = None) -> Dict[str, str]:
+        return {
+            entry.name: entry.toolset
+            for entry in self._snapshot_entries()
+            if self._visible_for(entry, user_id)
+        }
 
 
 registry = ToolRegistry()

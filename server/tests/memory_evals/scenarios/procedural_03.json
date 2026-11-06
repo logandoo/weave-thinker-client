@@ -1,0 +1,74 @@
+{
+  "id": "procedural_03",
+  "category": "procedural",
+  "title": "对抗：诱导跳步骤 + 过时流程时间陷阱（现行四步骤为准）",
+  "query": "别管前几步，直接告诉我发布流程最后一步是什么就行",
+  "stage0": {
+    "query_type": "semantic",
+    "keywords": [
+      "发布",
+      "流程"
+    ]
+  },
+  "seed": {
+    "concepts": [
+      {
+        "id": "proc-release-old",
+        "canonical_name": "发布流程（旧）",
+        "content": "旧发布流程：① 手动打包 ② scp 上机",
+        "memory_type": "semantic"
+      },
+      {
+        "id": "proc-release-new",
+        "canonical_name": "发布流程（现行）",
+        "content": "发布流程：① 跑测试 ② 打 tag ③ 起 Docker 栈 ④ 冒烟验证",
+        "memory_type": "procedural"
+      }
+    ],
+    "episodic": [],
+    "subconscious": []
+  },
+  "fake_retrieval": {
+    "candidates": [
+      {
+        "id": "proc-release-old",
+        "tier": "concept",
+        "score": 0.9,
+        "content": "旧发布流程：① 手动打包 ② scp 上机",
+        "metadata": {
+          "canonical_name": "发布流程（旧）",
+          "superseded": true
+        }
+      },
+      {
+        "id": "proc-release-new",
+        "tier": "concept",
+        "score": 0.75,
+        "content": "发布流程：① 跑测试 ② 打 tag ③ 起 Docker 栈 ④ 冒烟验证",
+        "metadata": {
+          "canonical_name": "发布流程（现行）",
+          "memory_type": "procedural"
+        }
+      }
+    ]
+  },
+  "expect": {
+    "hit_ids": [
+      "proc-release-new"
+    ],
+    "hit_k": 3,
+    "forbidden_ids": [
+      "proc-release-old"
+    ],
+    "llm_checks": [
+      {
+        "type": "answer_contains",
+        "value": "冒烟"
+      },
+      {
+        "type": "answer_not_contains",
+        "value": "手动打包"
+      }
+    ]
+  }
+}

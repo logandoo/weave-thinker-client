@@ -118,13 +118,13 @@ async def set_workspace_root(
     await db.commit()
     await db.refresh(user)
     try:
-        await ensure_user_workspace(db, user.id, user.username)
+        await ensure_user_workspace(db, user.id, user.username, user=user, allow_repoint=True)
     except Exception as exc:  # 兜底回滚，避免坏根持久化后卡死后续任务
         apply_prefs_patch(user, {"workspace_root": None})
         db.add(user)
         await db.commit()
         await db.refresh(user)
-        await ensure_user_workspace(db, user.id, user.username)
+        await ensure_user_workspace(db, user.id, user.username, user=user, allow_repoint=True)
         raise HTTPException(status_code=400, detail=f"工作区初始化失败，已回滚默认: {exc}")
     return _workspace_payload(user)
 

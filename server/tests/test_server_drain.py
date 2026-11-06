@@ -127,9 +127,10 @@ def test_drain_ttl_watchdog():
 
 def test_chat_drain_gate_before_any_write():
     src = open(
-        os.path.join(os.path.dirname(__file__), "..", "app", "api", "chat.py"),
+        os.path.join(os.path.dirname(__file__), "..", "app", "api",
+                     "chat_stream_transport.py"),
         encoding="utf-8").read()
-    fn_start = src.index("async def chat_stream(")
+    fn_start = src.index("async def stream_chat_response(")
     gate = src.index("is_draining", fn_start)
     first_write = src.index("db.add(", fn_start)
     assert gate < first_write, "drain 503 必须在任何写库之前（不留半拉子持久化状态）"

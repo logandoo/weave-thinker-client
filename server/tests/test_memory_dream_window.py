@@ -47,6 +47,10 @@ class FakeDreamSession:
         p = params or {}
         if "FROM memory_clarifications" in sql:
             return _R([])
+        # W1-3/W3-2（2026-10-23）：dream 写入前收集来源 source_trust（派生
+        # taint 继承最严——fixture 补新 SQL 面，不动既有断言）
+        if "FROM memory_concepts" in sql and "DISTINCT source_trust" in sql:
+            return _R([('user_stated',)])
         if "FROM memory_concepts" in sql and "LIMIT 30" in sql:
             return _R([('今日新概念X',)])
         if "FROM memory_concepts" in sql and "COALESCE(last_recalled_at, created_at) < :since" in sql:

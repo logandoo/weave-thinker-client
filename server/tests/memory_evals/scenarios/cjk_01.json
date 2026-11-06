@@ -1,0 +1,66 @@
+{
+  "id": "cjk_01",
+  "category": "cjk",
+  "title": "全中文：书法练习计划召回 + CJK 注入 token 上限",
+  "query": "我之前说过的书法练习计划是怎样的？",
+  "stage0": {
+    "query_type": "semantic",
+    "keywords": [
+      "书法",
+      "练习"
+    ]
+  },
+  "seed": {
+    "concepts": [
+      {
+        "id": "cjk-plan",
+        "canonical_name": "书法练习计划",
+        "content": "书法练习计划：每天临帖半小时，周末完成一幅完整作品",
+        "memory_type": "semantic"
+      }
+    ],
+    "episodic": [],
+    "subconscious": [
+      {
+        "id": "cjk-noise",
+        "content": "刚才的命令输出乱码：锟斤拷烫烫烫"
+      }
+    ]
+  },
+  "fake_retrieval": {
+    "candidates": [
+      {
+        "id": "cjk-plan",
+        "tier": "concept",
+        "score": 0.8,
+        "content": "书法练习计划：每天临帖半小时，周末完成一幅完整作品",
+        "metadata": {
+          "canonical_name": "书法练习计划"
+        }
+      },
+      {
+        "id": "cjk-noise",
+        "tier": "subconscious",
+        "score": 0.5,
+        "content": "刚才的命令输出乱码：锟斤拷烫烫烫",
+        "metadata": {
+          "created_at": "2026-10-13"
+        }
+      }
+    ]
+  },
+  "expect": {
+    "hit_ids": [
+      "cjk-plan"
+    ],
+    "hit_k": 3,
+    "forbidden_ids": [],
+    "max_injected_tokens": 160,
+    "llm_checks": [
+      {
+        "type": "answer_contains",
+        "value": "临帖"
+      }
+    ]
+  }
+}

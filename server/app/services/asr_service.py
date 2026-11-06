@@ -2,7 +2,6 @@ import asyncio
 import base64
 import json
 import logging
-import os
 import struct
 import uuid
 import time
@@ -328,8 +327,9 @@ class ASRService:
         return bool(self._asr_config.get("hotword_phonetic_correction", True))
 
     def get_audio_files_dir(self) -> Path:
-        backend_dir = Path(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
-        audio_dir = backend_dir / "audio_files"
+        # 可写基址：config.backend_root（打包态=<userData>/localstack/app；开发态=server/，
+        # 路径与旧实现一致）。LINUX_DEB_UPSTREAM_FIXES 缺陷 2。
+        audio_dir = Path(get_config().backend_root) / "audio_files"
         audio_dir.mkdir(parents=True, exist_ok=True)
         return audio_dir
 

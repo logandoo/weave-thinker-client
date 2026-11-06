@@ -150,7 +150,10 @@ def test_history_preload():
         _unregister_fakes()
 
 
-def test_empty_pool_drops_search_tools():
+def test_empty_pool_drops_search_tools(monkeypatch):
+    # 2026-10-18: isolate the new full-catalog flag; this test pins the
+    # MCP-progressive rollback surface, not the catalog surface.
+    monkeypatch.setitem(config.agent, "tools_catalog_discovery_enabled", False)
     mcp_names = [n for n, ts in registry.get_tool_to_toolset_map().items()
                  if ts and ts.startswith("mcp-")]
     saved = {}

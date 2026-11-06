@@ -387,10 +387,11 @@ def test_draft_never_windowed_full_coverage_contract():
     - 审计 prompt 中草稿永远逐字全文；
     - 超巨型草稿走 `_chunked_full_audit` 分块全覆盖（零省略）。
     """
-    src = open(
-        os.path.join(os.path.dirname(__file__), "..", "app", "services", "agent_loop.py"),
-        encoding="utf-8",
-    ).read()
+    _dir = os.path.join(os.path.dirname(__file__), "..", "app", "services")
+    src = "\n".join(
+        open(os.path.join(_dir, name), encoding="utf-8").read()
+        for name in ("agent_loop.py", "agent_loop_audit.py", "agent_loop_orchestrator.py")
+    )
     assert "_draft_audit_view" not in src, "草稿窗口函数必须删除（截断审计=断章取义）"
     assert "_AUDIT_DRAFT_WINDOW_TOKENS" not in src
     assert "窗口为头+尾" not in src
@@ -399,10 +400,11 @@ def test_draft_never_windowed_full_coverage_contract():
 
 
 def test_auditor_template_has_draft_full_coverage_rule():
-    src = open(
-        os.path.join(os.path.dirname(__file__), "..", "app", "services", "agent_loop.py"),
-        encoding="utf-8",
-    ).read()
+    _dir = os.path.join(os.path.dirname(__file__), "..", "app", "services")
+    src = "\n".join(
+        open(os.path.join(_dir, name), encoding="utf-8").read()
+        for name in ("agent_loop.py", "agent_loop_audit.py", "agent_loop_orchestrator.py")
+    )
     assert "草稿全文纪律" in src, "模板必须携带草稿全文/分块全覆盖纪律"
     assert "草稿窗口截断纪律" not in src, "旧窗口截断纪律必须移除"
     assert "_audit_tools[:8]" not in src, "工具名单不得再截到前 8 个"
@@ -523,10 +525,11 @@ def test_judge_done_steps_disclosure(tmp_path):
 def test_draft_full_text_regardless_of_mixed_content():
     """2026-10-06 用户红线：CJK/ASCII 混合长草稿不再做任何窗口测量收缩——
     审计输入恒为逐字全文（行为级断言在 test_audit_full_draft.py）。"""
-    src = open(
-        os.path.join(os.path.dirname(__file__), "..", "app", "services", "agent_loop.py"),
-        encoding="utf-8",
-    ).read()
+    _dir = os.path.join(os.path.dirname(__file__), "..", "app", "services")
+    src = "\n".join(
+        open(os.path.join(_dir, name), encoding="utf-8").read()
+        for name in ("agent_loop.py", "agent_loop_audit.py", "agent_loop_orchestrator.py")
+    )
     assert "上下文上限：草稿窗口进一步缩小" not in src, "守卫不得再缩小草稿窗口"
     assert "先收起证据正文" in src or "证据正文因上下文上限未展开" in src
 
@@ -535,6 +538,10 @@ def test_reserve_is_true_bound_and_guard_present():
     import app.services.agent_loop as al
     assert al._AUDIT_NON_EVIDENCE_RESERVE_TOKENS >= 50000
     src = open(al.__file__, encoding="utf-8").read()
+    audit_src = open(
+        os.path.join(os.path.dirname(al.__file__), "agent_loop_audit.py"),
+        encoding="utf-8").read()
+    src += "\n" + audit_src
     assert "audit_prompt_guard" in src, "发送前硬守卫缺失"
     assert "另有 {len(_audit_tools) - 40} 次调用未列名" in src, "工具名上限必须披露余量"
 

@@ -31,13 +31,17 @@ def remote_call_scope() -> Iterator[None]:
         _remote_call.reset(token)
 
 
-def super_admin_bypass_effective() -> bool:
-    """config.super_admin_bypass 的生效值：remote_call 下恒 False。"""
+def super_admin_bypass_effective(cfg: Any = None) -> bool:
+    """config.super_admin_bypass 的生效值：remote_call 下恒 False。
+
+    ``cfg`` 可注入（缺省 get_config()）：调用方模块传自己的模块级 config 引用，
+    保留 monkeypatch 注入接缝（如 test_tenant_namespace_p2 注入 terminal.config）。"""
     if _remote_call.get():
         return False
     from app.core.config import get_config
 
-    return bool(get_config().super_admin_bypass)
+    c = cfg if cfg is not None else get_config()
+    return bool(getattr(c, "super_admin_bypass", False))
 
 
 def permission_sentinel_effective(args: Dict[str, Any]) -> bool:

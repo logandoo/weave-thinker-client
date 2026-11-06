@@ -126,6 +126,108 @@ class FakeDB:
 
 # ── C5: 计划生成器必须看到完整盘问 Q&A（形状错配修复）─────────────────────
 
+def test_goal_synthesis_preserves_original_requirements_without_llm_rewrite():
+    original = "创建 dm.txt，内容为 ALPHA\\nBETA\\nGAMMA\\n，总字节数 17，不得增加其他约束。"
+    tasks = [SimpleNamespace(
+        context=json.dumps({
+            "original_query": original,
+            "question": "如何写入？",
+            "recommendation": "用 printf 写入并回读",
+        }),
+        goal="如何写入？",
+        result="按推荐执行，保持原始要求，不增加额外范围。",
+    )]
+
+    class FakeLLM:
+        def stream_chat_structured(self, *a, **k):
+            async def events():
+                yield {"type": "content", "data": "创建 dm.txt，但总字节数改为 16，并新增 verify.json。"}
+            return events()
+
+    conv = _conv()
+    mgr = _mgr(conv)
+    mgr._make_llm = lambda: FakeLLM()
+    goal = _run(mgr._synthesize_goal_from_answers(FakeDB([tasks])))
+    assert "总字节数 17" in goal, "原始硬约束必须逐字保留，不能被合成模型改写"
+    assert "总字节数改为 16" not in goal, "合成摘要不得把幻觉约束写回权威目标"
+    assert "按推荐执行，保持原始要求" in goal, "真实盘问回答仍应保留"
+
+
+def test_goal_synthesis_preserves_actual_decisions_defaults_and_bounds():
+    original = "原始目标为 3000 字。"
+    tasks = []
+    for i in range(12):
+        tasks.append(SimpleNamespace(
+            context=json.dumps({
+                "original_query": original,
+                "question": f"第{i}个决策？",
+                "recommendation": f"推荐值-{i}" + "长" * 200,
+            }),
+            goal=f"第{i}个决策？",
+            result=("最终改为 5000 字" if i == 11 else f"实际回答-{i}" + "答" * 120),
+        ))
+    conv = _conv(deathmatch_grilling_qa_history=[
+        {"round": 2, "readiness": {"assumed_defaults": ["默认 UTF-8 无 BOM"]}},
+    ])
+    mgr = _mgr(conv)
+    goal = _run(mgr._synthesize_goal_from_answers(FakeDB([tasks])))
+    assert "最终改为 5000 字" in goal
+    assert "默认 UTF-8 无 BOM" in goal
+    assert "实际回答为最终决策" in goal
+    assert len(goal) <= 6500, f"目标必须有界，当前 {len(goal)}"
+    assert goal.index("原始目标为 3000 字") < goal.index("最终改为 5000 字"), "原始基线必须先进入验收标准窗口，随后仍保留最新决策"
+
+
+def test_grilling_completion_defers_criteria_and_plan_until_after_active_frame():
+    import inspect
+    from pathlib import Path
+    from app.services.deathmatch_grilling_flow import DeathmatchGrillingFlowMixin
+
+    flow_src = inspect.getsource(DeathmatchGrillingFlowMixin)
+    assert "_synthesize_acceptance_criteria()" not in flow_src, "回答端不得再阻塞验收标准生成"
+    assert "generate_goal_plan(" not in flow_src, "回答端不得再阻塞计划生成"
+    assert "_draft_bible_from_grilling(" not in flow_src, "回答端不得再阻塞 creative 判定或 bible 生成"
+    assert "if current_round >= 2 and qa_pairs and should_continue:" in flow_src, "最终轮不得为无谓 readiness 阻塞 active；提前收束仍须判读"
+
+    transport = Path(__file__).with_name("..").joinpath("app/api/chat_stream_transport.py").read_text(encoding="utf-8")
+    assert "await _deathmatch_mgr._ensure_grilling_readiness_for_contract(task_db)" in transport, "最终轮/zombie readiness 必须进入 active 后懒合同"
+    assert "await _deathmatch_mgr._draft_bible_from_grilling(" in transport, "bible 草拟必须进入 kickoff 懒合同"
+    assert 'if not getattr(task_conversation, "deathmatch_bible_draft", None):' in transport, "已有 bible draft 时不得重复生成或覆盖"
+    assert "await _ensure_creative_judged(" in transport, "已有 draft 时也必须独立恢复 creative 判定"
+    readiness_call = transport.index("await _deathmatch_mgr._ensure_grilling_readiness_for_contract(task_db)")
+    goal_refresh = transport.index("await _deathmatch_mgr._refine_goal_with_readiness_if_needed(task_db)")
+    creative_call = transport.index("await _ensure_creative_judged(")
+    draft_guard = transport.index('if not getattr(task_conversation, "deathmatch_bible_draft", None):')
+    draft_call = transport.index("await _deathmatch_mgr._draft_bible_from_grilling(")
+    criteria_call = transport.index("await _deathmatch_mgr._synthesize_acceptance_criteria()")
+    plan_call = transport.index("await _deathmatch_mgr.generate_goal_plan(")
+    assert transport.count("if not _deathmatch_mgr.is_goal_active:") >= 2, "criteria 失败转为 paused 后必须在 plan 前重新检查 active"
+    paused_agent_guard = transport.index('task_conversation.deathmatch_status == "paused"')
+    agent_drive = transport.index("await _drive_agent_events(run)")
+    assert paused_agent_guard < agent_drive, "paused 必须在任何 Agent/工具执行前终止"
+    assert readiness_call < goal_refresh < creative_call < draft_guard < draft_call < criteria_call < plan_call, "补算 readiness 后必须先重建权威 goal，再做 creative/criteria/plan"
+    initial_frame = transport.index('await _put({"deathmatch_verdict": _dm_init})')
+    lazy_call = transport.index("await _ensure_deathmatch_contract()")
+    assert initial_frame < lazy_call, "首个 active 帧必须先于懒合同生成调用"
+    assert transport.count("await _ensure_deathmatch_contract()") >= 2, "正常 kickoff 与 zombie recovery 都必须懒生成合同"
+    assert "_replace_deathmatch_plan_directive(messages_for_model, plan_directive)" in transport, "首轮 Agent 必须收到懒生成后的唯一新计划指令"
+
+
+def test_newest_first_history_reverses_rounds_and_within_round_answers():
+    conv = _conv(deathmatch_grilling_qa_history=[
+        {"round": 1, "qa_pairs": [
+            {"question": "最旧问题", "answer": "旧回答" + "长" * 100},
+            {"question": "次新问题", "answer": "次新回答"},
+        ]},
+        {"round": 2, "qa_pairs": [
+            {"question": "较新问题", "answer": "较新回答" + "长" * 100},
+            {"question": "最新问题", "answer": "最新决策"},
+        ]},
+    ])
+    rendered = _mgr(conv)._format_history_for_prompt(newest_first=True)
+    assert rendered.index("最新决策") < rendered.index("较新回答") < rendered.index("次新回答") < rendered.index("旧回答")
+
+
 def test_flatten_grilling_qa_uses_round_qa_pairs_shape():
     flat = ds._flatten_grilling_qa(_HISTORY)
     assert flat, "history 条目是 {round, qa_pairs}，必须展开 qa_pairs"
@@ -346,9 +448,18 @@ def test_submit_round_early_stop_when_ready():
     conv = _conv(deathmatch_grilling_round=2, deathmatch_grilling_round_total=3)
     mgr = _mgr(conv)
     task = _pending_task("t1", "q9", "交付时间定在哪天？")
-    db = FakeDB(results=[[task], []])  # select pending → select completed
+    completed = [SimpleNamespace(
+        id="done-1", task_type="grilling", status="completed", goal="读者", result="技术管理层",
+        context=json.dumps({"question": "读者"}),
+    ), SimpleNamespace(
+        id="done-2", task_type="grilling", status="completed", goal="交付时间", result="月底",
+        context=json.dumps({"question": "交付时间"}),
+    )]
+    db = FakeDB(results=[[task], completed])
+    called = {"readiness": 0}
 
     async def fake_readiness(db_):
+        called["readiness"] += 1
         return {"should_continue": False, "reason": "已足够", "open_decisions": [],
                 "vague_dimensions": [], "assumed_defaults": ["按月底交付"],
                 "diminishing_returns": False}
@@ -483,14 +594,22 @@ def test_submit_round_degrades_to_synthesis_when_question_gen_fails():
     assert conv.deathmatch_grilling_round == 1, "降级收束不得留下虚高轮次（r2 cosmetic）"
 
 
-def test_final_round_still_records_readiness():
-    """Important 2：最后一轮也必须判读并落档 readiness（无静默假设）。"""
+def test_final_round_defers_readiness_until_after_active_contract():
+    """最终轮不再用 readiness 决定是否继续，必须先显示 active 再补算。"""
     conv = _conv(deathmatch_grilling_round=3, deathmatch_grilling_round_total=3)
     mgr = _mgr(conv)
     task = _pending_task("t1", "q9", "交付时间？", round_=3)
-    db = FakeDB(results=[[task], []])
+    db = FakeDB(results=[[task], [SimpleNamespace(
+        id="done-1", task_type="grilling", status="completed", goal="旧问题", result="旧回答",
+        context=json.dumps({"question": "旧问题"}),
+    ), SimpleNamespace(
+        id="done-2", task_type="grilling", status="completed", goal="交付时间？", result="月底",
+        context=json.dumps({"question": "交付时间？"}),
+    )]])
+    called = {"readiness": 0}
 
     async def fake_readiness(db_):
+        called["readiness"] += 1
         return {"should_continue": True, "reason": "", "open_decisions": [],
                 "vague_dimensions": [], "assumed_defaults": ["按月底交付"],
                 "diminishing_returns": False}
@@ -500,14 +619,17 @@ def test_final_round_still_records_readiness():
 
     mgr._grilling_readiness_report = fake_readiness
     mgr._synthesize_goal_from_answers = fake_synthesize
-    mgr._draft_bible_from_grilling = lambda *a, **k: asyncio.sleep(0)
-    mgr._synthesize_acceptance_criteria = lambda *a, **k: asyncio.sleep(0, result=[])
-    mgr.generate_goal_plan = lambda *a, **k: asyncio.sleep(0)
 
     result = _run(mgr.submit_grilling_round([{"task_id": "t1", "answer": "月底"}], db))
     assert result["status"] == "grilling_complete"
+    assert conv.deathmatch_status == "active"
+    assert called["readiness"] == 0, "最终轮 active 之前不得再阻塞 readiness LLM"
+    _run(mgr._ensure_grilling_readiness_for_contract(db))
+    assert called["readiness"] == 1
     assert mgr._latest_readiness().get("assumed_defaults") == ["按月底交付"], \
-        "最后一轮的 readiness 必须落档供目标合成/计划读取"
+        "active 后的同轮 readiness 必须落档供 criteria/plan 读取"
+    _run(mgr._ensure_grilling_readiness_for_contract(db))
+    assert called["readiness"] == 1, "同轮 readiness 不得重复生成"
 
 
 def test_failed_readiness_not_recorded():
@@ -631,9 +753,65 @@ def test_completion_memory_called_on_done_finalize():
 
 # ── 复核波（2026-09-25 晚）：盲区补漏 RED ─────────────────────────────────
 
-def test_zombie_recovery_records_readiness_before_synthesis():
-    """盲区 1：僵尸恢复路径（try_recover_stalled_grilling）也是目标合成路径，
-    必须先做 readiness 判读并落档（无静默假设覆盖所有合成入口）。"""
+def test_goal_refinement_retries_and_invalidates_derived_contract():
+    conv = _conv(
+        deathmatch_grilling_round=3,
+        deathmatch_goal="旧目标",
+        deathmatch_acceptance_criteria=[{"id": "old", "text": "旧标准"}],
+        deathmatch_plan={"steps": []},
+        deathmatch_bible_draft={"old.md": "旧稿"},
+        deathmatch_plan_version=4,
+        deathmatch_grilling_qa_history=[{
+            "round": 3,
+            "readiness": {"assumed_defaults": ["默认 UTF-8 无 BOM"]},
+        }],
+    )
+    mgr = _mgr(conv)
+    calls = {"n": 0}
+
+    async def flaky_synthesis(db_):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise RuntimeError("temporary synthesis failure")
+        return "原始目标\n【已采用的默认假设】\n- 默认 UTF-8 无 BOM"
+
+    mgr._synthesize_goal_from_answers = flaky_synthesis
+    with pytest.raises(RuntimeError):
+        _run(mgr._refine_goal_with_readiness_if_needed(None))
+    assert _run(mgr._refine_goal_with_readiness_if_needed(None)) is True, "报告已存在时也必须重试缺失的 goal defaults"
+    assert "默认 UTF-8 无 BOM" in conv.deathmatch_goal
+    assert conv.deathmatch_acceptance_criteria is None
+    assert conv.deathmatch_plan is None and conv.deathmatch_bible_draft is None
+    assert conv.deathmatch_plan_version == 5, "goal 更新必须使旧派生合同失效"
+    assert _run(mgr._refine_goal_with_readiness_if_needed(None)) is False
+    assert calls["n"] == 3, "确定性相同结果即收敛，不得重复改写或清空合同"
+    assert conv.deathmatch_plan_version == 5
+
+
+def test_goal_refinement_converges_even_when_defaults_are_truncated():
+    conv = _conv(
+        deathmatch_grilling_round=3,
+        deathmatch_goal="旧目标",
+        deathmatch_grilling_qa_history=[{
+            "round": 3,
+            "readiness": {"assumed_defaults": ["超长默认" + "x" * 8000]},
+        }],
+    )
+    mgr = _mgr(conv)
+    calls = {"n": 0}
+
+    async def truncated_synthesis(db_):
+        calls["n"] += 1
+        return "有界目标（尾部 defaults 已截断）"
+
+    mgr._synthesize_goal_from_answers = truncated_synthesis
+    assert _run(mgr._refine_goal_with_readiness_if_needed(None)) is True
+    assert _run(mgr._refine_goal_with_readiness_if_needed(None)) is False, "相同的有界合成结果必须收敛，不能因全文 defaults 不在目标中而无限重建"
+    assert calls["n"] == 2
+
+
+def test_zombie_recovery_defers_readiness_until_after_active_contract():
+    """僵尸恢复同样先显示 active，再在懒合同中补同轮 readiness。"""
     conv = _conv(deathmatch_grilling_round=3, deathmatch_grilling_round_total=3)
     mgr = _mgr(conv)
     t1 = SimpleNamespace(
@@ -648,11 +826,12 @@ def test_zombie_recovery_records_readiness_before_synthesis():
         context=json.dumps({"question_id": "z2", "question": "问题二",
                             "grilling_round": 3}, ensure_ascii=False),
     )
-    db = FakeDB(results=[[], [t1, t2]])  # pending 查询 → completed 查询
+    db = FakeDB(results=[[], [t1, t2], [t1, t2]])  # pending → completed → active 后补算查询
     called = {"readiness": 0}
 
     async def fake_readiness(db_):
         called["readiness"] += 1
+        called["history"] = mgr._format_history_for_prompt()
         return {"should_continue": False, "reason": "", "open_decisions": [],
                 "vague_dimensions": [], "assumed_defaults": ["按月底交付"],
                 "diminishing_returns": False}
@@ -668,9 +847,13 @@ def test_zombie_recovery_records_readiness_before_synthesis():
 
     ok = _run(mgr.try_recover_stalled_grilling(db))
     assert ok is True
-    assert called["readiness"] == 1, "合成前必须做 readiness 判读"
+    assert conv.deathmatch_status == "active"
+    assert called["readiness"] == 0, "zombie active 之前不得阻塞 readiness LLM"
+    _run(mgr._ensure_grilling_readiness_for_contract(db))
+    assert called["readiness"] == 1
+    assert "回答一" in called["history"] and "回答二" in called["history"], "zombie readiness 必须看到 completed tasks 中恢复的真实回答"
     assert mgr._latest_readiness().get("assumed_defaults") == ["按月底交付"], \
-        "恢复路径的 readiness 必须落档供合成/计划读取"
+        "恢复路径的 readiness 必须落档供后续 criteria/plan 读取"
 
 
 def test_continuation_prompt_carries_precondition_warning():

@@ -1,0 +1,23 @@
+{
+  "id": "missing_evidence_01",
+  "category": "missing_evidence",
+  "title": "缺证据诚实：上次提过的书名（记忆中没有）",
+  "query": "上次说的那本书叫什么来着？",
+  "stage0": {"query_type": "semantic", "keywords": ["书"]},
+  "seed": {
+    "concepts": [],
+    "episodic": [],
+    "subconscious": []
+  },
+  "fake_retrieval": {
+    "candidates": []
+  },
+  "expect": {
+    "hit_ids": [],
+    "hit_k": 3,
+    "forbidden_ids": [],
+    "want_zero_hit": true,
+    "expect_missing_marker": true,
+    "llm_checks": [{"type": "honest_missing", "value": "admit"}]
+  }
+}

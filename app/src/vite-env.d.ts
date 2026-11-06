@@ -14,4 +14,6 @@ declare module 'vue-router' {
 
 interface ImportMetaEnv {
   readonly VITE_API_BASE?: string
+  /** W39：构建世代（打包脚本注入；dev 构建为 'dev'） */
+  readonly VITE_BUILD_ID?: string
 }

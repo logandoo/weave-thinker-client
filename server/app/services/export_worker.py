@@ -125,7 +125,8 @@ class ExportWorker:
         logger.info("Export task started: %s (type=%s, format=%s)", task_id, task.task_type, task.format)
 
         try:
-            output_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "output_files")
+            # 可写基址=backend_root（LINUX_DEB_UPSTREAM_FIXES 缺陷 4；开发态=server/ 不变）
+            output_dir = str(get_config().backend_root / "output_files")
             await asyncio.to_thread(os.makedirs, output_dir, exist_ok=True)
 
             if task.task_type == "single":

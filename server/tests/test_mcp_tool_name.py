@@ -1,7 +1,7 @@
 """MCP tool-name sanitization — wave3 2026-09-02.
 
 OpenAI/DeepSeek contract: tool function name must match ^[a-zA-Z0-9_-]+$.
-RemPilot MCP servers expose dotted namespaced tools (rempilot.local_shell.open),
+remote MCP servers expose dotted namespaced tools (remote.local_shell.open),
 so the composed registry name mcp_<server>_<tool> MUST be sanitized — dispatch
 still routes via the handler's original tool_name, only the exposed name changes.
 """
@@ -50,9 +50,9 @@ async def _register_with_async(monkeypatch, tools, server="fake"):
 
 def test_dotted_tool_name_sanitized(monkeypatch):
     names = _register_with(
-        monkeypatch, [{"name": "rempilot.local_shell.open"}], server="t1"
+        monkeypatch, [{"name": "remote.local_shell.open"}], server="t1"
     )
-    assert names == ["mcp_t1_rempilot_local_shell_open"]
+    assert names == ["mcp_t1_remote_local_shell_open"]
 
 
 def test_clean_name_untouched(monkeypatch):
@@ -70,7 +70,7 @@ def test_collision_gets_deterministic_suffix(monkeypatch):
 
 
 # ── HTTP (Streamable) path — conv 6dcae019 2026-09-03: sanitization existed
-#    only on the stdio path; the RemPilot switch to Streamable HTTP re-exposed
+#    only on the stdio path; the remote switch to Streamable HTTP re-exposed
 #    the dotted-name 400 (Invalid 'tools[27].function.name'). ──
 
 def _register_http_with(monkeypatch, tools, server="h1"):
@@ -78,10 +78,10 @@ def _register_http_with(monkeypatch, tools, server="h1"):
 
     names_before = set(reg.get_all_tool_names())
 
-    async def _fake_init(url, headers):
+    async def _fake_init(url, headers, **kwargs):  # 2026-11-02: 新增 owner kwarg
         return "session-1"
 
-    async def _fake_list(url, session_id, headers):
+    async def _fake_list(url, session_id, headers, **kwargs):  # 2026-11-02: 新增 owner kwarg
         return tools
 
     monkeypatch.setattr(mc, "_mcp_initialize", _fake_init)
@@ -97,9 +97,9 @@ def _register_http_with(monkeypatch, tools, server="h1"):
 
 def test_http_dotted_tool_name_sanitized(monkeypatch):
     names = _register_http_with(
-        monkeypatch, [{"name": "rempilot.hosts.4090.nvidia-smi"}], server="h1"
+        monkeypatch, [{"name": "remote.hosts.4090.nvidia-smi"}], server="h1"
     )
-    assert names == ["mcp_h1_rempilot_hosts_4090_nvidia-smi"], names
+    assert names == ["mcp_h1_remote_hosts_4090_nvidia-smi"], names
     assert all(_NAME_RE2.match(x) for x in names), names
 
 
@@ -113,10 +113,10 @@ def test_http_clean_name_and_collision(monkeypatch):
 def test_sync_register_sanitized(monkeypatch):
     import asyncio as _aio
 
-    async def _fake_list(url, session_id, headers):
-        return [{"name": "rempilot.local_shell.open"}]
+    async def _fake_list(url, session_id, headers, **kwargs):  # 2026-11-02: 新增 owner kwarg
+        return [{"name": "remote.local_shell.open"}]
 
-    async def _fake_init(url, headers):
+    async def _fake_init(url, headers, **kwargs):  # 2026-11-02: 新增 owner kwarg
         return "s"
 
     monkeypatch.setattr(mcp_client, "_mcp_initialize", _fake_init)
@@ -127,7 +127,7 @@ def test_sync_register_sanitized(monkeypatch):
     names = [x for x in reg.get_all_tool_names() if x not in names_before]
     for x in names:
         reg.unregister(x)
-    assert n == 1 and names == ["mcp_s1_rempilot_local_shell_open"], names
+    assert n == 1 and names == ["mcp_s1_remote_local_shell_open"], names
 
 
 import re as _re2

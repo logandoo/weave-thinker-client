@@ -61,15 +61,35 @@
       <div v-if="message.role === 'assistant' && displaySequence.length > 0" class="alternating-content" :id="bodyDomId">
         <template v-for="(item, idx) in displaySequence" :key="idx">
           <template v-if="item.type === 'text'">
-            <div class="text segment-text" v-html="formatTextWithCitations(item.content)"></div>
-            <!-- 正文段恒全量：仅显式截断标记才出徽标（不按长度造噪音） -->
-            <span v-if="item.__truncated__ && truncBadge(item)" class="trunc-badge">{{ truncBadge(item) }}</span>
+            <!-- P0 R2: already-shown pre-tool prose is kept (A4.9 I2) but is a
+                 draft/process unit, never a second main answer. -->
+            <details v-if="item.superseded" class="superseded-draft">
+              <summary class="superseded-summary">草稿（已被终稿取代，点击展开）</summary>
+              <div class="text segment-text" v-html="formatTextWithCitations(item.content)"></div>
+              <span v-if="item.__truncated__ && truncBadge(item)" class="trunc-badge">{{ truncBadge(item) }}</span>
+            </details>
+            <template v-else>
+              <div class="text segment-text" v-html="formatTextWithCitations(item.content)"></div>
+              <!-- 正文段恒全量：仅显式截断标记才出徽标（不按长度造噪音） -->
+              <span v-if="item.__truncated__ && truncBadge(item)" class="trunc-badge">{{ truncBadge(item) }}</span>
+            </template>
           </template>
           <div v-else-if="item.type === 'reasoning_step'" class="reasoning-block">
             <details @toggle="(e) => onLazyToggle(`rs-${idx}`, e)">
               <summary class="reasoning-summary"><span class="step-title">{{ item.title || '💭 思考过程' }}</span><span v-if="truncBadge(item)" class="trunc-badge">{{ truncBadge(item) }}</span></summary>
-              <div v-if="isLazyOpen(`rs-${idx}`)" class="reasoning-text" v-html="renderMarkdownToHtml(item.content)"></div>
+              <div v-if="isLazyOpen(`rs-${idx}`)" class="reasoning-text" v-html="renderMarkdownToHtml(item.content, { deviceId: messageDeviceId })"></div>
             </details>
+          </div>
+          <div
+            v-else-if="item.type === 'interjection'"
+            class="inline-interjection"
+            :data-message-id="(item as any).message_id || undefined"
+          >
+            <div class="inline-interjection-head">
+              <span class="inline-interjection-label">插话</span>
+              <span v-if="item.created_at" class="inline-interjection-time">{{ formatTimestamp(String(item.created_at)) }}</span>
+            </div>
+            <div class="inline-interjection-text" v-html="formatTextWithCitations(item.content)"></div>
           </div>
           <ToolPartCard v-else-if="isToolSequenceItem(item)" :item="toToolPartItem(item)" />
           <div v-else class="agent-step-block">
@@ -157,14 +177,14 @@
           :key="'search-' + num"
           class="msg-ref-tag msg-ref-tag--search"
           :class="{ 'msg-ref-tag--active': searchPreviewIdx === num }"
-          :title="`[${num}] ${bibText || result.title || extractDomain(result.url)}`"
+          :title="`[${num}] ${(bibText || result.title || extractDomain(result.url)).replace(/^\[\d+\]\s*/, '')}`"
           @click.stop="searchPreviewIdx = searchPreviewIdx === num ? null : num"
         >
           <span class="msg-ref-index">[{{ num }}]</span>
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
           </svg>
-          {{ result.url ? extractDomain(result.url) : (bibText || result.title || '').slice(0, 40) }}
+          {{ bibText ? bibText.replace(/^\[\d+\]\s*/, '').slice(0, 48) : (result.url ? extractDomain(result.url) : (result.title || '').slice(0, 40)) }}
         </span>
       </div>
 
@@ -190,6 +210,7 @@
       <FileAttachmentComp
         v-if="parsedAttachments.length"
         :attachments="parsedAttachments"
+        :device-id="messageDeviceId"
       />
 
       <div v-if="message.role === 'assistant' && !saveMode" class="message-actions">
@@ -395,9 +416,14 @@ import MediaLightbox from './MediaLightbox.vue'
 import { useInlineImageZoom } from '@/composables/useInlineImageZoom'
 import { useChatStore } from '@/stores/chat'
 import { resolveDisplaySequence, forceFullBody } from '@/stores/streamReducer'
+import { parseInterjectionItems, resolvePersistedInterjectionSequence } from '@/stores/interjectionDisplay'
+import { deriveToolStatus } from '@/utils/toolStatus'
 import { isExternalizedStub, stubMarkersTrusted } from '@/api/chat'
 import { classifyFile, workspaceRelPath } from '@/composables/filePreview'
+import { apiUrl } from '@/api/base'
 import { buildDownloadUrl } from '@/api/workspaceFiles'
+import { buildDeviceDownloadUrl, deviceIdFromTarget } from '@/api/clientDevices'
+import { isSelfDeviceTarget, primeSelfDeviceId } from '@/utils/selfDeviceId'
 import { downloadUrl } from '@/composables/useDownload'
 import {
   renderMarkdownToHtml,
@@ -412,7 +438,7 @@ import {
   stripDsmlTags,
 } from '@/composables/useMarkdown'
 import { convertTabTablesToMarkdown } from '@/composables/tabTableConvert'
-import { parseBibliographyEntries, INLINE_SOURCE_REGEX, maxCitationIndexFor, assembleChips, type BibEntry } from '@/utils/citations'
+import { parseBibliographyEntries, INLINE_SOURCE_REGEX, maxCitationIndexFor, assembleChips, buildCitationChips, applyCitationInText, type BibEntry, type CitationsPayload } from '@/utils/citations'
 import { useToast } from '@/composables/useToast'
 import { useConfirmDialog } from '@/composables/useConfirmDialog'
 
@@ -718,10 +744,13 @@ async function onContentClick(e: MouseEvent) {
       return
     }
   }
-  if (target.classList.contains('citation-ref')) {
+  const citationEl = target.closest('.citation-ref') as HTMLElement | null
+  if (citationEl) {
     e.stopPropagation()
-    const idx = parseInt(target.dataset.citeIndex || '', 10)
-    const maxIdx = citationNumberMap.value.size || maxCitationIndex.value
+    const idx = parseInt(citationEl.dataset.citeIndex || '', 10)
+    const maxIdx = citationsPayload.value
+      ? citationsPayload.value.entries.length
+      : (citationNumberMap.value.size || maxCitationIndex.value)
     if (!isNaN(idx) && idx >= 1 && idx <= maxIdx) {
       searchPreviewIdx.value = searchPreviewIdx.value === idx ? null : idx
     }
@@ -934,6 +963,12 @@ const bibliographyMatches = computed<Array<{ entry: BibEntry; result: SearchResu
   return matchBibliography(`${JSON.stringify(bib)}\x00${JSON.stringify(results)}`)
 })
 
+// M4/M6：服务端 citations 载荷（存在时卡片与文内形态由载荷驱动）。
+const citationsPayload = computed<CitationsPayload | null>(() => {
+  const c = parsedToolResultsData.value?.citations
+  return c && Array.isArray(c.entries) && c.entries.length > 0 ? c : null
+})
+
 // Highest valid citation number for inline-marker clicks.
 // 并集语义（review R1/R2 Critical + r2 I1）：total = max(匹配条目最大编号,
 // 检索结果数)——短 bib 不得把范围坍缩到条目数（否则「1 条真注释+37 结果」
@@ -989,6 +1024,16 @@ const citationNumberReverseMap = computed<Map<number, number>>(() => {
 // 组装归位 @/utils/citations.assembleChips（每被引用标记恰一芯片：
 // bib 匹配优先、位置映射补位——短 bib 不得坍缩芯片列表）。
 const displayedToolResults = computed<Array<{ result: SearchResult; num: number; bibText?: string }>>(() => {
+  // M6：服务端载荷优先——卡片=规范 reference 文本（每被引条目恰一芯片；
+  // URL 可有可无，无链接条目（古籍/书籍）同样成卡）。
+  const payload = citationsPayload.value
+  if (payload) {
+    return buildCitationChips(payload).map((chip) => ({
+      result: chip.result as SearchResult,
+      num: chip.num,
+      bibText: chip.bibText,
+    }))
+  }
   // Don't show any chips if there are no actual search results — fabricated
   // bibliography entries (when the LLM answers from its own knowledge without
   // web_search) should not appear as reference tags.
@@ -1070,9 +1115,18 @@ const displaySequence = computed<DisplaySequenceItem[]>(() => {
     parsedToolResultsData.value?.content_segments,
     props.message.content,
   )
+  // 2026-11-01：把插话边界插回持久化序列（tool_results 外置桩时按 after_char
+  // 切 content 兜底）。已有 interjection 项的序列保持原样。
+  const withInterjections = resolvePersistedInterjectionSequence(
+    resolved as any,
+    props.message.interjection_items,
+    props.message.content,
+  ) as typeof resolved
+  const hasInterjections = withInterjections.some(it => it.type === 'interjection')
+  if (hasInterjections) return withInterjections
   // N2/criterion #8 终极兜底：末条回答任何情况下不得截断——未愈合时直接以
   // 恒全量的 message.content 合并渲染（零请求、零依赖取回）。
-  return isLastAnswer.value ? forceFullBody(resolved, props.message.content) : resolved
+  return isLastAnswer.value ? forceFullBody(withInterjections, props.message.content) : withInterjections
 })
 
 // ─── 正文保真（2026-10-05 用户指令：正式回答绝对不可截断、折叠）─────────
@@ -1191,7 +1245,9 @@ function toToolPartItem(item: DisplaySequenceItem): DisplaySequenceItem {
   return {
     ...item,
     type: 'tool_call',
-    status: item.status ?? 'completed',
+    // F4（2026-11-01 审计）：持久化步骤没有 status，旧实现一律 'completed'
+    // —— 超时步骤刷新后仍显示 ✓ 完成。按载荷兜底推断，与实时口径一致。
+    status: deriveToolStatus(item),
     result: item.result ?? item.content,
     // 评审 I5：ToolPartCard 展开截断项时按此取回 payload 全文
     message_id: props.message.id,
@@ -1388,8 +1444,33 @@ function fileRefRelPath(ref: FileRefInfo): string {
 }
 
 function fileRefUrl(ref: FileRefInfo): string {
-  return buildDownloadUrl(fileRefRelPath(ref))
+  // W16 设备执行模式：会话绑定客户端设备时，文件字节走设备代理（PLAN §6.2/§6.6）；
+  // fileRefRelPath=绝对路径归一化（本地 hunk 保留，相对路径恒等）。
+  const deviceId = messageDeviceId.value
+  const rel = fileRefRelPath(ref)
+  if (deviceId && ref.relPath) {
+    // apiUrl 包裹=桌面跨源基址（app:// 原生对 /api/* 404；W23 评审 C1）
+    return apiUrl(buildDeviceDownloadUrl(deviceId, rel))
+  }
+  return buildDownloadUrl(rel, deviceId)
 }
+
+// W18 G4：消息所属会话的设备 id——meta-miss 时经 resolveExecTargetFor 兜底
+// （refresh/create 均写 meta 后，兜底仅剩极端时序）
+// W32 判据 #99：device:<self>（本机）→ 返回 null——文件在本地 workspace（含云端
+// 物化），不走设备代理（代理无本地会话=404）；与显示面同源 utils/selfDeviceId。
+// 响应式 priming（评审 Minor：模块缓存非响应式——首帧算完不再重算）
+const selfReady = ref(false)
+void primeSelfDeviceId().then(() => { selfReady.value = true })
+const messageDeviceId = computed(() => {
+  void selfReady.value // self 身份就绪后重算
+  const convId = props.message.conversation_id
+  const target = convId
+    ? (chatStore.conversationMeta[convId]?.execution_target ?? chatStore.resolveExecTargetFor(convId))
+    : null
+  if (isSelfDeviceTarget(target)) return null
+  return deviceIdFromTarget(target)
+})
 
 function onFileRefClick(ref: FileRefInfo) {
   const kind = classifyFile(ref.filename, ref.fileType)
@@ -1417,7 +1498,7 @@ const previewHtml = computed(() => {
   if (previewIdx.value === null) return ''
   const ref = noteRefs.value[previewIdx.value]
   if (!ref) return ''
-  return renderMarkdownToHtml(ref.content)
+  return renderMarkdownToHtml(ref.content, { deviceId: messageDeviceId.value })
 })
 
 const formattedContent = computed(() => {
@@ -1428,8 +1509,11 @@ const formattedContent = computed(() => {
   const source = props.message.role === 'user'
     ? convertTabTablesToMarkdown(strippedContent.value)
     : strippedContent.value
-  let html = renderMarkdownToHtml(source)
-  if (parsedToolResults.value.length > 0) {
+  let html = renderMarkdownToHtml(source, { deviceId: messageDeviceId.value })
+  if (citationsPayload.value) {
+    // M6：服务端载荷驱动（样式族形态 + 服务端编号），跳过本地启发式/重排
+    html = applyCitationInText(html, citationsPayload.value)
+  } else if (parsedToolResults.value.length > 0) {
     html = addCitationSuperscripts(html, true, referencedCitationIndices.value)
     if (citationNumberMap.value.size > 0) {
       html = renumberCitationSuperscripts(html, citationNumberMap.value)
@@ -1448,8 +1532,10 @@ function formatTextWithCitations(content: string): string {
   let processed = content
     .replace(BIBLIOGRAPHY_SECTION_REGEX, '')
     .replace(INLINE_SOURCE_REGEX, '[$1]')
-  let html = renderMarkdownToHtml(processed)
-  if (parsedToolResults.value.length > 0) {
+  let html = renderMarkdownToHtml(processed, { deviceId: messageDeviceId.value })
+  if (citationsPayload.value) {
+    html = applyCitationInText(html, citationsPayload.value)
+  } else if (parsedToolResults.value.length > 0) {
     html = addCitationSuperscripts(html, true, referencedCitationIndices.value)
     if (citationNumberMap.value.size > 0) {
       html = renumberCitationSuperscripts(html, citationNumberMap.value)
@@ -1466,10 +1552,10 @@ const formattedReasoning = computed(() => {
   if (isExternalizedStub(props.message.reasoning_content)) {
     try {
       const stub = JSON.parse(props.message.reasoning_content)
-      return renderMarkdownToHtml(stub.preview || '')
+      return renderMarkdownToHtml(stub.preview || '', { deviceId: messageDeviceId.value })
     } catch { /* fall through */ }
   }
-  return renderMarkdownToHtml(props.message.reasoning_content)
+  return renderMarkdownToHtml(props.message.reasoning_content, { deviceId: messageDeviceId.value })
 })
 
 // P0-1：只 watch formattedContent——watch 数组里放 formattedReasoning 会在挂载时
@@ -2367,6 +2453,40 @@ onMounted(() => {
   margin-top: 12px;
 }
 
+/* 2026-11-01 插话内联：插话在 run 中真实进入模型上下文的位置。视觉上是一条
+   右对齐的用户气泡，但保留在 assistant 时间线内（不拆消息行/不破坏引用）。 */
+.inline-interjection {
+  margin: 14px 0 14px auto;
+  max-width: 88%;
+  padding: 9px 13px;
+  border-radius: var(--msg-bubble-radius);
+  background: var(--msg-user-bg);
+  border: var(--msg-bubble-border);
+  box-shadow: var(--msg-bubble-shadow);
+  overflow-wrap: anywhere;
+}
+.inline-interjection-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.inline-interjection-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-primary);
+}
+.inline-interjection-time {
+  font-size: 11px;
+  color: var(--msg-user-text);
+  opacity: .72;
+}
+.inline-interjection-text {
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--msg-user-text);
+}
+
 .agent-step-summary {
   cursor: pointer;
   font-weight: 500;
@@ -3150,6 +3270,26 @@ onMounted(() => {
   vertical-align: middle;
   white-space: nowrap;
   flex-shrink: 0;
+}
+
+/* P0 R2: superseded pre-tool draft — visible in the process area, collapsed
+   by default so it never reads as a second answer. */
+.superseded-draft {
+  margin: 0.35em 0;
+  padding: 0.3em 0.55em;
+  border: 1px dashed var(--color-border);
+  border-radius: 3px;
+  background: var(--color-bg-secondary, transparent);
+}
+.superseded-summary {
+  cursor: pointer;
+  font-size: 0.78em;
+  color: var(--color-text-light);
+  user-select: none;
+}
+.superseded-draft .segment-text {
+  margin-top: 0.35em;
+  opacity: 0.82;
 }
 
 /* 渐进落库（2026-10-06）：中断残稿徽标——skin token 体系，禁硬编码色 */

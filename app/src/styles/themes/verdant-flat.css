@@ -1351,25 +1351,32 @@ html[data-skin="verdant-flat"] .skill-source-badge {
 /* wave-11 登录按钮：14px 圆角矩形（青野家族） */
  html[data-skin="verdant-flat"] .login-btn { border-radius: var(--radius-md); }
 
-/* wave-8：底部悬浮钮与 chat-input 容器背景一致（白玻璃卡，active 以文字/边色区分） */
-html[data-skin="verdant-flat"] .mobile-tab-bar .tab-item {
+/* 任务块 9（2026-10-11）：移动端底 tab 对齐 mockup——居中浮动白胶囊 + #e9f1e2 活动 pill
+   规格源 design/mockups/01-verdant-flat/mobile.html .m-tabbar */
+html[data-skin="verdant-flat"] .mobile-tab-bar {
   background: #ffffff;
   border-color: #dfe7d8;
-  box-shadow: 0 1px 2px rgba(45, 59, 36, 0.06);
+  box-shadow: 0 4px 16px rgba(45, 59, 36, 0.14);
+}
+html[data-skin="verdant-flat"] .mobile-tab-bar .tab-item {
+  color: #6b7d5e;
+  background: transparent;
+  border-color: transparent;
 }
 html[data-skin="verdant-flat"] .mobile-tab-bar .tab-item.active {
-  background: #ffffff;
-  color: var(--color-primary-dark);
-  border-color: #cfdbc4;
+  background: #e9f1e2;
+  color: #2d3b24;
+  font-weight: 700;
 }
- html[data-skin="verdant-flat"][data-theme="dark"] .mobile-tab-bar .tab-item,
-html[data-skin="verdant-flat"][data-theme="dark"] .mobile-tab-bar .tab-item.active {
+html[data-skin="verdant-flat"][data-theme="dark"] .mobile-tab-bar {
   background: #1d201d;
   border-color: #343a34;
-  color: var(--color-text-light);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
 }
+html[data-skin="verdant-flat"][data-theme="dark"] .mobile-tab-bar .tab-item { color: #9fae94; }
 html[data-skin="verdant-flat"][data-theme="dark"] .mobile-tab-bar .tab-item.active {
-  color: var(--color-primary-dark);
+  background: rgba(122, 163, 90, 0.24);
+  color: #d7e6c8;
 }
 
 /* ══════════ wave-12：深色模式全表面对比度修复 + 浅色次级文字加深 ══════════
@@ -1744,3 +1751,80 @@ html[data-skin="verdant-flat"] .np-swipe-action.delete { background: #b0503a; }
 html[data-skin="verdant-flat"][data-theme="dark"] .np-swipe-action.rename { background: #4d6b37; }
 html[data-skin="verdant-flat"][data-theme="dark"] .np-swipe-action.move { background: #b45309; }
 html[data-skin="verdant-flat"][data-theme="dark"] .np-swipe-action.delete { background: #b0503a; }
+
+/* 笔记工具栏按钮尺寸统一（判据 #1，2026-10-25 笔记波）：与组件 scoped 基线同值
+   36×36 方盒（border-box + 内容居中）。本波前各按钮按内容撑尺寸（实测同栏
+   44x35 / 36x30 / 43x30 三档）；皮肤只保留各自的边框/圆角/配色。
+   作用域限定 .editor-toolbar / .zen-note-toolbar，聊天输入栏 .toolbar-btn 不受影响。 */
+html[data-skin="verdant-flat"] .editor-toolbar .toolbar-btn,
+html[data-skin="verdant-flat"] .zen-note-toolbar .toolbar-btn {
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  border: 1px solid var(--panel-border-strong);
+  background: var(--surface-panel-strong);
+  color: var(--color-primary-dark);
+  border-radius: 999px;
+  transition: background-color .16s ease, border-color .16s ease, color .16s ease;
+}
+/* 图标 + 文字的一级入口：内容与胶囊边框之间必须留出呼吸位 */
+html[data-skin="verdant-flat"] .editor-toolbar .toolbar-primary-btn,
+html[data-skin="verdant-flat"] .zen-note-toolbar .toolbar-primary-btn {
+  width: 60px;
+  min-width: 60px;
+  padding: 0;
+  gap: 5px;
+  justify-content: center;
+}
+html[data-skin="verdant-flat"] .editor-toolbar .toolbar-primary-label,
+html[data-skin="verdant-flat"] .zen-note-toolbar .toolbar-primary-label {
+  font-size: 12px;
+  font-weight: 500;
+}
+html[data-skin="verdant-flat"] .editor-toolbar .toolbar-btn:hover,
+html[data-skin="verdant-flat"] .zen-note-toolbar .toolbar-btn:hover {
+  background: var(--color-hover);
+  border-color: var(--panel-border-strong);
+  color: var(--color-primary-dark);
+  transform: none;
+}
+html[data-skin="verdant-flat"] .editor-toolbar .toolbar-btn.active,
+html[data-skin="verdant-flat"] .zen-note-toolbar .toolbar-btn.active {
+  background: var(--color-primary-dark);
+  border-color: var(--color-primary-dark);
+  color: #fff;
+}
+/* 二级面板：16px 圆角 + 柔和投影，与 verdant 的胶囊语言一致 */
+html[data-skin="verdant-flat"] .note-toolbar-panel {
+  border: 1px solid var(--panel-border-strong);
+  border-radius: 16px;
+  background: var(--surface-panel-strong);
+  box-shadow: var(--shadow-lg);
+}
+html[data-skin="verdant-flat"] .note-toolbar-panel-head {
+  background: var(--surface-panel-subtle);
+  border-bottom-color: var(--panel-border);
+}
+html[data-skin="verdant-flat"] .note-toolbar-menu-item { border-radius: 10px; }
+html[data-skin="verdant-flat"] .note-toolbar-menu-item:hover { background: var(--color-hover); }
+html[data-skin="verdant-flat"] .note-toolbar-menu-item.active { background: var(--color-hover); color: var(--color-text); font-weight: 600; }
+html[data-skin="verdant-flat"] .note-toolbar-menu-item:focus-visible { outline-color: var(--color-primary-dark); }
+html[data-skin="verdant-flat"] .note-toolbar-table-cell.active { background: var(--color-primary); border-color: var(--color-primary); }
+html[data-skin="verdant-flat"] .note-toolbar-group-label { color: var(--color-text-light); }
+
+/* 深色下一级入口的激活态用浅绿底 + 深字，避免白字压浅绿 */
+html[data-skin="verdant-flat"][data-theme="dark"] .editor-toolbar .toolbar-btn.active,
+html[data-skin="verdant-flat"][data-theme="dark"] .zen-note-toolbar .toolbar-btn.active {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: #16210f;
+}
+
+html[data-skin="verdant-flat"] .toc-panel { border-radius: 16px; }
+html[data-skin="verdant-flat"] .toc-header { background: var(--surface-panel-subtle); }
+html[data-skin="verdant-flat"] .toc-item { border-radius: 10px; }

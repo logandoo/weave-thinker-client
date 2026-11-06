@@ -1,0 +1,83 @@
+{
+  "id": "cjk_02",
+  "category": "cjk",
+  "title": "全中文：长篇读书笔记 + 紧预算截断（注入 token ≤ 上限）",
+  "query": "上次聊过的那份长篇读书笔记，都记了哪些要点？",
+  "budget_chars": 200,
+  "stage0": {
+    "query_type": "semantic",
+    "keywords": [
+      "读书笔记",
+      "要点"
+    ]
+  },
+  "seed": {
+    "concepts": [
+      {
+        "id": "cjk-note-a",
+        "canonical_name": "读书笔记第一章",
+        "content": "读书笔记第一章要点：记忆的形成依赖重复与情绪标记，遗忘曲线决定复习节奏",
+        "memory_type": "semantic"
+      },
+      {
+        "id": "cjk-note-b",
+        "canonical_name": "读书笔记第二章",
+        "content": "读书笔记第二章要点：检索依赖线索而非时间顺序，主动回想是巩固关键",
+        "memory_type": "semantic"
+      }
+    ],
+    "episodic": [],
+    "subconscious": [
+      {
+        "id": "cjk-note-raw",
+        "content": "（原文片段）第三章谈知识固化与迁移：多样化练习、交叉学习、及时反馈、睡眠除噪"
+      }
+    ]
+  },
+  "fake_retrieval": {
+    "candidates": [
+      {
+        "id": "cjk-note-a",
+        "tier": "concept",
+        "score": 0.85,
+        "content": "读书笔记第一章要点：记忆的形成依赖重复与情绪标记，遗忘曲线决定复习节奏，间隔重复能显著延缓遗忘",
+        "metadata": {
+          "canonical_name": "读书笔记第一章"
+        }
+      },
+      {
+        "id": "cjk-note-b",
+        "tier": "concept",
+        "score": 0.8,
+        "content": "读书笔记第二章要点：检索依赖线索而非时间顺序，主动回想是巩固记忆的关键手段，测试效应优于重复阅读",
+        "metadata": {
+          "canonical_name": "读书笔记第二章"
+        }
+      },
+      {
+        "id": "cjk-note-raw",
+        "tier": "subconscious",
+        "score": 0.6,
+        "content": "（原文片段）第三章谈知识固化与迁移：多样化练习、交叉学习、及时反馈、睡眠除噪、挂接既有图式",
+        "metadata": {
+          "created_at": "2026-10-13"
+        }
+      }
+    ]
+  },
+  "expect": {
+    "hit_ids": [
+      "cjk-note-a",
+      "cjk-note-b"
+    ],
+    "hit_k": 3,
+    "forbidden_ids": [],
+    "max_injected_tokens": 160,
+    "llm_checks": [
+      {
+        "type": "answer_contains",
+        "value": "遗忘曲线"
+      }
+    ]
+  }
+}

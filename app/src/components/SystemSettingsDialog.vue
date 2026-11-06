@@ -46,6 +46,12 @@
                     <line x1="12" y1="18" x2="12" y2="12"/>
                     <line x1="9" y1="15" x2="15" y2="15"/>
                   </template>
+                  <template v-else-if="tab.key === 'mcp'">
+                    <rect x="2" y="7" width="20" height="10" rx="2"/>
+                    <line x1="7" y1="7" x2="7" y2="17"/>
+                    <line x1="12" y1="7" x2="12" y2="17"/>
+                    <line x1="17" y1="7" x2="17" y2="17"/>
+                  </template>
                   <template v-else-if="tab.key === 'memory'">
                     <path d="M12 2a7 7 0 0 0-7 7c0 2.4 1.2 4.5 3 5.7V17a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2v-2.3c1.8-1.2 3-3.3 3-5.7a7 7 0 0 0-7-7z"/>
                     <line x1="9" y1="22" x2="15" y2="22"/>
@@ -54,15 +60,8 @@
                     <path d="M12 20h9"/>
                     <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
                   </template>
-                  <template v-else-if="tab.key === 'sync'">
-                    <polyline points="17 1 21 5 17 9"/>
-                    <path d="M3 11V9a4 4 0 0 1 4-4h14"/>
-                    <polyline points="7 23 3 19 7 15"/>
-                    <path d="M21 13v2a4 4 0 0 1-4 4H3"/>
-                  </template>
-                  <template v-else-if="tab.key === 'device-exec'">
-                    <rect x="2" y="3" width="20" height="14" rx="2"/>
-                    <path d="M8 21h8M12 17v4"/>
+                  <template v-else-if="tab.key === 'cloud-link'">
+                    <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/>
                   </template>
                   <template v-else-if="tab.key === 'skins'">
                     <circle cx="13.5" cy="6.5" r=".5"/>
@@ -112,6 +111,10 @@
                 />
               </div>
 
+              <div v-else-if="activeTab === 'mcp'" class="tab-panel">
+                <McpServerPanel embedded />
+              </div>
+
               <div v-else-if="activeTab === 'memory'" class="tab-panel">
                 <MemoryPanel
                   embedded
@@ -154,12 +157,8 @@
                 />
               </div>
 
-              <div v-else-if="activeTab === 'sync'" class="tab-panel">
-                <SyncPanel />
-              </div>
-
-              <div v-else-if="activeTab === 'device-exec'" class="tab-panel">
-                <DeviceExecPanel />
+              <div v-else-if="activeTab === 'cloud-link'" class="tab-panel">
+                <CloudLinkPanel />
               </div>
             </div>
           </div>
@@ -177,11 +176,11 @@ import PermissionSettingsPanel from './PermissionSettingsPanel.vue'
 import SkillsPanel from './SkillsPanel.vue'
 import MemoryPanel from './MemoryPanel.vue'
 import SkinPanel from './SkinPanel.vue'
-import SyncPanel from './SyncPanel.vue'
-import DeviceExecPanel from './DeviceExecPanel.vue'
+import CloudLinkPanel from './CloudLinkPanel.vue'
 import WorkspaceSettingsPanel from './WorkspaceSettingsPanel.vue'
 import UserInfoPanel from './UserInfoPanel.vue'
 import ModelProviderPanel from './ModelProviderPanel.vue'
+import McpServerPanel from './McpServerPanel.vue'
 import type { HotwordItem } from '@/api/asr'
 
 interface Permissions {
@@ -217,10 +216,10 @@ const tabs = [
   { key: 'hotwords', label: '热词配置' },
   { key: 'permissions', label: '权限管理' },
   { key: 'skills', label: '技能管理' },
+  { key: 'mcp', label: 'MCP' },
   { key: 'memory', label: '记忆管理' },
   { key: 'skins', label: '皮肤选择' },
-  { key: 'sync', label: '同步' },
-  { key: 'device-exec', label: '设备执行' },
+  { key: 'cloud-link', label: '云端关联' },
   { key: 'editor', label: '编辑器' },
   { key: 'workspace', label: '工作区' },
 ]
@@ -336,6 +335,10 @@ function handleSkillsUpdated() {
   padding: 16px 24px 0;
   border-bottom: 1px solid var(--panel-border);
   overflow-x: auto;
+  overflow-y: hidden;
+  /* W24：tab 条不参与竖向压缩（高内容面板竞争高度时曾被压 20px+出竖滚动条）；
+     条内仅保留横向滚动（overflow-y 显式钉死，防 computed auto 回潮）。 */
+  flex-shrink: 0;
 }
 
 .settings-tab {
@@ -365,6 +368,9 @@ function handleSkillsUpdated() {
 
 .settings-tab-content {
   flex: 1;
+  /* W24：min-height:0 打破 flex 子项 min-height:auto 惯性——内容区成为唯一
+     竖向滚动面，不再把高度竞争转嫁给 tab 条。 */
+  min-height: 0;
   overflow-y: auto;
   padding: 20px 24px 24px;
   display: flex;

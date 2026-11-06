@@ -62,7 +62,7 @@ max_read_chars = 20000
 
 [agent.tool_loop]
 max_iterations = 50
-max_consecutive_iterations = 999
+max_consecutive_iterations = 60  # 2026-10-25 上游审计 F4：999 在 execute_code 退款族下几乎不可达 → 60（配置可回改）
 memory_read_dedup = true
 max_empty_answer_retries = 2
 max_force_stage_rounds = 50
@@ -75,7 +75,9 @@ vision_interpret = 3600
 
 [agent.tool_loop.tool_call_stall_timeout_overrides]
 vision_interpret = 600
-code_execution = 300
+# 2026-10-25 上游审计 F7：键名必须=注册名（tools/code_execution.py 注册为 execute_code）；
+# 旧键 code_execution 精确查表不命中 → 300s 停滞看门狗静默失效（本模板 2026-10-26 W28 已改名）。
+execute_code = 300
 
 tool_call_progress_check_interval_seconds = 10
 subtask_iteration_timeout_seconds = 1800
@@ -233,9 +235,6 @@ stream_include_usage = true
 
 [mcp]
 [mcp.servers]
-[mcp.servers.rempilot]
-url = "https://your-endpoint.example/v1"
-oauth_state_file = "<YOUR-HOME>/Library/Application Support/WeaveThinker/rempilot_oauth.json"
 
 
 

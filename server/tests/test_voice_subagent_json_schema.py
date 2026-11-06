@@ -197,20 +197,20 @@ def test_barge_in_parses_json_verdict():
     asyncio.run(run())
 
 
-def test_barge_in_accepts_legacy_bare_word():
+def test_barge_in_requires_structured_verdict_and_defers_on_outage():
     async def run():
         s, _ = _make_session()
 
         async def fake_interrupt(system, user, purpose="voice", response_format=None):
-            return "interrupt"
+            return '{"verdict":"interrupt"}'
 
         async def fake_backchannel(system, user, purpose="voice", response_format=None):
-            return ""
+            return "do not interrupt; defer to the current answer"
 
         s._quick_classify = fake_interrupt
         assert await s._classify_barge_in("停下") == "interrupt"
         s._quick_classify = fake_backchannel
-        assert await s._classify_barge_in("嗯嗯") == "backchannel"
+        assert await s._classify_barge_in("嗯嗯") == "defer"
     asyncio.run(run())
 
 

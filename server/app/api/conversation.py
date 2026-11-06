@@ -15,6 +15,7 @@ import logging
 from datetime import datetime, timedelta
 from urllib.parse import quote
 
+from app.core.config import get_config
 from app.db.database import get_db, Conversation, Message, ChatSession, User, Assistant, ScheduledTask, ConversationGroup
 from app.schemas.chat import (
     ConversationCreate,
@@ -45,6 +46,23 @@ from app.api.notes import (
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/conversations", tags=["conversations"])
+
+
+async def _active_delegation_conversation_ids(db: AsyncSession, conversation_ids: list[str]) -> list[str]:
+    """§12 delete matrix: active separate_v1 C2s must be cancelled first."""
+    if not conversation_ids:
+        return []
+    from app.db.database import AgentTask
+    from app.services.agent_task_status import ACTIVE_STATUSES
+
+    rows = (await db.execute(
+        select(AgentTask.execution_conversation_id).where(
+            AgentTask.execution_conversation_id.in_(conversation_ids),
+            AgentTask.execution_mode == "separate_v1",
+            AgentTask.status.in_(ACTIVE_STATUSES),
+        )
+    )).scalars().all()
+    return [r for r in rows if r]
 
 
 async def _reconcile_deathmatch_status(db: AsyncSession, conversation: Conversation) -> None:
@@ -189,6 +207,14 @@ class BulkDeleteGroupsRequest(BaseModel):
     delete_conversations: bool = False
 
 
+class ExecutionTargetBindingRequest(BaseModel):
+    target: Optional[str]
+
+
+class ExecutionTargetBindingResponse(BaseModel):
+    execution_target: Optional[str]
+
+
 class ExportMessagesPDFRequest(BaseModel):
     title: str = ""
     content: str = ""
@@ -248,6 +274,8 @@ def _message_response_fields(m, slim: bool = False) -> dict:
         tool_results=m.tool_results,
         context_info=m.context_info,
         delivery_status=getattr(m, "delivery_status", None) or "final",
+        interjection_items=getattr(m, "interjection_items", None),
+        embedded_in_message_id=getattr(m, "embedded_in_message_id", None),
         created_at=_utc_iso(m.created_at),
     )
     if slim:
@@ -264,6 +292,7 @@ def _conversation_response(
         title=conversation.title,
         group_id=conversation.group_id,
         assistant_id=conversation.assistant_id,
+        execution_target=conversation.execution_target,
         sort_order=conversation.sort_order or 0,
         created_at=_utc_iso(conversation.created_at),
         updated_at=_utc_iso(conversation.updated_at),
@@ -329,10 +358,25 @@ async def create_conversation(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    # W16 设备执行模式：执行环境创建即定（D-6）——校验格式+设备属主/未撤销。
+    execution_target = None
+    if conversation_data.execution_target:
+        from app.services import client_device_service as cds
+        try:
+            execution_target = cds.normalize_execution_target(
+                conversation_data.execution_target
+            )
+            if execution_target is not None:
+                await cds.assert_device_usable(db, current_user.id, execution_target)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc))
+        except LookupError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
     conversation = Conversation(
         user_id=current_user.id,
         title=conversation_data.title or "新对话",
-        assistant_id=conversation_data.assistant_id
+        assistant_id=conversation_data.assistant_id,
+        execution_target=execution_target,
     )
     db.add(conversation)
     await db.commit()
@@ -359,6 +403,17 @@ async def bulk_delete_conversations(
     valid_ids = [row[0] for row in result.all()]
     if not valid_ids:
         raise HTTPException(status_code=404, detail="Conversation not found")
+
+    blocked_ids = await _active_delegation_conversation_ids(db, valid_ids)
+    if blocked_ids:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "active_delegation_conversation",
+                "message": "部分会话正由执行中的委派任务占用；请先取消任务",
+                "conversation_ids": blocked_ids,
+            },
+        )
 
     for batch_ids in _chunked_ids(valid_ids):
         await db.execute(
@@ -754,6 +809,16 @@ async def delete_conversation_group(
         )
         conv_rows = conv_result.scalars().all()
         conv_ids = [c.id for c in conv_rows]
+        blocked_ids = await _active_delegation_conversation_ids(db, conv_ids)
+        if blocked_ids:
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "code": "active_delegation_conversation",
+                    "message": "分组内有执行中的委派任务会话；请先取消任务",
+                    "conversation_ids": blocked_ids,
+                },
+            )
         for batch_ids in _chunked_ids(conv_ids):
             await db.execute(
                 update(ScheduledTask)
@@ -814,6 +879,16 @@ async def bulk_delete_groups(
         )
         conv_rows = conv_result.scalars().all()
         conv_ids = [c.id for c in conv_rows]
+        blocked_ids = await _active_delegation_conversation_ids(db, conv_ids)
+        if blocked_ids:
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "code": "active_delegation_conversation",
+                    "message": "分组内有执行中的委派任务会话；请先取消任务",
+                    "conversation_ids": blocked_ids,
+                },
+            )
         for batch_ids in _chunked_ids(conv_ids):
             await db.execute(
                 update(ScheduledTask)
@@ -969,6 +1044,7 @@ async def get_conversation(
         title=conversation.title,
         group_id=conversation.group_id,
         assistant_id=conversation.assistant_id,
+        execution_target=conversation.execution_target,
         sort_order=conversation.sort_order or 0,
         created_at=_utc_iso(conversation.created_at),
         updated_at=_utc_iso(conversation.updated_at),
@@ -1013,6 +1089,24 @@ async def delete_conversation(
     conversation = result.scalar_one_or_none()
     if not conversation:
         raise HTTPException(status_code=404, detail="Conversation not found")
+
+    # §12: an active delegated task owns its C2; deletion would orphan the
+    # worker and destroy the long-lived result authority.
+    from app.db.database import AgentTask
+    from app.services.agent_task_status import ACTIVE_STATUSES
+
+    active_task = (await db.execute(
+        select(AgentTask.id).where(
+            AgentTask.execution_conversation_id == conversation_id,
+            AgentTask.execution_mode == "separate_v1",
+            AgentTask.status.in_(ACTIVE_STATUSES),
+        ).limit(1)
+    )).scalar_one_or_none()
+    if active_task:
+        raise HTTPException(
+            status_code=409,
+            detail="Conversation is owned by an active delegated task; cancel it first",
+        )
 
     await db.execute(
         update(ScheduledTask)
@@ -1063,6 +1157,62 @@ async def update_conversation(
         conversation, last_user_times.get(conversation.id)
     )
 
+
+@router.post(
+    "/{conversation_id}/execution-target",
+    response_model=ExecutionTargetBindingResponse,
+)
+async def set_conversation_execution_target(
+    conversation_id: str,
+    binding: ExecutionTargetBindingRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Bind an execution target while the conversation still has no messages."""
+    result = await db.execute(
+        select(Conversation)
+        .where(
+            Conversation.id == conversation_id,
+            Conversation.user_id == current_user.id,
+        )
+        .with_for_update()
+    )
+    conversation = result.scalar_one_or_none()
+    if conversation is None:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
+    from app.services import client_device_service as cds
+
+    target = None
+    if binding.target is not None:
+        try:
+            target = cds.normalize_execution_target(binding.target)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc))
+    if target is not None:
+        try:
+            await cds.assert_device_usable(db, current_user.id, target)
+        except LookupError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
+
+    has_messages = (await db.execute(
+        select(Message.id).where(Message.conversation_id == conversation_id).limit(1)
+    )).first() is not None
+    if has_messages:
+        raise HTTPException(
+            status_code=400,
+            detail="执行环境已固定：切换云端/客户端执行环境请新建会话",
+        )
+
+    # ORM persistence is intentional: sync_capture observes mapper updates and
+    # emits the same binding change to the user's other devices.
+    conversation.execution_target = target
+    conversation.updated_at = datetime.utcnow()
+    await db.commit()
+    await db.refresh(conversation)
+    return ExecutionTargetBindingResponse(
+        execution_target=conversation.execution_target
+    )
 
 
 @router.put("/{conversation_id}/move", response_model=ConversationResponse)
@@ -1178,7 +1328,7 @@ async def get_messages(
             text(f"""
                 SELECT id, conversation_id, role, content, reasoning_content,
                        tool_calls, tool_results, context_info, created_at,
-                       delivery_status
+                       delivery_status, interjection_items, embedded_in_message_id
                 FROM messages
                 WHERE conversation_id = :cid
                   AND delivery_status != 'streaming' {cursor_clause}
@@ -1207,6 +1357,8 @@ async def get_messages(
                 tool_results=m["tool_results"],
                 context_info=m["context_info"],
                 delivery_status=m["delivery_status"] or "final",
+                interjection_items=m.get("interjection_items"),
+                embedded_in_message_id=m.get("embedded_in_message_id"),
                 created_at=_utc_iso(m["created_at"])
             )
             for m in messages
@@ -1240,6 +1392,8 @@ async def get_messages(
             tool_results=m.tool_results,
             context_info=m.context_info,
             delivery_status=m.delivery_status or "final",
+            interjection_items=getattr(m, "interjection_items", None),
+            embedded_in_message_id=getattr(m, "embedded_in_message_id", None),
             created_at=_utc_iso(m.created_at)
         )
         for m in messages
@@ -1554,7 +1708,7 @@ async def export_conversations(
     if not assistant:
         raise HTTPException(status_code=404, detail="Assistant not found")
 
-    output_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "output_files", sanitize_filename(assistant.name))
+    output_dir = os.path.join(str(get_config().backend_root / "output_files"), sanitize_filename(assistant.name))
     os.makedirs(output_dir, exist_ok=True)
 
     conversations_result = await db.execute(
@@ -1878,7 +2032,7 @@ async def export_messages_pdf(
         # W6（2026-10-06 三波，D-16）：导出登记 + 同内容去重（命中回文件零渲染）
         # + 渲染并发护栏——18:00 冻结画像=无界并行渲染风暴且零登记
         from app.services.export_registry import render_with_dedup
-        output_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "output_files")
+        output_dir = str(get_config().backend_root / "output_files")
         os.makedirs(output_dir, exist_ok=True)
         try:
             file_path, file_name, cached = await render_with_dedup(
@@ -1923,7 +2077,7 @@ async def export_messages_pdf(
 
         # W6（2026-10-06 三波，D-16）：zip 同享登记/去重/渲染护栏（整包为一个产物）
         from app.services.export_registry import render_with_dedup
-        output_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "output_files")
+        output_dir = str(get_config().backend_root / "output_files")
         os.makedirs(output_dir, exist_ok=True)
         # 键分片按独立 part 喂指纹（长度前缀消歧义，A4.9 M1）
         zip_key = ("conv-bulk",) + tuple(

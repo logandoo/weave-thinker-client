@@ -278,7 +278,10 @@ def test_backoff_consumed_on_all_continue_sites():
     """Structural pin: every deathmatch decision-continue block in agent_loop
     must consume _dm_decision_backoff (the W1-I1 omission class: budget /
     mid-loop paths hot-continued a WAIT verdict with zero delay)."""
-    src = open(os.path.join(os.path.dirname(__file__), "..", "app", "services", "agent_loop.py")).read()
+    src = (
+        open(os.path.join(os.path.dirname(__file__), "..", "app", "services", "agent_loop.py")).read()
+        + open(os.path.join(os.path.dirname(__file__), "..", "app", "services", "agent_loop_orchestrator.py")).read()
+    )
     sites = src.count("await self._dm_decision_backoff(")
     assert sites == 5, (
         f"expected 5 consumption sites (budget-exhaustion, inactivity, mid-loop, "
@@ -337,3 +340,26 @@ def test_autonomy_off_legacy_spin_gates(autonomy_off):
     d2 = _run(mgr.evaluate_after_turn("", workspace_path="/tmp/x", tool_results=None))
     assert d2["status"] == "partial_complete" and d2["should_continue"] is False
     ds._SPIN_COUNTS.pop("conv-auto", None)
+
+
+def test_resume_resets_judge_parse_failure_streak():
+    conv = _conv(
+        deathmatch_status="paused",
+        deathmatch_mode=False,
+        deathmatch_consecutive_failures=5,
+    )
+    DeathmatchManager(conv).resume()
+    assert conv.deathmatch_status == "active"
+    assert conv.deathmatch_consecutive_failures == 0, "用户显式恢复必须给 judge 解析一条全新失败 streak"
+
+
+def test_resume_from_partial_resets_parse_streak_but_preserves_progress_stall():
+    conv = _conv(
+        deathmatch_status="partial_complete",
+        deathmatch_consecutive_failures=5,
+        deathmatch_verify_failures=4,
+    )
+    DeathmatchManager(conv).resume_from_partial()
+    assert conv.deathmatch_status == "active"
+    assert conv.deathmatch_consecutive_failures == 0, "judge 解析失败与进度 stall 是不同预算，恢复时应清零前者"
+    assert conv.deathmatch_verify_failures == 4, "partial 的进度 stall 必须保留，不能被顺手重置"

@@ -1,0 +1,73 @@
+{
+  "id": "stale_state_01",
+  "category": "stale_state",
+  "title": "陈旧状态：站会时间旧状态被 superseded 封存，现行 10:15",
+  "query": "我现在每天的站会时间是几点？",
+  "stage0": {
+    "query_type": "semantic",
+    "keywords": [
+      "站会",
+      "时间"
+    ]
+  },
+  "seed": {
+    "concepts": [
+      {
+        "id": "c-standup-old",
+        "canonical_name": "站会时间（旧）",
+        "content": "站会时间 09:30",
+        "memory_type": "semantic"
+      },
+      {
+        "id": "c-standup-new",
+        "canonical_name": "站会时间（现行）",
+        "content": "站会时间已改到 10:15",
+        "memory_type": "semantic"
+      }
+    ],
+    "episodic": [],
+    "subconscious": []
+  },
+  "fake_retrieval": {
+    "candidates": [
+      {
+        "id": "c-standup-old",
+        "tier": "concept",
+        "score": 0.85,
+        "content": "站会时间 09:30",
+        "metadata": {
+          "canonical_name": "站会时间（旧）",
+          "superseded": true
+        }
+      },
+      {
+        "id": "c-standup-new",
+        "tier": "concept",
+        "score": 0.7,
+        "content": "站会时间已改到 10:15",
+        "metadata": {
+          "canonical_name": "站会时间（现行）"
+        }
+      }
+    ]
+  },
+  "expect": {
+    "hit_ids": [
+      "c-standup-new"
+    ],
+    "hit_k": 3,
+    "forbidden_ids": [
+      "c-standup-old"
+    ],
+    "llm_checks": [
+      {
+        "type": "answer_contains",
+        "value": "10:15"
+      },
+      {
+        "type": "answer_not_contains",
+        "value": "09:30"
+      }
+    ]
+  }
+}

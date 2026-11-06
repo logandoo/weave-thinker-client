@@ -37,10 +37,13 @@ from app.services.agent_loop import (  # noqa: E402
 )
 
 config = get_config()
-_AGENT_LOOP_SRC = open(
-    os.path.join(os.path.dirname(__file__), "..", "app", "services", "agent_loop.py"),
-    encoding="utf-8",
-).read()
+_AGENT_LOOP_SRC = "".join(
+    open(
+        os.path.join(os.path.dirname(__file__), "..", "app", "services", name),
+        encoding="utf-8",
+    ).read()
+    for name in ("agent_loop.py", "agent_loop_orchestrator.py")
+)
 
 
 # ── Task 1: 配置属性 ─────────────────────────────────────────────────────────
@@ -445,5 +448,8 @@ def test_ship_points_call_settlement():
 def test_shipped_text_wiring_locked():
     """A4.9 C1 回归锁：出货结算基于被审计文本（拼接审计=完整拼接稿），
     防止未来改回 assistant_content 造成丢头。"""
-    assert "_shipped_text = _audit_target" in _AGENT_LOOP_SRC
-    assert "_shipped_text if _shipped_text is not None" in _AGENT_LOOP_SRC
+    # C-01c: the audit branch was split into helpers and the shared state now
+    # lives on `_LoopResult` (the caller re-reads it after the branch).
+    assert "_loop_result._shipped_text = _loop_result._audit_target" in _AGENT_LOOP_SRC
+    assert ("_loop_result._shipped_text if _loop_result._shipped_text is not None"
+            in _AGENT_LOOP_SRC)

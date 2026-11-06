@@ -1,6 +1,6 @@
 """Audit evidence grounding for MCP tools (conv 6dcae019, 2026-09-03).
 
-A RemPilot remote_shell (nvidia-smi over 8 GPUs) fed the whole answer, but
+A remote remote_shell (nvidia-smi over 8 GPUs) fed the whole answer, but
 MCP tools were NOT in _AUDIT_GROUNDING_TOOLS — the auditor saw only a
 head+tail fragment, declared 「nvidia-smi 输出被截断」 and needs_evidence'd
 every draft until the budget fell to the selection fallback. MCP tool outputs
@@ -25,7 +25,7 @@ class _State:
 
 
 def test_mcp_tools_are_grounding_class():
-    assert _is_audit_grounding("mcp_rempilot_rempilot_remote_shell_open")
+    assert _is_audit_grounding("mcp_remote_remote_remote_shell_open")
     assert _is_audit_grounding("mcp_anyserver_any_tool")
     assert _is_audit_grounding("execute_code")
     assert not _is_audit_grounding("random_unknown_tool")
@@ -40,7 +40,7 @@ def test_mcp_result_middle_content_reaches_auditor_full_text():
         + 'MIDDLE_MARKER_19767MiB_TAIL_LINE"}'
     )
     tr = ToolCallResult(
-        call_id="c1", name="mcp_rempilot_rempilot_remote_shell_open",
+        call_id="c1", name="mcp_remote_remote_remote_shell_open",
         arguments={}, result=raw, error=False,
     )
     state = _State([tr])

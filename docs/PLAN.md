@@ -1,76 +1,110 @@
-# PLAN — 2026-10-08 W11：agent 输入框 Shift+Enter 跟随修复 + vibeweaver 技能本地客户端实测/评估
+# PLAN — 2026-10-14 W23：上游对齐（chatbot 1f6c3d4e7→faf9afcab）+ Linux .deb 打包链（LINUX_DEB_UPSTREAM_FIXES 1–7）
 
-来源：用户指令（两任务）。任务 A = ChatInput contenteditable 在「光标已位于可视区最后一行」时按 Shift+Enter，内部滚动不跟随新光标行、鼠标无法选中新行；任务 B = 将 `/home/user/Documents/DEV/SKILLS/vibeweaver` 技能本体加入本地客户端 alice 账号做完整多轮端到端测试，并评估该 skill 是否需要独立 coding 模式与 MoA（仅评估）。
-前置证据：`tests/chatinput_shift_enter/`（最小复现+候选修复实验，已入库）；根因见 verification_log。
+来源：用户指令（两任务，顺序固定）。任务 A = 上游 chatbot 有更新（90 commits），按同步波 SOP 对齐；
+任务 B = 按 `docs/LINUX_DEB_UPSTREAM_FIXES.md` 修改代码，范围经用户裁定为「完整落地打包链」：
+缺陷 1–7 全修 + 新建 `script/linux/package_linux.sh` 与 `electron-builder-linux.yml`。
+本机 macOS 不能交叉编译 Linux 侧车（PyInstaller 无跨平台）→ deb 构建验证面如实标注 UNVERIFIED。
 
 ## Consistency Hub
 
 | entity | canonical value/type | source of truth |
 |---|---|---|
-| 本地客户端后端 | `http://127.0.0.1:8160`（已安装 WeaveThinker.app sidecar；DB 55432） | `~/Library/Application Support/weave-thinker-client/localstack/app/config.toml` `[server].port` |
-| alice 账号 | user_id `beef0002-19ad-4544-b676-c013cc39bed4`（本地 DB `users`） | DB 55432 查询（本波实测） |
-| 目标 skill 源 | `/home/user/Documents/DEV/SKILLS/vibeweaver/`（SKILL.md sha256 `2434bb8d…`） | 用户指令路径 + shasum |
-| 技能上传名 | `vibeweaver`（实测：本地客户端打包 sidecar 无系统技能合并，重名限制不触发；D-74 修订） | 8160 `GET /api/skills` 实测 + D-74 |
-| 技能上传 API | `POST /api/skills/upload`（zip，顶层目录名=技能名；`.py` 触发 executable 警告 → `force=true`） | server/app/api/skills.py:434-533 |
-| 修复文件/函数 | `app/src/components/ChatInput.vue` `scrollCaretIntoView()` + 新增 `measureCaretLineRect()` | 本波 diff |
-| caret 行盒 margin | `8`（既有常量，不新引入） | ChatInput.vue:1426 |
-| dist 测试基址 | `VITE_API_BASE=http://127.0.0.1:8160`（仅在测试构建期，config.toml 用后复原） | D-75 |
-| E2E 测试入口 | `tests/ui_chatinput_shift_enter.py`（dev Electron + CDP，沿用 ui_note_cmd_s.py 模式） | 既有 harness |
-| 评估报告 | `docs/AUDIT_2026-10-08_vibeweaver_coding_mode_moa.md` | 本波交付物 |
-| 验证命令 | `bash script/linux/project_build.sh` · app `test:unit` · `.localstack/venv/bin/python tests/ui_chatinput_shift_enter.py` | package.json / 既有 log |
+| 可写运行时基址 | `config.backend_root`（=`config_path.parent`；打包态=`<userData>/localstack/app`，开发态=`server/`） | `server/app/core/config.py:251` |
+| audio_files 目录 | `Path(config.backend_root) / "audio_files"` | LINUX_DEB_UPSTREAM_FIXES 缺陷 1/2 |
+| output_files 目录 | `str(config.backend_root / "output_files")` | LINUX_DEB_UPSTREAM_FIXES 缺陷 1/4 |
+| drain token 路径 | `os.path.join(str(config.backend_root), ".drain_token")`（0600 语义不变） | LINUX_DEB_UPSTREAM_FIXES 缺陷 1 |
+| fonts 目录 | 保持 `os.path.join(os.path.dirname(__file__), "Fonts")`（只读随包资源，不迁 backend_root） | LINUX_DEB_UPSTREAM_FIXES 缺陷 1 注 |
+| asr 录音目录 | `Path(get_config().backend_root) / "audio_files"`（与上同目录） | LINUX_DEB_UPSTREAM_FIXES 缺陷 2 |
+| desktopName | `"WeaveThinker"`（根 `package.json` 顶层键） | LINUX_DEB_UPSTREAM_FIXES 缺陷 7 |
+| productName / executableName | `WeaveThinker` | `electron-builder.yml` |
+| syncDesktopName | `true`（electron-builder v26 开关；v27 起行为常开并移除该键——本仓 `electron-builder@^26.15.3` 需显式开启） | LINUX_DEB_UPSTREAM_FIXES 缺陷 7 + websearch（electron.build v26 linux 文档） |
+| pyinstaller 版本 | `6.22.3`（`pip install pyinstaller==6.22.3` 固定，替换浮动安装） | LINUX_DEB_UPSTREAM_FIXES 缺陷 3 |
+| pginstall 收集 | `--add-data "$EP_DIR/pginstall${SEP}embedded_postgres/pginstall"`（整树；SEP=`:` 除 Windows） | LINUX_DEB_UPSTREAM_FIXES 缺陷 3 |
+| 上游同步目标 | chatbot `faf9afcab`（推进后即 upstream.toml `base`） | upstream.toml + docs/upstream/UPSTREAM_SYNC_2026-10-14.md |
+| deb 产物 | `dist_installer/WeaveThinker-<version>-amd64.deb` | LINUX_DEB_UPSTREAM_FIXES 验证节 |
+| vendor 路径映射 | 上游 `frontend/`→本地 `app/`、`backend/`→`server/`（合并后 grep 必查） | upstream.toml [[map]] + memory/fix_upstream_sync_wave_20261004.md |
 
-## Task 1 — 根因调查 + 回归测试先行（RED）
+## Task A1 — 直采 ff-safe + new-upstream（111 件）
 
-- **Files**: 既有 `tests/chatinput_shift_enter/{repro.html,repro2.py,probe_fix2.py}`（证据，已入库）；新增 `tests/ui_chatinput_shift_enter.py`。
-- **Interfaces**: Consumes 本地客户端后端 8160（登录/建会话）+ dist（8160 基址）+ dev Electron；Produces RED 证据（修复前 UI 实测：`caret 不可见 / 点击不到新行`）。
-- **Test seam**: 真实组件 `.chat-input`（contenteditable）在真实客户端壳内——DOM rect/scrollTop + 截图；不新增生产代码缝。
-- **Steps**:
-  1. 最小复现（已完成）：确认 Chromium 对行尾 `\n` 边界的折叠 Range 返回空 rects/零 bounding（`tests/chatinput_shift_enter/probe_fix.trace.log`）。验证：M1 空、M2 ZWSP marker 得 24px 行盒。
-  2. 候选修复实验（已完成，`probe_fix2.py` PASS）：marker 回退 + 既有 margin 滚动，连续 4 次 Shift+Enter 均可见；⌘Z 撤销不受 marker 污染。
-  3. 写 `tests/ui_chatinput_shift_enter.py`（含技能 E2E 复用 session helper）→ 对未修复源码跑出 RED。验证：测试 rc=1 且失败点=判据 #1。
+**Files**：Modify — 41 ff-safe + 70 new-upstream 映射对（清单：`docs/upstream/UPSTREAM_SYNC_2026-10-14.md`）；无新文件类型，全部为 `server/`、`app/`、`server/tests/`、`app/tests/` 映射域内文件。
+**Interfaces**：Produces — 与上游 `faf9afcab` 逐字节一致的直采文件；后续 A2/A3 依赖其为合并基件。
+**Test seam**：报告复跑（分类计数）+ `rg -n "frontend/|backend/" <直采件>` 布局 grep（命中即按惯例改路径不改断言，测试文件转 local-mod 并登记）。
+**Steps**：
+1. 对每个 ff-safe/new-upstream 对执行 `git -C /home/user/Documents/DEV/chatbot show faf9afcab:<from> > <to>`（字节级写入）。验证：`bash script/linux/upstream_report.sh` 两分类归零。
+2. 直采件布局 grep `frontend/|backend/`（排除注释文案），命中改为 `app/`/`server/` 相对路径。验证：`rg -n "(\.\./)*frontend/|(\.\./)*backend/" server/tests app/tests | wc -l` 趋零（历史既有个案除外，逐条记录）。
+3. ours→merged 删除行审计（A2 一并做）前置：直采前保存 `git stash create` 无必要——直采不触碰 local-mod 件。
 
-## Task 2 — 修复落地（GREEN，最小变更）
+## Task A2 — 28 个 conflict 件三方合并（保留 §3 登记 hunk）
 
-- **Files**: Modify `app/src/components/ChatInput.vue`（scrollCaretIntoView 回退链 + `measureCaretLineRect()`；isComposing 守卫）。
-- **Interfaces**: Consumes 既有 `isComposing`/`inputAreaRef`；Produces `measureCaretLineRect(range): DOMRect | null`（仅当折叠 Range 无有效 rect 时由 scrollCaretIntoView 调用；测后移除并还原选区）。
-- **Test seam**: 同 Task 1 的 E2E；另跑 app `test:unit` 回归（含 test_voice_toggle_wiring 静态断言）。
-- **Steps**:
-  1. 编辑 ChatInput.vue（test-first 已由 Task 1 的 RED 满足：E2E 针对真实组件）。
-  2. `bash script/linux/project_build.sh`（dist 保持 8160 基址）→ 重跑 E2E 至全绿（含连续换行/点击/撤销/Enter 发送腿）。
-  3. app `test:unit` 全绿。
+**Files**：Modify — 冲突清单 28 件（API.md、conversation.py、skins.py、config.py、database.py、migrations.py、voice_service.py、registry.py、skill_tools.py、main.py、app/package.json、chat.ts、workspaceFiles.ts、ChatInput.vue、FileAttachment.vue、FilePreviewDialog.vue、FolderAttachment.vue、FolderBrowserDialog.vue、MessageBubble.vue、NotebooksList.vue、NotesList.vue、SystemSettingsDialog.vue、WysiwygEditor.vue、useMarkdown.ts、stores/chat.ts、三主题 css）。
+**Interfaces**：Consumes — A1 直采结果（同域邻件）；Produces — 合并后本地树（本地 hunk 全保留 + 上游新性全进）。
+**Test seam**：守卫测试（`server/tests/test_main_sync_wiring.py`、`test_main_device_executor_wiring.py`、`test_local_patch_imports`、`test_payload_stub_guard`、`test_config_resource_resolver.py` 本地腿）+ 双审计输出落 `tests/upstream_merge_audit_w23.md`。
+**Steps**（逐件重复，件件验证）：
+1. 提取 base：`git -C /home/user/Documents/DEV/chatbot show 1f6c3d4e7:<from> > /tmp/w23/base`；ours=本地现件；theirs=`git show faf9afcab:<from>`。
+2. `git merge-file ours base theirs` → 解冲突标记；冲突区裁决规则=DECISION_MATRIX §3 登记 hunk 优先保留（本地语义），其余按「以上游为准」取上游。
+3. 审计 a（ours→merged 删除行）：`diff <(sed ...) 本地旧件` 找出被合并静默删除的本地行——每一删除行必须能指认是登记 hunk 的故意替换还是吞特性（吞特性=回植）。
+4. 审计 b（对上游残差）：`diff <(git show faf9afcab:<from>) <合并件>` 残差只应剩本地登记 hunk（+已知 vendor 路径改写），逐条指认。
+5. 布局 grep 同 A1-2。验证命令：`cd server && ../.localstack/venv/bin/python -m pytest tests/test_main_sync_wiring.py tests/test_main_device_executor_wiring.py tests/test_config_resource_resolver.py -q`。
 
-## Task 3 — 技能上传到本地客户端账号
+## Task A3 — 测试全绿 + base 推进 + 报告清零
 
-- **Files**: 生成物 `tests/vibeweaver_dev_upload.zip`（不入库，随测试清单）；账号 DB 行（user_skills/skill_files，外部状态）。
-- **Interfaces**: Consumes `POST /api/auth/login`（alice）+ `POST /api/skills/upload?force=true`；Produces 可复读的账号技能 `vibeweaver`（含 files）。
-- **Test seam**: HTTP API 双证（列表 + by-name 详情文件清单/sha 对比源文件）；UI 面板可见（Task 4 截图）。
-- **Steps**:
-  1. 打包技能本体（SKILL.md + 10 伴读 + scripts/，排除 tests/memory/.git/.DS_Store）为 zip，顶层目录 `vibeweaver/`。
-  2. 登录 8160 → 上传 → `GET /api/skills/by-name/vibeweaver` 核对文件数/内容；`GET /api/skills` 与 DB `skill_files` 双证。
+**Files**：Modify — `upstream.toml`（base→faf9afcab）、`docs/upstream/UPSTREAM_SYNC_2026-10-15.md`（复跑报告）、merge-induced 测试修复件（若有，test-change 登记）。
+**Interfaces**：Consumes — A1+A2 树；Produces — 同步域清零的交付树。
+**Test seam**：`bash script/linux/project_build.sh` + `cd server && ../.localstack/venv/bin/python -m pytest tests/ -q` + `npm --workspace app run test:unit` + `bash script/linux/upstream_report.sh`。
+**Steps**：
+1. 三件套跑绿；失败→归因（合并错误=修代码；上游自有缺陷=三类分野处置并记录），`diagnosis:` 入 log。
+2. `upstream.toml` base=`faf9afcab`；复跑报告确认 conflict/ff-safe/new-upstream/added-both/gone-*=0。
+3. 提交同步波 commit。
 
-## Task 4 — 完整多轮端到端（UI，真实 LLM）
+## Task B1 — RED：可写路径回归测试（A4.8）
 
-- **Files**: `tests/ui_chatinput_shift_enter.py`（会话腿复用）+ 证据 `tests/screenshots/w11_*`·`tests/w11_chat_e2e.trace.log`。
-- **Interfaces**: Consumes Task 2 的修复构建 + Task 3 的账号技能；Produces 判据 #5/#6 证据（技能可见；≥2 轮对话真实调用技能加载）。
-- **Test seam**: 真实客户端 UI：SkillsPanel 列表 + ChatArea 会话（agent SSE 轨迹/DOM tool 卡片）。每步超时 120s；LLM 单轮超时余量 180s。
-- **Steps**:
-  1. 冷启动 dev Electron（isolated profile）→ 注入 alice 登录态 → 技能面板断言 `vibeweaver` 在列（API 交叉核对）。
-  2. 新建会话 → 第 1 轮：任务指令（显式点名技能）→ 断言 agent 调用了技能加载工具（DOM/SSE 可见），且回复体现该技能工作流（如判定/分级/计划项）。
-  3. 第 2 轮：按技能流程提供下一步输入（如确认/选择）→ 断言会话连续、技能上下文延续（≥2 轮）。
-  4. 截图（面板/会话末态）+ trace 落盘。
+**Files**：Create — `server/tests/test_writable_runtime_paths.py`。
+**Interfaces**：Produces — 4 个测试：`test_asr_audio_dir_uses_backend_root`（monkeypatch config_path→tmp，`ASRService.get_audio_files_dir()` 应为 tmp/audio_files）、`test_main_startup_dirs_use_backend_root`（main.py 源中断言 audio/output/drain 三路径以 `config.backend_root` 为基、Fonts 保持 `__file__`）、`test_export_and_browser_output_dir_use_backend_root`（两服务源断言 output_files 基址=backend_root、`dirname(__file__)` 派生模式绝迹）、`test_dev_mode_paths_unchanged`（开发 config 下 backend_root/audio_files==server/audio_files，钉「开发态路径不变」契约）。
+**Test seam**：`cd server && ../.localstack/venv/bin/python -m pytest tests/test_writable_runtime_paths.py -q`。
+**Steps**：
+1. 写 4 测试并运行 → asr 腿 + 源断言腿 **RED**（现码 `dirname×3`/`dirname×2` 模式）→ 失败输出逐字入 log。
+2. 不改测试进入 B2。
 
-## Task 5 — 评估报告（仅评估，零产品代码改动）
+## Task B2 — 缺陷 1/2/4（server 写盘路径）+ 5/6（卫生/文档）
 
-- **Files**: 新增 `docs/AUDIT_2026-10-08_vibeweaver_coding_mode_moa.md`。
-- **Interfaces**: Consumes Task 4 实测证据 + 本仓机制事实（skill_tools/force_inject/hooks/MoA tool/deathmatch 模式/delegation 配置）；Produces 两问判定（独立 coding 模式？MoA？）与理由/证据。
-- **Test seam**: 文档 read-back + 关键事实 grep 核对（如 `mixture_of_agents` 工具注册、`agent.moa.enabled`、skill force_inject 语义、deathmatch 用途）。
-- **Steps**:
-  1. 事实采集：`server/app/tools/skill_tools.py`（技能加载/注入语义）· `server/app/services/moa_service.py`+`tools/mixture_of_agents.py`（MoA 现状与开关）· `server/app/core/config.py`（force_inject/moa/delegation 配置）· deathmatch（语义=死磕模式，非 coding 模式）。
-  2. 基于多轮 E2E 实测（技能在通用 agent 模式下的真实表现）逐项判定：独立 coding 模式必要性（对照现有机制能否达成目标、缺口是什么、成本）；MoA 必要性（技能属流程性方法论，MoA 本质=多模型答案聚合——是否命中其收益面）。
-  3. 报告 read-back + `docs-drift` 判定。
+**Files**：Modify — `server/main.py`（startup_event）、`server/app/services/asr_service.py`（get_audio_files_dir，删无用 `import os` 若不再用）、`server/app/services/interactive_browser_service.py`（619/665 两处）、`server/app/services/export_worker.py`（128）、`.gitignore`（+.cache/）、`README.md`（打包段+Linux）。
+**Interfaces**：Consumes — Hub「可写运行时基址」行；Produces — B1 测试 GREEN。
+**Test seam**：B1 测试 + `cd server && ../.localstack/venv/bin/python -m pytest tests/ -q`。
+**Steps**：
+1. 按文档补丁逐件修改（补丁原文为准；字体目录不动）。
+2. B1 测试 GREEN + server 全量零回归。
 
-## 计划自审
+## Task B3 — 缺陷 3（build_sidecar.sh pginstall 整树 + pyinstaller 钉版）
 
-- Coverage：判据 #1/#2/#3/#4 → Task 1/2；#5/#6 → Task 3/4；#7 → Task 5，全覆盖。
-- Placeholder scan：无 TBD/「类似 Task N」；每步含验证动作（命令或复读断言）。
-- Type consistency：`vibeweaver` / `8160` / `scrollCaretIntoView` / `measureCaretLineRect` / `tests/ui_chatinput_shift_enter.py` 全篇单源（Hub 行）。
+**Files**：Modify — `script/linux/build_sidecar.sh`。
+**Interfaces**：Consumes — Hub「pyinstaller 版本」「pginstall 收集」行；Produces — Linux 侧车含 80 个 PG 扩展 .so（macOS 侧同款断言见 B5 待验清单）。
+**Test seam**：bash 语法闸（`bash -n`）+ 本机 macOS 构建冒烟（侧车仍可建，收集面含 pginstall 断言脚本钩子）+ `tests/sidecar_pginstall_assert.sh`（构建后断言 `dist_sidecar/weave-server/_internal/embedded_postgres/pginstall/lib/dict_snowball*` 在场——macOS 环境同样适用）。
+**Steps**：
+1. 应用文档 diff（钉 `pyinstaller==6.22.3`、EP_DIR 解析、`--add-data` 整树、缺 pginstall 即 fail-fast）。
+2. `bash -n script/linux/build_sidecar.sh` + 实跑 `bash script/linux/build_sidecar.sh` 并断言 pginstall 树在产物中。
+
+## Task B4 — 缺陷 7 + 打包链（electron-builder-linux.yml + package_linux.sh）
+
+**Files**：Modify — `package.json`（+`"desktopName": "WeaveThinker"`）；Create — `electron-builder-linux.yml`、`script/linux/package_linux.sh`。
+**Interfaces**：Consumes — `electron-builder.yml`（macOS 版结构参照：appId/productName/files/extraResources/sidecar 映射）、`script/linux/build_sidecar.sh`（B3）、`script/linux/project_build.sh`；Produces — `dist_installer/WeaveThinker-<ver>-amd64.deb`（Linux 上）。
+**Test seam**：`python -c "import yaml…"` 配置解析闸（或 node smol-toml/yaml 等价）+ `bash -n` + `node -e` 探针（package.json desktopName 在场断言）+ electron-builder schema 校验（`npx electron-builder --help` 不验 schema；用配置加载尝试 `npx electron-builder --linux deb --dir` dry 在 macOS 会走 mac 路径——故本机只做静态断言，实跑入待验清单）。
+**Steps**：
+1. `package.json` 增 desktopName（顶层，与 workspaces 平级）。
+2. 写 `electron-builder-linux.yml`：linux.target=deb、category=Utility、icon=build/icon.png、**`syncDesktopName: true`**（注释注明 v26 语义/v27 移除）、沿用 electron-builder.yml 的 appId/productName/files/extraResources 侧车映射。
+3. 写 `script/linux/package_linux.sh`：对齐 package_macos.sh 四段流程（SPA→侧车→BUILD_ID→electron-builder `--config electron-builder-linux.yml` deb），产物 `dist_installer/`，日志 `logs/package_linux.log`；注释声明目标机依赖（系统 git/ffmpeg 或后续随包，deferred）与非 root 安装验证方法（引 LINUX_DEB_UPSTREAM_FIXES 验证节）。
+4. 静态断言：desktopName/syncDesktopName 在位（守卫并入 B1 测试文件或独立 `tests/test_linux_packaging_config.py`）。
+
+## Task B5 — 终验 + 双评审（Lane L §V4）+ FCV
+
+**Files**：Modify — 评审修复件（若有）；Create — `tests/coverage_matrix.md`、`tests/fcv_brief.md`、`tests/fcv_report.md`、`tests/upstream_merge_audit_w23.md`。
+**Steps**：
+1. 全量三件套 + `bash script/linux/check_hygiene.sh`。
+2. 双对抗 fresh-context 评审（git diff 83c0600..HEAD）→ 收口 Critical/Important → scoped re-review。
+3. FCV brief → 子代理独立复跑 → `Fresh-verify: pass`。
+4. memory（A7.9）+ Memory Gate（A7.10）+ 完成输出（A4.4）。
+
+## Plan self-review
+
+1. Coverage — 判据 #27–#30→A1/A2/A3；#31/32→B1/B2；#33→B3；#34→B2；#35→B2；#36/37→B4；#38→B5。全覆盖。
+2. Placeholder scan — 无 TBD/待定；「deferred」项（git/ffmpeg 随包、config.data_path() 收敛、Linux 实机 deb 构建）显式出表为待验/建议项而非隐藏。
+3. Type consistency — Hub 行内路径拼写在 B1 测试与 B2 实现间一致（`backend_root / "audio_files"`、`backend_root / "output_files"`、`.drain_token`）；`syncDesktopName` 拼写一致。

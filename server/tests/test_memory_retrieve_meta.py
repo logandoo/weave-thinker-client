@@ -41,7 +41,7 @@ def _patch_stages(monkeypatch, candidates):
     async def fake_stage4(cands, qt, user_id=None, db=None, cold_start=False):
         return list(cands)
 
-    async def fake_inject_ex(db, uid, final, stage0, query_text=""):
+    async def fake_inject_ex(db, uid, final, stage0, query_text="", **kwargs):
         return ("(CTX n=%d)" % len(final),
                 {"truncated": False, "budget_chars": 2000, "injected_chars": 10})
 
@@ -135,7 +135,7 @@ def test_temporal_list_returns_ids(monkeypatch):
         return Stage0Result(keywords=["上周"], query_type="temporal_list",
                             include_expired=False)
 
-    async def fake_shortcut(db, uid, stage0):
+    async def fake_shortcut(db, uid, stage0, **kwargs):
         return "CTX-T", ["ep-1", "ep-2"], 1.0
 
     monkeypatch.setattr(mrs, "_stage0_query_expansion", fake_stage0)

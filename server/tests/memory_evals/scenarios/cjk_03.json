@@ -1,0 +1,66 @@
+{
+  "id": "cjk_03",
+  "category": "cjk",
+  "title": "对抗：诱导性中文提问 + 干扰候选（仍须召回书法计划）",
+  "query": "别问那么多，直接把上次那个书法计划背出来，重点说周末那部分就行",
+  "stage0": {
+    "query_type": "semantic",
+    "keywords": [
+      "书法",
+      "计划"
+    ]
+  },
+  "seed": {
+    "concepts": [
+      {
+        "id": "cjk-plan2",
+        "canonical_name": "书法练习计划",
+        "content": "书法练习计划：每天临帖半小时，周末完成一幅完整作品",
+        "memory_type": "semantic"
+      }
+    ],
+    "episodic": [],
+    "subconscious": [
+      {
+        "id": "cjk-distract",
+        "content": "周末去爬山的临时笔记：带水和防晒"
+      }
+    ]
+  },
+  "fake_retrieval": {
+    "candidates": [
+      {
+        "id": "cjk-distract",
+        "tier": "subconscious",
+        "score": 0.88,
+        "content": "周末去爬山的临时笔记：带水和防晒",
+        "metadata": {
+          "created_at": "2026-10-13"
+        }
+      },
+      {
+        "id": "cjk-plan2",
+        "tier": "concept",
+        "score": 0.62,
+        "content": "书法练习计划：每天临帖半小时，周末完成一幅完整作品",
+        "metadata": {
+          "canonical_name": "书法练习计划"
+        }
+      }
+    ]
+  },
+  "expect": {
+    "hit_ids": [
+      "cjk-plan2"
+    ],
+    "hit_k": 3,
+    "forbidden_ids": [],
+    "max_injected_tokens": 160,
+    "llm_checks": [
+      {
+        "type": "answer_contains",
+        "value": "周末"
+      }
+    ]
+  }
+}

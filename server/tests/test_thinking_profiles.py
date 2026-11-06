@@ -27,13 +27,33 @@ class TestProfileRegistry:
 
 
 class TestProfileWireShapes:
-    def test_deepseek_enable_effort_budget(self):
+    def test_deepseek_enable_effort_only(self):
+        """2026-10-18: DeepSeek documents effort only; thinking_budget is not
+        a wire field (harness-aligned). Passing budget must not emit it."""
         from app.model_gateway.profiles import get_thinking_profile
         p = get_thinking_profile("deepseek")
         assert p.enable(effort="max", budget=1024) == {
-            "thinking": {"type": "enabled"}, "reasoning_effort": "max", "thinking_budget": 1024,
+            "thinking": {"type": "enabled"}, "reasoning_effort": "max",
         }
         assert p.efforts == ("low", "high", "max")
+
+    def test_deepseek_sanitize_thinking_params(self):
+        """Thinking mode ignores temperature/penalties; top_p clamps to 0.95."""
+        from app.model_gateway.profiles import get_thinking_profile
+        p = get_thinking_profile("deepseek")
+        out = p.sanitize_request({
+            "temperature": 0.7, "top_p": 0.9,
+            "presence_penalty": 1.5, "frequency_penalty": 0.0,
+            "extra_body": {"thinking": {"type": "enabled"}, "thinking_budget": 512},
+        }, thinking=True)
+        assert "temperature" not in out
+        assert "presence_penalty" not in out
+        assert "frequency_penalty" not in out
+        assert out["top_p"] == 0.95
+        assert "thinking_budget" not in out["extra_body"]
+        # Non-thinking: sampling params stay (they are effective there).
+        out2 = p.sanitize_request({"temperature": 0.7, "top_p": 0.9}, thinking=False)
+        assert out2["temperature"] == 0.7 and out2["top_p"] == 0.9
 
     def test_qwen38_enable_ctk(self):
         from app.model_gateway.profiles import get_thinking_profile
@@ -182,6 +202,14 @@ class TestProfilePreserveAndSampling:
 
 
 class TestSniff:
+    def test_deepseek_url(self):
+        """2026-10-18: legacy/custom endpoints pointing at DeepSeek must get
+        the DeepSeek profile (preserve_thinking + param hygiene), not generic."""
+        from app.model_gateway.profiles import sniff_thinking_profile
+        p = sniff_thinking_profile("https://api.deepseek.com/v1", "deepseek-flash")
+        assert p.name == "deepseek"
+        assert p.preserve_thinking is True
+
     def test_dashscope_url(self):
         from app.model_gateway.profiles import sniff_thinking_profile
         p = sniff_thinking_profile("https://dashscope.aliyuncs.com/v1", "qwen3-max")
@@ -208,6 +236,41 @@ class TestSniff:
         assert p.normalize_user_extra_body({"thinking": {"type": "enabled"}}) == {
             "thinking": {"type": "enabled"},
         }
+
+
+class TestDeepSeekWireBuild:
+    """2026-10-18: final DeepSeek request body matches the documented
+    thinking-mode semantics (no ignored sampling params, no budget field)."""
+
+    def test_thinking_wire_shape(self):
+        from app.model_gateway import factory
+        from app.model_gateway.schemas import KIND_LLM, ModelEndpoint
+        ep = ModelEndpoint(
+            alias="deepseek", kind=KIND_LLM,
+            base_url="https://api.deepseek.com/v1", api_key="test-key",
+            model_name="deepseek-flash", provider_type="deepseek",
+            is_custom=True, params={"top_p": 0.95},
+        )
+        llm = factory.build_llm_service(ep, preserve_reasoning=True)
+        params = llm._build_params(
+            [{"role": "user", "content": "hi"}],
+            temperature=0.7,
+            presence_penalty=1.5,
+            frequency_penalty=0.0,
+            top_p=0.9,
+            extra_body={
+                "thinking": {"type": "enabled"},
+                "reasoning_effort": "high",
+                "thinking_budget": 999,
+            },
+        )
+        assert params["model"] == "deepseek-flash"
+        assert "temperature" not in params
+        assert "presence_penalty" not in params
+        assert "frequency_penalty" not in params
+        assert params["top_p"] == 0.95
+        assert "thinking_budget" not in params["extra_body"]
+        assert params["extra_body"]["reasoning_effort"] == "high"
 
 
 class TestFacadeDelegation:

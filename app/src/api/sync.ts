@@ -49,8 +49,9 @@ export async function revokeSyncDevice(id: string): Promise<void> {
   await api.post(`/sync/devices/${id}/revoke`)
 }
 
-export async function getSyncConflicts(limit = 50): Promise<SyncConflict[]> {
-  const { data } = await api.get('/sync/conflicts', { params: { limit } })
+export async function getSyncConflicts(limit = 50, offset = 0): Promise<SyncConflict[]> {
+  // 服务端 /sync/conflicts 既有 offset/limit 分页契约（S4；红线 B 面零变更）
+  const { data } = await api.get('/sync/conflicts', { params: { limit, offset } })
   return data
 }
 

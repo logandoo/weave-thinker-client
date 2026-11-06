@@ -1,0 +1,83 @@
+{
+  "id": "temporal_list_03",
+  "category": "temporal_list",
+  "title": "对抗：时间陷阱——高分过期旧事件干扰“昨天”窗口列表",
+  "query": "昨天我改了哪些配置？帮我列一下",
+  "stage0": {
+    "query_type": "temporal_list",
+    "keywords": [
+      "昨天",
+      "配置"
+    ]
+  },
+  "seed": {
+    "concepts": [],
+    "episodic": [
+      {
+        "id": "e-cfg-1",
+        "content": "[2026-10-12] 调整了检索阈值"
+      },
+      {
+        "id": "e-cfg-2",
+        "content": "[2026-10-12] 关闭了过期记忆注入"
+      },
+      {
+        "id": "e-cfg-old",
+        "content": "[2026-09-30] 更早的一次配置变更（已过期）"
+      }
+    ],
+    "subconscious": []
+  },
+  "fake_retrieval": {
+    "candidates": [
+      {
+        "id": "e-cfg-old",
+        "tier": "episodic",
+        "score": 0.92,
+        "content": "[2026-09-30] 更早的一次配置变更（已过期）",
+        "metadata": {
+          "valid_from": "2026-09-30",
+          "valid_to": "2026-10-05"
+        }
+      },
+      {
+        "id": "e-cfg-1",
+        "tier": "episodic",
+        "score": 0.72,
+        "content": "[2026-10-12] 调整了检索阈值",
+        "metadata": {
+          "valid_from": "2026-10-12"
+        }
+      },
+      {
+        "id": "e-cfg-2",
+        "tier": "episodic",
+        "score": 0.7,
+        "content": "[2026-10-12] 关闭了过期记忆注入",
+        "metadata": {
+          "valid_from": "2026-10-12"
+        }
+      }
+    ]
+  },
+  "expect": {
+    "hit_ids": [
+      "e-cfg-1",
+      "e-cfg-2"
+    ],
+    "hit_k": 3,
+    "forbidden_ids": [
+      "e-cfg-old"
+    ],
+    "llm_checks": [
+      {
+        "type": "answer_lists_all",
+        "value": "2"
+      },
+      {
+        "type": "answer_not_contains",
+        "value": "2026-09-30"
+      }
+    ]
+  }
+}

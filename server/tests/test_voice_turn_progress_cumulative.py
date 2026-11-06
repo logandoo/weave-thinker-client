@@ -1,8 +1,9 @@
 """语音回合进度持久化——单调累计契约（conv 4e159a79 同族排查，2026-10-01）。
 
 `_persist_turn_progress` 每次**整体替换** msg.content。审计结论（✅ 无收缩）：
-mid-loop 三处调用传 `full_reply + reply_text`（累计），循环两出口先
-`full_reply += reply_text` 折叠再 final 传 `full_reply` —— content 恒单调增长。
+mid-loop 四处调用传 `full_reply + reply_text`（累计；P1b 新增了 act-gate 拒绝
+分支），循环两出口先 `full_reply += reply_text` 折叠再 final 传 `full_reply`
+—— content 恒单调增长。
 本测试钉死接线契约：所有调用点首参必须以 `full_reply` 为根的累计表达式，
 防止未来编辑漏掉 `reply_text` 造成部分快照覆盖（conv 4e159a79 数据丢失类）。
 
@@ -14,10 +15,11 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-_SRC = open(
-    os.path.join(os.path.dirname(__file__), "..", "app", "services", "voice_service.py"),
-    encoding="utf-8",
-).read()
+_SERVICE_DIR = os.path.join(os.path.dirname(__file__), "..", "app", "services")
+_SRC = "\n".join(
+    open(os.path.join(_SERVICE_DIR, name), encoding="utf-8").read()
+    for name in ("voice_service.py", "voice_generation.py")
+)
 
 _CALL_RE = re.compile(r"_persist_turn_progress\(\s*\n?\s*([^,\n]+)")
 
@@ -30,7 +32,7 @@ def test_all_call_sites_pass_cumulative_content():
         if "def " in line:
             continue  # 方法定义行
         sites.append(m.group(1).strip())
-    assert len(sites) == 4, f"调用点数量变化（预期 4，实际 {len(sites)}）——请同步更新本契约"
+    assert len(sites) == 5, f"调用点数量变化（预期 5，实际 {len(sites)}）——请同步更新本契约"
     for i, first_arg in enumerate(sites):
         arg = first_arg.strip()
         assert arg.startswith("full_reply"), (

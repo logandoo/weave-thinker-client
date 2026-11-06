@@ -1,0 +1,27 @@
+{
+  "id": "contradiction_update_02",
+  "category": "contradiction_update",
+  "title": "矛盾更新：部署环境已迁移",
+  "query": "当前的部署环境是哪个？",
+  "stage0": {"query_type": "semantic", "keywords": ["部署", "环境"]},
+  "seed": {
+    "concepts": [
+      {"id": "c-env-old", "canonical_name": "部署环境（旧）", "content": "部署在测试机 10.0.0.5", "memory_type": "semantic"},
+      {"id": "c-env-new", "canonical_name": "部署环境（现行）", "content": "已迁到 60 服务器 8158", "memory_type": "semantic"}
+    ],
+    "episodic": [],
+    "subconscious": []
+  },
+  "fake_retrieval": {
+    "candidates": [
+      {"id": "c-env-old", "tier": "concept", "score": 0.8, "content": "部署在测试机 10.0.0.5", "metadata": {"canonical_name": "部署环境（旧）", "valid_to": "2026-10-01"}},
+      {"id": "c-env-new", "tier": "concept", "score": 0.7, "content": "已迁到 60 服务器 8158", "metadata": {"canonical_name": "部署环境（现行）"}}
+    ]
+  },
+  "expect": {
+    "hit_ids": ["c-env-new"],
+    "hit_k": 3,
+    "forbidden_ids": ["c-env-old"],
+    "llm_checks": [{"type": "answer_not_contains", "value": "10.0.0.5"}]
+  }
+}

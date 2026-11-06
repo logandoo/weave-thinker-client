@@ -196,12 +196,14 @@ def test_t5_voice_and_deathmatch_replay_neutralized():
     历史回放同样接入中性化——voice 路径无台账（[N] 会被 TTS 读出/被模型
     模仿），deathmatch 压缩摘要路径同理。"""
     import inspect
+    from pathlib import Path
 
     import app.services.deathmatch_service as dm_mod
     import app.services.voice_service as voice_mod
 
-    vsrc = inspect.getsource(voice_mod)
+    base = Path(voice_mod.__file__).resolve().parent
+    vsrc = "".join(p.read_text(encoding="utf-8") for p in base.glob("voice_*.py"))
+    dsrc = "".join(p.read_text(encoding="utf-8") for p in base.glob("deathmatch_*.py"))
     assert "neutralize_historical_citations" in vsrc, "voice_service 回放未接入中性化"
     assert "_denumber_search_formatted" in vsrc, "voice_service 工具消息未去编号"
-    dsrc = inspect.getsource(dm_mod)
     assert "neutralize_historical_citations" in dsrc, "deathmatch_service 回放未接入中性化"

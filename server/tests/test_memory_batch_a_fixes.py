@@ -132,7 +132,8 @@ def test_memory_injection_sections_not_truncated():
 
     assert len(sections) == 1
     assert len(sections[0]) > 1500
-    assert sections[0].endswith("记" * 10)
+    assert ("记" * 10) in sections[0]
+    assert sections[0].rstrip().endswith("</untrusted-data>")
 
 
 def test_memory_injection_sections_entries_still_capped():

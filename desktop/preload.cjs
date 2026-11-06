@@ -12,7 +12,12 @@ const apiArg = (process.argv || []).find((a) => String(a).startsWith('--weave-ap
 const rawApiBase = apiArg ? String(apiArg).slice('--weave-api-base='.length) : ''
 // 只接受 loopback http(s) base（评审 Minor：注入值不得指向任意主机）
 const safeApiBase = /^https?:\/\/(127\.0\.0\.1|localhost)(:\d{1,5})?$/.test(rawApiBase) ? rawApiBase : ''
-contextBridge.exposeInMainWorld('weaveRuntime', { apiBase: safeApiBase })
+// W26 执行模式（云端/本地客户端层区分）：主进程仅在本地栈实启时注入
+// --weave-exec-mode=local；白名单校验，非法值一律视为云端。
+const modeArg = (process.argv || []).find((a) => String(a).startsWith('--weave-exec-mode='))
+const rawMode = modeArg ? String(modeArg).slice('--weave-exec-mode='.length) : ''
+const execMode = rawMode === 'local' ? 'local' : ''
+contextBridge.exposeInMainWorld('weaveRuntime', { apiBase: safeApiBase, execMode })
 
 contextBridge.exposeInMainWorld('NativeBridge', {
   platform: { os: process.platform, kind: 'desktop', shell: 'electron' },

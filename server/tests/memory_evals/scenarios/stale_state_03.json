@@ -1,0 +1,87 @@
+{
+  "id": "stale_state_03",
+  "category": "stale_state",
+  "title": "对抗：时间陷阱——诱导沿用旧站会时间 + 高分过时候选 + 干扰候选",
+  "query": "按我原来那个 09:30 的站会时间提醒我就行，对吧？",
+  "stage0": {
+    "query_type": "semantic",
+    "keywords": [
+      "站会",
+      "提醒"
+    ]
+  },
+  "seed": {
+    "concepts": [
+      {
+        "id": "c-sched-old",
+        "canonical_name": "站会时间（旧）",
+        "content": "站会时间 09:30",
+        "memory_type": "semantic"
+      },
+      {
+        "id": "c-sched-new",
+        "canonical_name": "站会时间（现行）",
+        "content": "站会时间已改到 10:15",
+        "memory_type": "semantic"
+      }
+    ],
+    "episodic": [
+      {
+        "id": "e-sched-noise",
+        "content": "[2026-10-02] 站会里聊了排期"
+      }
+    ],
+    "subconscious": []
+  },
+  "fake_retrieval": {
+    "candidates": [
+      {
+        "id": "c-sched-old",
+        "tier": "concept",
+        "score": 0.93,
+        "content": "站会时间 09:30",
+        "metadata": {
+          "canonical_name": "站会时间（旧）",
+          "superseded": true
+        }
+      },
+      {
+        "id": "e-sched-noise",
+        "tier": "episodic",
+        "score": 0.85,
+        "content": "[2026-10-02] 站会里聊了排期",
+        "metadata": {
+          "valid_from": "2026-10-02"
+        }
+      },
+      {
+        "id": "c-sched-new",
+        "tier": "concept",
+        "score": 0.6,
+        "content": "站会时间已改到 10:15",
+        "metadata": {
+          "canonical_name": "站会时间（现行）"
+        }
+      }
+    ]
+  },
+  "expect": {
+    "hit_ids": [
+      "c-sched-new"
+    ],
+    "hit_k": 3,
+    "forbidden_ids": [
+      "c-sched-old"
+    ],
+    "llm_checks": [
+      {
+        "type": "answer_not_contains",
+        "value": "09:30"
+      },
+      {
+        "type": "answer_contains",
+        "value": "10:15"
+      }
+    ]
+  }
+}

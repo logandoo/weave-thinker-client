@@ -99,8 +99,10 @@ def test_t2_receipt_grounds_converted_value():
 
 # ── T3: hardcode escape (B1, acceptance #3) ──
 def test_t3_hardcoded_print_not_a_receipt():
+    # 2026-10-18 收紧+4a 根治：触发改数学块结果位（纯文本心算归审计员；
+    # 不可信回执输出不再喂闭包）；B1a 语义不变——裸 print 字面量永不接地
     r = _report(
-        "代入计算得该锥管容积约为 40000 mm³。",
+        "代入：$$V ≈ 40000\\ \\text{mm}^3$$",
         user_messages=[STRAWBERRY_USER_MSG],
         tool_calls=[{"name": "execute_code", "code": "print(40000)", "output": "40000"}],
     )
@@ -118,9 +120,11 @@ def test_t3b_real_expression_is_a_receipt():
 
 # ── T4: Chinese numerals (B3, acceptance #4) ──
 def test_t4_chinese_numeral_ungrounded():
-    r = _report("该锥管容积约为一百八十六毫升。", user_messages=[STRAWBERRY_USER_MSG])
+    # 2026-10-18 收紧（用户裁定）：触发=闭包命中/数学块结果位。二百二十=110×2
+    # 在用户输入闭包内且体积族可导出 → 必须有回执；同时钉中文数字归一化（220）。
+    r = _report("该锥管容积约为二百二十毫升。", user_messages=[STRAWBERRY_USER_MSG])
     assert r.flags != [], "中文数字推导值未被提取"
-    assert any(abs(f.value - 186.0) < 1.0 for f in r.flags), f"中文数字未归一化为 186: {r.flags}"
+    assert any(abs(f.value - 220.0) < 1.0 for f in r.flags), f"中文数字未归一化为 220: {r.flags}"
 
 
 def test_t4b_chinese_numeral_receipt_grounded():
@@ -135,7 +139,10 @@ def test_t4b_chinese_numeral_receipt_grounded():
 # ── T5: domain separation (B2, acceptance #5) ──
 def test_t5a_assistant_history_text_never_grounds():
     # 上一轮 assistant 幻觉数字（不在 evidence_text/user_messages）不能接地
-    r = _report("正如上一轮所说，容积约为 186.5 ml。", user_messages=[STRAWBERRY_USER_MSG])
+    # 2026-10-18 收紧：220=110×2 在闭包内（体积族可导出）→ 触发；历史文本
+    # 不在 evidence/user 来源 → 永不接地 → 打回。原 186.5 形态在新 spec 下
+    # 不触发（非闭包非数学块），语义判定归 LLM 审计员。
+    r = _report("正如上一轮所说，容积约为 220 ml。", user_messages=[STRAWBERRY_USER_MSG])
     assert r.flags != [], "历史 assistant 文本数字被当作接地来源"
 
 
@@ -169,15 +176,19 @@ def test_t7_risk_grading():
     # 无标记、闭包外、族不可导出 → 知识点值豁免（T17 语义，2026-09-02 晚修订）
     r = _report("该文件大小约为 12 GB。", user_messages=[])
     assert r.flags == [], f"无标记知识点值被误标: {r.flags}"
-    # 计算标记 + 闭包外 → gated
-    r = _report("经计算该文件大小约为 12 GB。", user_messages=[])
-    assert r.flags != [], "标记型 12GB 未被 gated"
-    # 无单位 ≥3 位 gated（总数标记）
-    r = _report("总数为 40000。", user_messages=[])
-    assert r.flags != [], "总数 40000 未被 gated"
-    # 裸小数（≥2 位有效数字）+ 标记 gated
-    r = _report("比值约为 186.5。", user_messages=[])
-    assert r.flags != [], "比值 186.5 未被 gated"
+    # 2026-10-18 收紧（用户裁定删关键词标记表）：以下三例由「标记触发」改写为
+    # 「闭包命中触发」的等价形态——语义「是不是计算」归 LLM 审计员，NPG 只管
+    # 算术可归因性。12=6×2（data 族用户消息可导出）→ 必须有回执。
+    r = _report("扩容后该文件大小约为 12 GB。", user_messages=["旧盘只有 6 GB，太小了"])
+    assert r.flags != [], "闭包命中 12GB 未被 gated"
+    # 无单位 ≥3 位 + 闭包命中（40000=20000×2）→ gated
+    r = _report("总数为 40000。", user_messages=["预估 20000 行数据"])
+    assert r.flags != [], "闭包命中 40000 未被 gated"
+    # 闭包命中（375=250+125 配对和；count 族在可导出排除清单内，须用
+    # data 等可导出族）→ gated。取值避开 19xx/20xx 年号形态（_YEAR_RE
+    # 预豁免）与 B8 单步变换清单（un/2、un×10 等）。
+    r = _report("扩容后约 375 GB。", user_messages=["旧盘 250 GB，分区占 125 GB"])
+    assert r.flags != [], "闭包命中 375GB 未被 gated"
 
 
 # ── T2c: calculate receipt grounds (A4.9 C1 regression) ──
@@ -193,8 +204,10 @@ def test_t2c_calculate_receipt_grounds():
 
 
 def test_t2d_calculate_hardcode_expression_not_a_receipt():
+    # 2026-10-18 收紧+4a 根治：数学块结果位触发；calculate 裸字面量表达式
+    # （expression 即 B1 的 code）不接地（B1a 覆盖 calculate 通道）
     r = _report(
-        "代入计算得该锥管容积约为 186.5 ml。",
+        "代入：$$V ≈ 186.5\\ \\text{ml}$$",
         user_messages=[STRAWBERRY_USER_MSG],
         tool_calls=[{"name": "calculate", "code": "186.5", "output": '{"success":true,"numeric":186.5}'}],
     )
@@ -213,8 +226,9 @@ def test_t2e_single_digit_user_number_anchor():
 
 # ── T3 additional hardcode shapes (A4.9 C2 regression) ──
 def test_t3c_assign_then_print_hardcode():
+    # 同上：数学块结果位触发；赋值后打印的硬编码不接地（B1a 覆盖）
     r = _report(
-        "代入计算得该锥管容积约为 40000 mm³。",
+        "代入：$$V ≈ 40000\\ \\text{mm}^3$$",
         user_messages=[STRAWBERRY_USER_MSG],
         tool_calls=[{"name": "execute_code", "code": "V=40000\nprint(V)", "output": "40000"}],
     )
@@ -222,8 +236,9 @@ def test_t3c_assign_then_print_hardcode():
 
 
 def test_t3d_terminal_echo_hardcode():
+    # 同上：terminal echo 硬编码不接地（B1a 覆盖 terminal 通道）
     r = _report(
-        "代入计算得该锥管容积约为 40000 mm³。",
+        "代入：$$V ≈ 40000\\ \\text{mm}^3$$",
         user_messages=[STRAWBERRY_USER_MSG],
         tool_calls=[{"name": "terminal", "code": "echo 40000", "output": "40000"}],
     )
@@ -232,8 +247,9 @@ def test_t3d_terminal_echo_hardcode():
 
 # ── T4c: 中文百分比（A4.9 M3）──
 def test_t4c_chinese_percent_extracted():
-    # 带计算标记上下文（无标记知识点值按 T17 语义豁免）
-    r = _report("经计算该方案的支持率为百分之九十八。", user_messages=[])
+    # 数学块结果位（2026-10-18 收紧：percent 族不可导出，唯一触发面=数学块
+    # 结果位；≈ 邻接即结果位，见 _classify_candidate）
+    r = _report("代入计算：$$支持率 ≈ 百分之九十八$$。", user_messages=[])
     assert r.flags != [], "百分之九十八 未被提取"
     assert any(abs(f.value - 98.0) < 0.01 and f.unit == "%" for f in r.flags), f"百分比归一化错误: {r.flags}"
 
@@ -257,8 +273,9 @@ def test_t11b_point_computed_values_still_gated():
 
 # ── T12: math-block intermediates exempt, ≈/=/result still gated (friction-1) ──
 def test_t12_math_block_intermediate_exempt():
-    draft = "代入数值：$$V = \\frac{\\pi \\times 110}{3} \\times 1618.75$$ 即容积约 186.5 毫升。"
-    # 1618.75 在数学块内且运算符邻接（×后）→ 中间量豁免；186.5 为点值 → gated
+    draft = "代入数值：$$V = \\frac{\\pi \\times 110}{3} \\times 1618.75 ≈ 186.5\\ \\text{毫升}$$"
+    # 1618.75 运算符邻接（×后）→ 中间量豁免；186.5 在 ≈ 结果位 → gated
+    # （2026-10-18 收紧：原文本点值形态不再触发，移入数学块结果位保持判别力）
     r = _report(draft, user_messages=[STRAWBERRY_USER_MSG])
     vals = _flag_values(r)
     assert (186.5, "毫升") in vals or (186.5, "ml") in vals, f"点值未被标记: {r.flags}"
@@ -323,8 +340,10 @@ def test_t15_coarse_rounding_receipt_grounds():
 
 def test_t15b_tight_precision_still_requires_receipt():
     # ≥3 位有效数字仍走严格容差：190 ml（偏差 1.9%）不得蒙混
+    # 2026-10-18 收紧：190 移入数学块结果位（触发面=结果位/闭包）；回执
+    # 输出 186.47 与 190 偏差 1.9% 超容差 → 不接地 → 打回
     r = _report(
-        "代入计算得该锥管容积约为 190 ml。",
+        "代入：$$V ≈ 190\\ \\text{ml}$$",
         user_messages=[STRAWBERRY_USER_MSG],
         tool_calls=[{"name": "calculate", "code": REAL_CODE, "output": REAL_OUTPUT}],
     )
@@ -356,10 +375,12 @@ def test_t18_closure_derived_volume_gated():
     assert r.flags != [], f"闭包内推导值逃逸: {r.flags}"
 
 
-def test_t18b_marker_gated_without_closure():
-    # 计算标记（容积）+ 闭包外数值（500）→ gated（模型必须 calculate）
+def test_t18b_marker_only_no_closure_not_gated():
+    # 2026-10-18 用户裁定「收紧」：旧契约「计算标记（容积）+ 闭包外 → gated」
+    # 废除——关键词枚举做语义判断是用户红线。新契约：仅标记、非闭包、非数学块
+    # → 不触发（500ml 是不是计算结果由 LLM 审计员判，NPG 不管）。
     r = _report("这款大规格穴盘总容积可达 500 ml。", user_messages=[STRAWBERRY_USER_MSG])
-    assert r.flags != [], f"标记型推导值逃逸: {r.flags}"
+    assert r.flags == [], f"仅标记形态在新 spec 下不应触发: {r.flags}"
 
 
 def test_t18c_same_volume_receipt_still_grounds():
@@ -402,8 +423,10 @@ def test_t19_evidence_derived_calculate_receipt_grounds():
 
 def test_t19b_untraceable_receipt_still_flagged():
     # 回执输入与用户/证据数字均无关联 → 仍不接地（B1b 不放宽为“任意回执”）
+    # 2026-10-18 收紧：触发面改为数学块结果位（282 在 = 结果位必 gated），
+    # B1b 语义不变——回执代码输入（100+182）无证据锚点 → 不接地 → 打回。
     r = _report(
-        "文档层：docs/ 四份文档合计约 282KB。",
+        "文档层合计：$$175 + 50 + 30 + 27 = 282\\ \\text{KB}$$。",
         evidence_text=NPG_EVIDENCE,
         user_messages=[NON_NUMERIC_USER_MSG],
         tool_calls=[{"name": "calculate", "code": "100 + 182", "output": "282"}],
@@ -413,8 +436,10 @@ def test_t19b_untraceable_receipt_still_flagged():
 
 def test_t19c_literal_receipt_still_hardcode():
     # 证据锚点存在也不得放行裸字面量表达式（B1a 保持）
+    # 2026-10-18 收紧：同 t19b 以数学块结果位触发；B1a 不变——代码就是
+    # 裸字面量 282 → 硬编码 → 不接地 → 打回。
     r = _report(
-        "文档层：docs/ 四份文档合计约 282KB。",
+        "文档层合计：$$175 + 50 + 30 + 27 = 282\\ \\text{KB}$$。",
         evidence_text=NPG_EVIDENCE,
         user_messages=[NON_NUMERIC_USER_MSG],
         tool_calls=[{"name": "calculate", "code": "282", "output": "282"}],
@@ -593,3 +618,133 @@ def test_t10b_auditor_template_b7_boundary_and_ungrounded_clause():
     assert ok_b7, "审计模板缺少 B7 重算边界条款"
     # 无回执推导数值 → needs_evidence 条款
     assert ("回执" in t or "工具计算" in t) and "needs_evidence" in t, "审计模板缺少无回执推导数值条款"
+
+
+# ── T20: 标识符数字豁免（conv 6871cf68，2026-10-17 生产误伤） ─────────────
+# 生产事故：草稿照录 12306 查询结果（表格行含 D2281），NPG 把标识符中的
+# 「2281」当「未经计算回执的推导数值」打回（_BARE_RE 后瞻只排数字/点，不排
+# 字母）；execute_code 校核输出含 2281 → 进推导闭包变得可 flag，而 B1a/B1b
+# 回执规则永不给标识符接地 → 不可满足打回 → 退化出货。豁免=后瞻加 ASCII 字母。
+TRAVEL_USER_MSG = "从南京去香港最便宜的路费怎么走，我看高铁要971"
+TRAVEL_DRAFT = (
+    "| 车次 | 终到站 | 时刻 | 历时 | 二等座 |\n"
+    "|---|---|---|---|---|\n"
+    "| G2789 | 深圳 | 14:52 - 22:35 | 7 小时 43 分 | 695 元 |\n"
+    "| D2281 | 深圳北 | 06:32 - 20:14 | 13 小时 42 分 | 818 元 |\n"
+    "| G385 | 深圳北 | 10:25 - 17:30 | 7 小时 05 分 | 830.5 元 |\n"
+    "- 推荐 G2781：终到深圳站，15:26 到。T31 次硬座 219.5 元。\n"
+)
+
+
+def test_t20_identifier_numbers_not_gated():
+    """车次/航班等字母前缀标识符（D2281/G385/T31/G2789/G2781）中的数字
+    不是数量候选——即便证据窗缺失且闭包含同值（校核脚本输出），也不得 flag。"""
+    r = _report(
+        TRAVEL_DRAFT,
+        evidence_text="",  # 证据窗被预算裁掉的极端情形（生产实况）
+        user_messages=[TRAVEL_USER_MSG],
+        tool_calls=[
+            # 校核脚本：输出含标识符数字（进闭包），代码无溯源锚点（B1b 不接地）
+            {"name": "execute_code", "code": "rows = draft_table.splitlines()\nprint(len(rows))",
+             "output": "D2281 ok; G385 ok; T31 ok; 15/15"},
+        ],
+    )
+    # 判别成员说明（评审 M3）：集合中 31 不过 risk 地板、2789/2781 不进闭包，
+    # 改动前后都永不 flag；真正有判别力的是 2281/385（闭包命中+B1b 无锚）。
+    flagged = {f.raw for f in r.flags}
+    assert not ({"2281", "385", "31", "2789", "2781"} & flagged), \
+        f"标识符数字被误伤（conv 6871cf68 回归）: {r.flags}"
+
+
+def test_t20b_plain_quantity_still_gated():
+    """对照钉死豁免边界：闭包命中的纯数量形态（无字母前缀、无接地）仍必须
+    flag——豁免只削标识符上下文，不放宽数量闸门（2026-10-18 收紧后触发面
+    =数学块结果位∨闭包命中）。"""
+    # 2026-10-18 收紧后对照改为闭包命中形态：1017=971+46（用户输入闭包
+    # 配对和，非 B8 单步）、无接地 → 仍必须 flag（豁免只削标识符，数量闸门
+    # 不放宽）。取值避开 19xx/20xx 年号形态（_YEAR_RE 预豁免）与 currency
+    # 族（可导出排除清单内 unit'd 永不触发）——必须裸值。
+    r = _report(
+        "两种走法合计 1017。",
+        evidence_text="",
+        user_messages=[TRAVEL_USER_MSG, "港铁段约 46"],
+        tool_calls=[],
+    )
+    assert any(abs(f.value - 1017.0) < 0.01 for f in r.flags), f"闭包命中纯数量应仍被 gated: {r.flags}"
+
+
+def test_t20c_user_anchor_identifier_aligned():
+    """评审 I1 回归形态：user_nums 锚点抽取（gate.py 内联正则）与 _BARE_RE
+    同口径豁免字母紧邻数字——用户消息「坐 D2281」+ 草稿裸重述「车次 2281」
+    不得 flag（修复前：quoted 语料接地；若锚点侧漏豁免则退化成不可满足打回）。"""
+    r = _report(
+        "好的，车次 2281 已为您记下，明天出发。",
+        evidence_text="",
+        user_messages=["我明天坐 D2281 去深圳"],
+        tool_calls=[],
+    )
+    assert not any(f.raw == "2281" for f in r.flags), \
+        f"用户消息标识符锚点未豁免导致裸重述被误伤: {r.flags}"
+
+
+def test_t20d_identifier_with_unit_suffix_not_gated():
+    """评审 A-M2 残留形态：标识符紧贴单位词（D2281 次列车）+ marker 邻接
+    （合计）也不得是候选——_UNITED_RE 后瞻与 _BARE_RE 同口径排字母。"""
+    r = _report(
+        "本月合计开行 D2281 次列车，上座率不错。",
+        evidence_text="",
+        user_messages=[TRAVEL_USER_MSG],
+        tool_calls=[],
+    )
+    assert not any(f.raw.startswith("2281") for f in r.flags), \
+        f"标识符+单位词形态被误伤: {r.flags}"
+
+
+def test_t21_untrusted_receipt_output_does_not_feed_closure():
+    """4a 深层根治（2026-10-18，调研后方案）：闭包只吞通过 B1 溯源（代码含
+    用户/证据锚点、非裸字面量表达式）的回执输出值。校核脚本（代码无锚点）
+    打印的照录值不进闭包 → 不触发 → 不存在「照录事实被不可满足打回」。
+    D2281 事故的纯数字形态回归（无标识符豁免可依赖）。"""
+    # 不可信校核脚本：代码无锚点 → 输出 1075 不进闭包 → 草稿 1075 不触发
+    r = _report(
+        "两种走法相差 1075。",
+        evidence_text="",
+        user_messages=[TRAVEL_USER_MSG],
+        tool_calls=[{"name": "execute_code",
+                     "code": "rows = draft_table.splitlines()\nprint('check 1075 ok')",
+                     "output": "1075 ok 15/15"}],
+    )
+    assert not any(abs(f.value - 1075.0) < 0.01 for f in r.flags), \
+        f"不可信校核输出污染闭包导致照录值被误伤: {r.flags}"
+
+
+def test_t21b_trusted_receipt_output_feeds_closure():
+    """对照：可信回执（代码含锚点 971）的输出 1075 进闭包——草稿写其推导值
+    2150=1075×2（未被打印、无接地）→ 仍 flag（闭包触发面不萎缩）。"""
+    r = _report(
+        "两种走法相差 2150。",
+        evidence_text="",
+        user_messages=[TRAVEL_USER_MSG],
+        tool_calls=[{"name": "execute_code",
+                     "code": "base = 971\nprint(base + 104)",
+                     "output": "1075"}],
+    )
+    assert any(abs(f.value - 2150.0) < 0.01 for f in r.flags), \
+        f"可信回执的闭包推导值应仍被 gated: {r.flags}"
+
+
+def test_t21c_anchor_leg_is_load_bearing():
+    """评审补缺（2026-10-18）：锚点腿是白名单的承重腿——校核脚本代码既不含
+    被校核值字面量、也无溯源锚点（print(len(rows)) 形态），其输出照录值不得
+    进闭包 → 草稿照录该值不触发（conv 6871cf68 不可满足打回的原形回归）。
+    若删锚点腿（any(_num_in_code...)），本测试即 RED。"""
+    r = _report(
+        "两种走法相差 1075。",
+        evidence_text="",
+        user_messages=[TRAVEL_USER_MSG],
+        tool_calls=[{"name": "execute_code",
+                     "code": "rows = draft_table.splitlines()\nprint(len(rows), 'rows ok')",
+                     "output": "diff total 1075; 15 rows ok"}],
+    )
+    assert not any(abs(f.value - 1075.0) < 0.01 for f in r.flags), \
+        f"无锚点校核脚本的照录值进闭包（锚点腿失效）: {r.flags}"

@@ -100,7 +100,14 @@ def test_mocked_gateway_call(monkeypatch):
     from app.tools import vision_interpret as vi_mod
     ep = ModelEndpoint(alias="vlm", kind=KIND_LLM, base_url="http://vlm.local/v1",
                        api_key="sk-x", model_name="qwen-vl-max")
-    fake_registry = type("R", (), {"resolve": lambda self, purpose: ep})()
+    # 2026-11-01：解析顺序改为主模型探针优先——fixture 必须同时给出主端点
+    # （此处主端点为空 = 无视觉），才能测到 vlm 回落路径。
+    _empty_main = ModelEndpoint(alias="main", kind=KIND_LLM, base_url="", api_key="",
+                                model_name="")
+    fake_registry = type("R", (), {
+        "resolve": lambda self, purpose: (_empty_main if purpose == "main" else ep),
+        "endpoint_for_assistant": lambda self, assistant: _empty_main,
+    })()
     monkeypatch.setattr("app.model_gateway.registry.get_model_registry", lambda: fake_registry)
 
     captured = {}
@@ -142,7 +149,14 @@ def test_oversize_rejected(monkeypatch):
     from app.tools import vision_interpret as vi_mod
     ep = ModelEndpoint(alias="vlm", kind=KIND_LLM, base_url="http://vlm.local/v1",
                        api_key="sk-x", model_name="qwen-vl-max")
-    fake_registry = type("R", (), {"resolve": lambda self, purpose: ep})()
+    # 2026-11-01：解析顺序改为主模型探针优先——fixture 必须同时给出主端点
+    # （此处主端点为空 = 无视觉），才能测到 vlm 回落路径。
+    _empty_main = ModelEndpoint(alias="main", kind=KIND_LLM, base_url="", api_key="",
+                                model_name="")
+    fake_registry = type("R", (), {
+        "resolve": lambda self, purpose: (_empty_main if purpose == "main" else ep),
+        "endpoint_for_assistant": lambda self, assistant: _empty_main,
+    })()
     monkeypatch.setattr("app.model_gateway.registry.get_model_registry", lambda: fake_registry)
     monkeypatch.setattr(vi_mod, "_MAX_IMAGE_BYTES", 10)  # a.png is 68 bytes
     ws = _make_ws()
@@ -157,7 +171,14 @@ def test_empty_key_never_falls_back_to_main_key(monkeypatch):
     from app.tools import vision_interpret as vi_mod
     ep = ModelEndpoint(alias="vlm", kind=KIND_LLM, base_url="http://vlm.local/v1",
                        api_key="", model_name="qwen-vl-max")
-    fake_registry = type("R", (), {"resolve": lambda self, purpose: ep})()
+    # 2026-11-01：解析顺序改为主模型探针优先——fixture 必须同时给出主端点
+    # （此处主端点为空 = 无视觉），才能测到 vlm 回落路径。
+    _empty_main = ModelEndpoint(alias="main", kind=KIND_LLM, base_url="", api_key="",
+                                model_name="")
+    fake_registry = type("R", (), {
+        "resolve": lambda self, purpose: (_empty_main if purpose == "main" else ep),
+        "endpoint_for_assistant": lambda self, assistant: _empty_main,
+    })()
     monkeypatch.setattr("app.model_gateway.registry.get_model_registry", lambda: fake_registry)
     captured = {}
 

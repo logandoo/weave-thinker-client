@@ -118,11 +118,11 @@ def test_signal_words_and_detect_signal_removed():
 # ── 2/3: 调用方不再有请求路径关键词闸门 ───────────────────────────────────
 
 def test_chat_schedules_clarification_without_keyword_gate():
-    src_path = os.path.join(
-        os.path.dirname(__file__), "..", "app", "api", "chat.py"
-    )
-    with open(src_path, encoding="utf-8") as fh:
+    base = os.path.join(os.path.dirname(__file__), "..", "app", "api")
+    with open(os.path.join(base, "chat.py"), encoding="utf-8") as fh:
         src = fh.read()
+    with open(os.path.join(base, "chat_stream_transport.py"), encoding="utf-8") as fh:
+        src += fh.read()
     assert "import detect_signal" not in src, "chat 请求路径不得再有关键词预分类"
     assert "detect_signal(" not in src, "chat 不得调用关键词闸门"
     assert "process_clarification(" in src, "必须仍调度异步 LLM 澄清检测"
@@ -135,8 +135,18 @@ def test_voice_schedules_shadow_without_keyword_gate():
     src_path = os.path.join(
         os.path.dirname(__file__), "..", "app", "services", "voice_service.py"
     )
+    gen_path = os.path.join(
+        os.path.dirname(__file__), "..", "app", "services", "voice_generation.py"
+    )
+    turn_path = os.path.join(
+        os.path.dirname(__file__), "..", "app", "services", "voice_turn.py"
+    )
     with open(src_path, encoding="utf-8") as fh:
         src = fh.read()
+    with open(gen_path, encoding="utf-8") as fh:
+        src += "\n" + fh.read()
+    with open(turn_path, encoding="utf-8") as fh:
+        src += "\n" + fh.read()
     assert "import detect_signal" not in src, "voice 路径不得再有关键词预分类"
     assert "detect_signal(" not in src, "voice 不得调用关键词闸门"
     assert "_clarification_shadow(" in src, "必须仍调度 shadow 检测"

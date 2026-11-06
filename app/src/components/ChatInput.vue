@@ -211,19 +211,7 @@
 
         <!-- Bottom toolbar: always-visible buttons + more menu -->
         <div class="input-bottom-toolbar">
-          <button
-            v-show="!isRecording"
-            class="toolbar-btn note-ref-btn"
-            @click="onNoteButtonClick"
-            title="引用笔记"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
-              <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
-            </svg>
-            <span class="toolbar-btn-label toolbar-btn-label--full">笔记引用</span>
-            <span class="toolbar-btn-label toolbar-btn-label--short">笔记</span>
-          </button>
+          <!-- 任务块 11：思考在前、笔记引用在后（DOM 源序=视觉序，WCAG C27；弃 CSS order） -->
           <div class="reasoning-toggle-group" ref="reasoningGroupRef">
             <button
               v-show="!isRecording"
@@ -274,6 +262,105 @@
               </div>
             </Teleport>
           </div>
+          <button
+            v-show="!isRecording"
+            class="toolbar-btn note-ref-btn"
+            @click="onNoteButtonClick"
+            title="引用笔记"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+              <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+            </svg>
+            <span class="toolbar-btn-label toolbar-btn-label--full">笔记引用</span>
+            <span class="toolbar-btn-label toolbar-btn-label--short">笔记</span>
+          </button>
+          <!-- W16 执行环境切换：云端服务器 / 已配对客户端设备 -->
+          <div class="reasoning-toggle-group" ref="execGroupRef">
+            <button
+              v-show="!isRecording"
+              class="toolbar-btn exec-env-btn"
+              :class="{ active: !!displayedExecutionTarget, offline: selectedDeviceOffline }"
+              @click="openExecMenu"
+              :title="execButtonTitle"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="2" y="3" width="20" height="14" rx="2"/>
+                <line x1="8" y1="21" x2="16" y2="21"/>
+                <line x1="12" y1="17" x2="12" y2="21"/>
+              </svg>
+              <span class="toolbar-btn-label toolbar-btn-label--full">执行：{{ execTargetLabel }}</span>
+              <span class="toolbar-btn-label toolbar-btn-label--short">{{ execTargetLabel }}</span>
+            </button>
+            <Teleport to="body">
+              <div
+                v-if="showExecMenu"
+                class="reasoning-menu-overlay"
+                @click="closeExecMenu"
+              >
+                <div class="reasoning-menu exec-menu" :style="execMenuStyle" @click.stop>
+                  <div class="reasoning-menu-title">执行环境</div>
+                  <!-- W32 云端联动三选一：本地（device:<self>）/ 云端（null）/ 其他绑定客户端 -->
+                  <button
+                    class="reasoning-menu-item"
+                    :class="{ active: isSelfTarget(displayedExecutionTarget) || (!displayedExecutionTarget && !cloudLinked) }"
+                    @click="selectLocalTarget()"
+                  >
+                    <span class="reasoning-menu-label">{{ selfDeviceId ? '本地' : '本地（本机）' }}</span>
+                    <span class="reasoning-menu-desc">在本机工作区中执行文件/终端操作（断网可用）</span>
+                  </button>
+                  <button
+                    v-if="cloudLinked"
+                    class="reasoning-menu-item"
+                    :class="{ active: !displayedExecutionTarget }"
+                    @click="selectExecTarget(null)"
+                  >
+                    <span class="reasoning-menu-label">云端</span>
+                    <span class="reasoning-menu-desc">在云端工作区执行（云端服务器运行，可派发到客户端设备）</span>
+                  </button>
+                  <div
+                    v-for="dev in otherDevices"
+                    :key="dev.device_id"
+                    class="reasoning-menu-item exec-device-row"
+                    :class="{ active: displayedExecutionTarget === `device:${dev.device_id}` }"
+                    @click="selectExecTarget(`device:${dev.device_id}`)"
+                  >
+                    <span class="reasoning-menu-label">
+                      <span class="exec-online-dot" :class="{ online: dev.online }"></span>
+                      {{ dev.name || dev.device_id }}
+                    </span>
+                    <span class="reasoning-menu-desc">
+                      {{ dev.revoked ? '已解绑' : (dev.online ? '在线' : '离线') }} · 在该设备上执行本地工作
+                      <button
+                        v-if="!dev.revoked"
+                        class="exec-revoke-btn"
+                        :class="{ armed: revokeArmId === dev.device_id }"
+                        @click.stop="revokeDevice(dev)"
+                      >{{ revokeArmId === dev.device_id ? '确认撤销?' : '撤销' }}</button>
+                    </span>
+                  </div>
+                  <div v-if="!otherDevices.length" class="reasoning-menu-desc" style="padding: 8px 12px;">
+                    {{ cloudLinked ? '暂无其他已绑定客户端——在上游网页端「生成配对码」，在客户端「设备执行」面板输入完成绑定' : '未绑定云端账号——在「云端关联」绑定后可选择云端/其他客户端执行环境' }}
+                  </div>
+                  <!-- 判据 #95：配对码只由上游网页端生成（云端注册表属主面）——客户端仅消费码 -->
+                  <div v-if="EXECUTION_MODE === 'cloud'" class="exec-pair-section">
+                    <button
+                      class="reasoning-menu-item"
+                      :disabled="pairingBusy"
+                      @click="generatePairingCode"
+                    >
+                      <span class="reasoning-menu-label">{{ pairingCode ? '重新生成配对码' : '生成配对码' }}</span>
+                      <span class="reasoning-menu-desc">一次性短时码，输入到客户端「设备执行」面板完成绑定</span>
+                    </button>
+                    <div v-if="pairingCode" class="exec-pair-code">
+                      <code>{{ pairingCode }}</code>
+                      <span class="reasoning-menu-desc">{{ pairingHint }}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </Teleport>
+          </div>
           <!-- More menu (after thinking mode) -->
           <div class="more-menu-wrapper" ref="moreMenuRef">
             <button
@@ -281,13 +368,14 @@
               :class="{ active: showMoreMenu }"
               @click="toggleMoreMenu"
               title="更多功能"
+              aria-label="更多功能"
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
                 <circle cx="12" cy="5" r="2"/>
                 <circle cx="12" cy="12" r="2"/>
                 <circle cx="12" cy="19" r="2"/>
               </svg>
-              <span class="toolbar-btn-label">更多</span>
+              <span class="toolbar-btn-label toolbar-btn-label--full">更多</span>
             </button>
           </div>
           <div class="toolbar-spacer"></div>
@@ -424,6 +512,11 @@ import { useAssistantStore } from '@/stores/assistant'
 import { useDraftsStore } from '@/stores/drafts'
 import { useUploadStore } from '@/stores/upload'
 import { notesApi } from '@/api/notes'
+import { clientDevicesApi } from '@/api/clientDevices'
+import { getCloudDevices, revokeCloudDevice, getDeviceExecStatus } from '@/api/clientExec'
+import { EXECUTION_MODE } from '@/api/base'
+import { saveUiPreferences } from '@/api/skins'
+import type { ClientDevice } from '@/types'
 import { renderMarkdownToHtml } from '@/composables/useMarkdown'
 import { useAsrStreaming } from '@/composables/useAsrStreaming'
 import { useAsrHotwords } from '@/composables/useAsrHotwords'
@@ -435,7 +528,8 @@ import FilePreviewDialog from './FilePreviewDialog.vue'
 import { skillsApi } from '@/api/skills'
 import type { Skill } from '@/types'
 import { fileUploadApi, type FileParseResult } from '@/api/fileUpload'
-import { dropRestoredChips } from '@/utils/fileRefs'
+import { dropRestoredChips, restoreEditChips } from '@/utils/fileRefs'
+import { buildNoteRefBlock, dropRestoredNotes, restoreEditNotes, type NoteRefData } from '@/utils/noteRefs'
 import { classifyFile } from '@/composables/filePreview'
 import { buildDownloadUrl } from '@/api/workspaceFiles'
 import { workspaceRelPath } from '@/composables/filePreview'
@@ -478,30 +572,54 @@ const canInterject = computed(() => chatStore.isStreamingCurrentConversation && 
 const sendBtnDisabled = computed(() => {
   if (chatStore.isStreamingCurrentConversation) {
     if (chatStore.deathmatchMode) return true  // deathmatch 生成中保持阻断（自有交互机制）
-    if (editMessageId.value) return !inputText.value.trim() && uploadedFiles.value.length === 0  // 编辑重发（自处理在途流），与 handleSend 空发守卫同式
-    return !inputText.value.trim() || dropRestoredChips(uploadedFiles.value).length > 0  // 插话 v1 纯文本（restored 芯片不计）
+    if (editMessageId.value) return !inputText.value.trim() && uploadedFiles.value.length === 0 && referencedNotes.value.length === 0  // 编辑重发（自处理在途流），与 handleSend 空发守卫同式
+    return !inputText.value.trim() || dropRestoredChips(uploadedFiles.value).length > 0 || dropRestoredNotes(referencedNotes.value).length > 0  // 插话 v1 纯文本（restored 芯片/引用不计）
   }
-  return !inputText.value.trim() && (editMessageId.value ? uploadedFiles.value : dropRestoredChips(uploadedFiles.value)).length === 0
+  return !inputText.value.trim()
+    && (editMessageId.value ? uploadedFiles.value : dropRestoredChips(uploadedFiles.value)).length === 0
+    && (editMessageId.value ? referencedNotes.value : dropRestoredNotes(referencedNotes.value)).length === 0
 })
 const sendBtnTitle = computed(() => {
   if (chatStore.isStreamingCurrentConversation && !chatStore.deathmatchMode && editMessageId.value) return '发送编辑（将停止当前生成）'
   if (canInterject.value) {
     if (dropRestoredChips(uploadedFiles.value).length > 0) return '插话暂不支持附件，请先停止生成或移除附件'
+    if (dropRestoredNotes(referencedNotes.value).length > 0) return '插话暂不支持笔记引用，请先停止生成或移除引用'
     return '发送插话（注入当前回答）'
   }
   return '发送'
 })
 const DRAFT_KEY = 'chatllm_draft_input'
 
-// Note reference tags
-interface NoteRef {
-  id: string
-  title: string
-  content: string
-}
+// Note reference tags（评审 R2 F7：复用 utils/noteRefs 的单一类型，弃本地重复声明）
+type NoteRef = NoteRefData
 const referencedNotes = ref<NoteRef[]>([])
 const previewingNoteIdx = ref<number | null>(null)
 const editMessageId = ref<string | null>(null)
+// 编辑武装不跨会话（2026-11-04）：editMessageId 此前只在发送时清除，切换会话后
+// 发送会拿他会话的 edit_message_id 走 editAndResendMessage → targetIndex=-1
+// 静默丢消息（输入已清空）。解除武装即「弃编辑」——restored 引用/芯片当场清除
+// （评审 R2 F2：不留到发送时才被 dropRestored* 剥离，否则新会话里「芯片可见却
+// 未被引用」重现本波要修的表象），手动内容保留。
+watch(() => chatStore.currentConversationId, () => {
+  if (!editMessageId.value) return
+  editMessageId.value = null
+  referencedNotes.value = restoreEditNotes(referencedNotes.value, [])
+  removeStaleNoteTagElements()
+  uploadStore.setFiles(restoreEditChips(uploadStore.files, []))
+})
+
+/** Remove .note-tag elements whose note id is no longer referenced (disarm
+ *  purge complement — syncInputText would drop the state anyway, but the chip
+ *  must not stay visible while the reference is gone). */
+function removeStaleNoteTagElements() {
+  const el = editorRef.value
+  if (!el) return
+  const keep = new Set(referencedNotes.value.map((n) => n.id))
+  el.querySelectorAll<HTMLElement>('.note-tag').forEach((tag) => {
+    const id = tag.dataset.noteId
+    if (id !== undefined && !keep.has(id)) tag.remove()
+  })
+}
 
 const previewNoteHtml = computed(() => {
   if (previewingNoteIdx.value === null) return ''
@@ -588,6 +706,11 @@ function effortDesc(e: string) { return effortMetaMap.value[e]?.desc ?? EFFORT_M
 const showReasoningMenu = ref(false)
 const reasoningGroupRef = ref<HTMLDivElement | null>(null)
 const reasoningMenuStyle = ref<Record<string, string>>({})
+// W16 设备执行模式：执行环境按钮 + 设备菜单（云端/客户端切换，PLAN §6.6）
+const showExecMenu = ref(false)
+const execGroupRef = ref<HTMLDivElement | null>(null)
+const execMenuStyle = ref<Record<string, string>>({})
+const execDevices = ref<ClientDevice[]>([])
 const showMoreMenu = ref(false)
 const moreMenuRef = ref<HTMLDivElement | null>(null)
 
@@ -598,7 +721,7 @@ const selectedSkillIndex = ref(0)
 const skillSearchQuery = ref('')
 const skillPopupStyle = ref<Record<string, string>>({})
 const inputAreaRef = ref<HTMLDivElement | null>(null)
-let skillPopupDismissed = false
+
 
 const moreMenuStyle = computed(() => {
   if (!showMoreMenu.value || !moreMenuRef.value) return {}
@@ -653,8 +776,6 @@ function closeSkillPopup() {
   showSkillPopup.value = false
   skillSearchQuery.value = ''
   selectedSkillIndex.value = 0
-  skillPopupDismissed = true
-  setTimeout(() => { skillPopupDismissed = false }, 300)
 }
 
 function selectSkill(skill: Skill) {
@@ -706,14 +827,278 @@ function handleReasoningClick() {
   chatStore.enableReasoning = !chatStore.enableReasoning
 }
 
-function handleDeathmatchClick() {
-  if (chatStore.deathmatchMode) {
-    chatStore.deathmatchMode = false
-    chatStore.deathmatchAction = 'stop'
-  } else {
-    chatStore.deathmatchMode = true
-    chatStore.deathmatchAction = 'start'
+async function handleDeathmatchClick() {
+  await chatStore.setDeathmatchModeEnabled(!chatStore.deathmatchMode)
+}
+
+// ---- W16 执行环境切换（set-once D-6：已有消息的会话禁止换环境） ----
+// W18 G5：配对码/撤销管理 + 离线 UX + G7 偏好持久化
+const pairingCode = ref<string | null>(null)
+const pairingBusy = ref(false)
+const pairingHint = ref('在客户端「设备执行」面板输入此码（短时有效，一次性）')
+const revokeArmId = ref<string | null>(null)
+// A4.9 I-3：用户显式选择标记——偏好恢复竞态护栏
+const execUserSelected = ref(false)
+const execBindingBusy = ref(false)
+const execBindingUncertain = ref(false)
+
+const displayedExecutionTarget = computed(() => {
+  const convId = chatStore.currentConversationId
+  const meta = convId ? chatStore.conversationMeta[convId] : null
+  if (meta && meta.execution_target !== undefined) return meta.execution_target ?? null
+  return chatStore.executionTarget
+})
+
+const selectedDeviceOffline = computed(() => {
+  const t = displayedExecutionTarget.value
+  if (!t || !t.startsWith('device:')) return false
+  const dev = execDevices.value.find(d => `device:${d.device_id}` === t)
+  return !!dev && (!dev.online || dev.revoked)
+})
+
+// W32 执行环境云端联动：null=云端（API.md「null 表示恢复云端执行」）·
+// device:<self>=本地 · device:<other>=其他绑定客户端。无云端链接=退化 W26
+// 语义（空目标=「本地（本机）」，仅本地可选，ADR D-121）。
+const selfDeviceId = ref('')
+const cloudLinked = ref(true)
+const otherDevices = computed(() =>
+  execDevices.value.filter(d => !d.is_self))  // 含撤销态（判据 #98：已解绑行可见）
+const localTargetValue = computed<string | null>(() =>
+  selfDeviceId.value ? `device:${selfDeviceId.value}` : null)
+function isSelfTarget(t: string | null | undefined): boolean {
+  return !!t && !!selfDeviceId.value && t === `device:${selfDeviceId.value}`
+}
+
+const execButtonTitle = computed(() => {
+  if (execBindingUncertain.value) return '执行环境绑定结果未知（已阻止发送）'
+  if (execBindingBusy.value) return '执行环境绑定中…'
+  const t = displayedExecutionTarget.value
+  if (!t) return `执行环境：${cloudLinked.value ? '云端（云端服务器执行）' : '本地（本机执行）'}`
+  if (isSelfTarget(t)) return '执行环境：本地（本机执行）'
+  if (selectedDeviceOffline.value) return '执行环境：客户端设备（离线/已解绑）'
+  return `执行环境：客户端设备（${execTargetLabel.value}）`
+})
+
+const execTargetLabel = computed(() => {
+  if (execBindingUncertain.value) return '结果未知'
+  if (execBindingBusy.value) return '绑定中…'
+  const t = displayedExecutionTarget.value
+  if (!t) return cloudLinked.value ? '云端' : '本地（本机）'
+  // 判据 #94：绑定的客户端就是本机 → 「本地」（不再「客户端」）
+  if (isSelfTarget(t)) return '本地'
+  const dev = execDevices.value.find(d => `device:${d.device_id}` === t)
+  return dev?.name || '客户端'
+})
+
+async function openExecMenu() {
+  if (execGroupRef.value) {
+    const rect = execGroupRef.value.getBoundingClientRect()
+    execMenuStyle.value = {
+      position: 'fixed',
+      left: `${rect.left}px`,
+      bottom: `${window.innerHeight - rect.top + 8}px`,
+      zIndex: '10000',
+    }
   }
+  showExecMenu.value = true
+  revokeArmId.value = null
+  await refreshExecContext()
+}
+
+// W32 联动上下文（本机身份 + 云端注册表）：菜单打开与挂载时都拉取——按钮标签
+// 必须在未开菜单时就正确（iter 11 diagnosis：仅菜单打开才拉=首屏「执行：客户端」）。
+async function refreshExecContext(): Promise<void> {
+  try {
+    const res = await getCloudDevices()
+    // 形状防御（iter 13 diagnosis）：旧/mock 后端可能回数组或缺字段——不得让
+    // undefined.filter 拆掉整个渲染（菜单 Teleport 连带不出）
+    execDevices.value = Array.isArray(res?.devices) ? res.devices : []
+    cloudLinked.value = !!(res && typeof res === 'object' && 'linked' in res ? res.linked : false)
+  } catch {
+    // 列表拉取失败保持空态提示，允许重开菜单重试
+  }
+  try {
+    const st = await getDeviceExecStatus()
+    selfDeviceId.value = st.device_id || ''
+  } catch {
+    // 本机身份取不到=无自目标语义（回落空目标=本地）
+  }
+}
+
+function closeExecMenu() {
+  showExecMenu.value = false
+}
+
+async function generatePairingCode() {
+  pairingBusy.value = true
+  try {
+    const rec = await clientDevicesApi.createPairingCode()
+    pairingCode.value = rec.code
+    pairingHint.value = `在客户端「设备执行」面板输入此码（${Math.round(rec.expires_in_seconds / 60)} 分钟内有效，一次性）`
+  } catch {
+    showToast('配对码生成失败，请稍后重试', 'error')
+  } finally {
+    pairingBusy.value = false
+  }
+}
+
+async function revokeDevice(dev: ClientDevice) {
+  if (revokeArmId.value !== dev.device_id) {
+    revokeArmId.value = dev.device_id
+    return
+  }
+  revokeArmId.value = null
+  try {
+    await revokeCloudDevice(dev.device_id)
+    showToast(`设备「${dev.name || dev.device_id}」已解绑`, 'info')
+    const res = await getCloudDevices()
+    execDevices.value = Array.isArray(res?.devices) ? res.devices : []
+    cloudLinked.value = !!(res && typeof res === 'object' && 'linked' in res ? res.linked : false)
+  } catch (e: any) {
+    showToast(e?.response?.data?.detail || '撤销失败，请稍后重试', 'error')
+  }
+}
+
+// 「本地」点击：本机身份未知（云端链接态）时先重取，仍未知=明确报错不误绑
+// （null=云端语义，set-once 会把误绑永久钉死——评审 A/B Important）。
+async function selectLocalTarget(): Promise<void> {
+  if (cloudLinked.value && !selfDeviceId.value) {
+    await refreshExecContext()
+    if (!selfDeviceId.value) {
+      showToast('本机设备身份获取失败：请检查「云端关联」配对状态后重试', 'error')
+      return
+    }
+  }
+  await selectExecTarget(localTargetValue.value)
+}
+
+async function selectExecTarget(target: string | null) {
+  if (execBindingBusy.value) return
+  const convId = chatStore.currentConversationId
+  const meta = convId ? chatStore.conversationMeta[convId] : null
+  const previousMetaTarget = meta?.execution_target
+  const previousTarget = previousMetaTarget !== undefined
+    ? previousMetaTarget
+    : chatStore.executionTarget
+  // 只写「下次默认」，不代替当前会话的服务端绑定。
+  const preferenceSave = saveUiPreferences({ default_execution_target: target ?? '' }).catch(() => {})
+  if (previousTarget === target) {
+    showExecMenu.value = false
+    void preferenceSave
+    return
+  }
+  const hasMessages = !!(convId && (chatStore.messages[convId]?.length))
+  if (hasMessages && previousTarget !== target) {
+    showToast('执行环境已固定：切换云端/客户端执行环境请新建会话', 'error')
+    showExecMenu.value = false
+    return
+  }
+  execUserSelected.value = true
+  chatStore.executionTargetUserSelected = !convId
+  revokeArmId.value = null
+  execBindingUncertain.value = false
+  execBindingBusy.value = true
+  showExecMenu.value = false
+  try {
+    if (convId) {
+      await chatStore.bindExecutionTarget(convId, target)
+      void preferenceSave
+    } else {
+      await preferenceSave
+      chatStore.executionTarget = target
+    }
+    if (target && target.startsWith('device:')) {
+      const dev = execDevices.value.find(d => `device:${d.device_id}` === target)
+      if (dev && (!dev.online || dev.revoked)) {
+        showToast(dev.revoked ? '该设备已解绑：请撤销绑定后重新配对，或改用云端' : '该设备当前离线：发送后工具将无法执行', 'error')
+      }
+    }
+  } catch (e: any) {
+    // A committed response may be lost after the server wrote the row. Never
+    // roll back blindly: reconcile first; if that fails, keep sending blocked.
+    let reconciled = false
+    if (convId) {
+      try {
+        await chatStore.reconcileExecutionTarget(convId)
+        reconciled = true
+      } catch {
+        reconciled = false
+      }
+    }
+    if (reconciled) {
+      execBindingUncertain.value = false
+      showToast(e?.response?.data?.detail || '执行环境绑定结果已按服务端状态同步', 'error')
+    } else {
+      if (chatStore.currentConversationId === convId) chatStore.executionTarget = previousTarget
+      if (meta) meta.execution_target = previousMetaTarget
+      execBindingUncertain.value = true
+      showToast('执行环境绑定结果未知，已阻止发送，请刷新重试', 'error')
+    }
+  } finally {
+    execBindingBusy.value = false
+  }
+}
+
+// G5 发送前校验（fail-fast，D-8 一致）：设备离线/已解绑即拦截，不静默改道。
+// A4.9 I-2：execDevices 仅在菜单打开时填充——设备目标下发送前强制刷新列表
+// （菜单从未打开/偏好恢复的目标不得 fail-open）。
+async function execPreSendCheck(): Promise<boolean> {
+  if (execBindingBusy.value) {
+    showToast('执行环境绑定中，请稍候', 'info')
+    return false
+  }
+  if (execBindingUncertain.value) {
+    const convId = chatStore.currentConversationId
+    if (!convId) return false
+    try {
+      await chatStore.reconcileExecutionTarget(convId)
+      execBindingUncertain.value = false
+    } catch {
+      showToast('执行环境状态仍无法确认，已阻止发送', 'error')
+      return false
+    }
+  }
+  const t = chatStore.resolveExecTargetFor(chatStore.currentConversationId)
+  // W32：本机目标（device:<self>）=本地直执行无需在线态；空目标=云端（有链接走
+  // 中继，无链接=W26 本地退化）——两者都放行；设备目标查云端注册表（联动面）。
+  if (!t || !t.startsWith('device:')) {
+    // 判据 #101「不静默」腿（D-121 扩展裁决）：无云端链接时空目标在本机执行——
+    // 明确提示一次（sessionStorage 防噪音），不阻断（断网全功能=产品根本原则②）
+    if (!cloudLinked.value && typeof sessionStorage !== 'undefined'
+        && !sessionStorage.getItem('wt-unlinked-local-notice')) {
+      sessionStorage.setItem('wt-unlinked-local-notice', '1')
+      showToast('未绑定云端：云端执行环境不可用，本次在本机执行', 'info')
+    }
+    return true
+  }
+  if (isSelfTarget(t)) return true
+  try {
+    const res = await getCloudDevices()
+    execDevices.value = Array.isArray(res?.devices) ? res.devices : []
+    cloudLinked.value = !!(res && typeof res === 'object' && 'linked' in res ? res.linked : false)
+  } catch {
+    // 列表拉取失败无法判定在线态——放行由服务端 fail-closed 兜底（D-8）
+    return true
+  }
+  if (!cloudLinked.value) {
+    showToast('未绑定云端账号：目标为其他客户端的会话需先在「云端关联」绑定', 'error')
+    return false
+  }
+  const dev = execDevices.value.find(d => `device:${d.device_id}` === t)
+  if (!dev) {
+    // 评审 r4 I-b：目标设备已删（解绑即删）——不得 fail-open 放行，D-8 不静默改道
+    showToast('设备已解绑或不存在：请重新配对设备，或改用云端执行环境', 'error')
+    return false
+  }
+  if (dev.revoked) {
+    showToast('设备已解绑：请改用云端新建会话', 'error')
+    return false
+  }
+  if (dev && !dev.online) {
+    showToast('设备离线：请保持客户端在线，或改用云端执行环境', 'error')
+    return false
+  }
+  return true
 }
 
 function openReasoningMenu() {
@@ -762,7 +1147,12 @@ watch(() => assistantStore.currentAssistantId, () => {
 watch(() => chatStore.interjectionRestoreText, (text) => {
   if (!text) return
   inputText.value = text
-  if (editorRef.value) editorRef.value.textContent = text
+  if (editorRef.value) {
+    editorRef.value.textContent = text
+    // 评审 R2 F5：textContent 会抹掉 .note-tag —— 不补标签的话 syncInputText
+    // 的「无标签即删」同步会在下一次键入/发送吞掉现存引用（与草稿缺陷同类）。
+    insertNoteTagElements(referencedNotes.value)
+  }
   editorHasContent.value = true
   chatStore.interjectionRestoreText = ''
   nextTick(() => editorRef.value?.focus())
@@ -950,7 +1340,12 @@ function onEditorClick(e: MouseEvent) {
     if (idx !== -1) {
       previewingNoteIdx.value = previewingNoteIdx.value === idx ? null : idx
     }
+    return
   }
+  // Clicking the empty tail can put the caret after the invisible anchor.
+  // Clean a leftover ghost line immediately; typing after it is covered by
+  // onEditorInput → scrollCaretIntoView → removeStrayLineAnchors.
+  ensureTrailingLineAnchor()
 }
 
 async function onMicClick() {
@@ -1097,6 +1492,8 @@ async function handleSend() {
   // the message (repro 2026-08-03: keyboard.type + immediate Enter → no
   // POST /api/chat/stream fired).
   syncInputText()
+  // W18 G5：发送前执行环境校验（fail-fast，D-8）——设备离线/已解绑即拦截
+  if (!(await execPreSendCheck())) return
   const text = inputText.value.trim()
   // 当前会话生成中：发送即插话（迭代边界注入，不打断在途生成）。
   // deathmatch 会话生成中全阻断（复审 r4：按钮禁用之外 Enter 直调 handleSend
@@ -1109,21 +1506,24 @@ async function handleSend() {
     if (!editMessageId.value) {
       if (!text) return
       if (dropRestoredChips(uploadedFiles.value).length > 0) return  // 插话 v1 不支持附件（restored 芯片不计——弃编辑残留）
+      if (dropRestoredNotes(referencedNotes.value).length > 0) return  // 插话 v1 不支持笔记引用——不同步吞掉（2026-11-04，与附件同式）
       await handleInterject(text)
       return
     }
   }
-  if (!text && (editMessageId.value ? uploadedFiles.value : dropRestoredChips(uploadedFiles.value)).length === 0) return
+  // Restored-tagged refs/chips belong to an edit session (utils/noteRefs +
+  // utils/fileRefs): a normal send after an abandoned edit must not reference
+  // the edited message's notes or attach its files.
+  const notesToSend = editMessageId.value ? referencedNotes.value : dropRestoredNotes(referencedNotes.value)
+  const filesToAttach = editMessageId.value ? uploadedFiles.value : dropRestoredChips(uploadedFiles.value)
+  // 引用即内容（与草稿先例一致：仅引用的草稿可存可发）——仅引用无正文的
+  // 消息编辑重发必须可发，否则恢复的引用无法原样重发（2026-11-04）。
+  if (!text && filesToAttach.length === 0 && notesToSend.length === 0) return
 
   let fullContent = ''
-  if (referencedNotes.value.length > 0) {
-    for (const noteRef of referencedNotes.value) {
-      fullContent += `[note-ref:${noteRef.id}|${noteRef.title}]\n${noteRef.content}\n[/note-ref]\n\n`
-    }
+  for (const noteRef of notesToSend) {
+    fullContent += buildNoteRefBlock(noteRef)
   }
-  // Restored-tagged chips belong to an edit session (utils/fileRefs): a normal
-  // send after an abandoned edit must not attach the edited message's files.
-  const filesToAttach = editMessageId.value ? uploadedFiles.value : dropRestoredChips(uploadedFiles.value)
   if (filesToAttach.length > 0) {
     for (const f of filesToAttach) {
       if (f.file_path || f.rel_path) {
@@ -1149,8 +1549,25 @@ async function handleSend() {
   }
 
   const currentEditMessageId = editMessageId.value
+  if (chatStore.activeSteerTask && !currentEditMessageId
+      && filesToAttach.length === 0 && notesToSend.length === 0) {
+    // §7.1/§11.4: C2 is owned by an active task — send the text as a steer,
+    // not as a new chat stream (the backend would answer 409).
+    const steered = await chatStore.steerActiveTask(fullContent)
+    if (steered) {
+      inputText.value = ''
+      clearEditorDom()
+      editorHasContent.value = false
+      referencedNotes.value = []
+      previewingNoteIdx.value = null
+      uploadStore.clear()
+      sessionStorage.removeItem(DRAFT_KEY)
+      emit('sent')
+      return
+    }
+  }
   inputText.value = ''
-  if (editorRef.value) editorRef.value.textContent = ''
+  clearEditorDom()
   editorHasContent.value = false
   referencedNotes.value = []
   previewingNoteIdx.value = null
@@ -1168,7 +1585,7 @@ async function handleSend() {
 
 async function handleInterject(text: string) {
   inputText.value = ''
-  if (editorRef.value) editorRef.value.textContent = ''
+  clearEditorDom()
   editorHasContent.value = false
   sessionStorage.removeItem(DRAFT_KEY)
   await chatStore.sendInterjection(text, assistantStore.currentAssistantId)
@@ -1184,12 +1601,15 @@ function saveCurrentAsDraft() {
   if (!text && referencedNotes.value.length === 0) return
   draftsStore.addDraft({
     content: text,
+    // 评审 R2 F1：显式存草稿=用户收编（restored 标记有意不随草稿持久化——
+    // 草稿可在任意会话发送，存下即成为用户自己的引用；弃编辑泄漏面由
+    // dropRestoredNotes 在普通发送剥离 + 解除武装即清兜住）。
     references: referencedNotes.value.map(r => ({ id: r.id, title: r.title, content: r.content })),
     conversationId: chatStore.currentConversationId,
     assistantId: assistantStore.currentAssistantId,
   })
   inputText.value = ''
-  if (editorRef.value) editorRef.value.textContent = ''
+  clearEditorDom()
   editorHasContent.value = false
   referencedNotes.value = []
   previewingNoteIdx.value = null
@@ -1310,9 +1730,17 @@ function loadDraftIntoInput(draftId: string) {
   const draft = draftsStore.getDraft(draftId)
   if (!draft) return
   inputText.value = draft.content
-  if (editorRef.value) editorRef.value.textContent = draft.content
+  if (editorRef.value) {
+    editorRef.value.textContent = draft.content
+    // Tags must be re-created in the DOM (2026-11-04): syncInputText() drops
+    // any referencedNote without a .note-tag element, so a state-only draft
+    // restore lost every note reference on the first keystroke/send.
+    referencedNotes.value = draft.references.map(r => ({ ...r }))
+    insertNoteTagElements(referencedNotes.value)
+  } else {
+    referencedNotes.value = draft.references.map(r => ({ ...r }))
+  }
   editorHasContent.value = !!draft.content.length
-  referencedNotes.value = draft.references.map(r => ({ ...r }))
   showDrafts.value = false
   draftsStore.removeDraft(draftId)
   nextTick(() => editorRef.value?.focus())
@@ -1323,7 +1751,7 @@ async function sendDraftNow(draftId: string) {
   if (!draft || chatStore.isStreamingCurrentConversation) return
   let fullContent = ''
   for (const noteRef of draft.references) {
-    fullContent += `[note-ref:${noteRef.id}|${noteRef.title}]\n${noteRef.content}\n[/note-ref]\n\n`
+    fullContent += buildNoteRefBlock(noteRef)
   }
   fullContent += draft.content
   draftsStore.removeDraft(draftId)
@@ -1356,7 +1784,7 @@ function formatDraftDate(iso: string): string {
 // 为段落分隔（与 markdown 渲染及 Shift+Enter 字面 '\n' 的最终视觉一致）。
 function extractEditorText(source: HTMLElement): string {
   const clone = source.cloneNode(true) as HTMLElement
-  clone.querySelectorAll('.note-tag').forEach(el => el.remove())
+  clone.querySelectorAll('.note-tag, .line-anchor').forEach(el => el.remove())
   const BLOCK_TAGS = new Set(['DIV', 'P'])
   let out = ''
   const walk = (node: Node) => {
@@ -1379,6 +1807,15 @@ function extractEditorText(source: HTMLElement): string {
   walk(clone)
   const text = out.replace(/\u200B/g, '').replace(/\n{3,}/g, '\n\n')
   return text.trim() ? text : ''
+}
+
+function clearEditorDom() {
+  const el = editorRef.value
+  if (!el) return
+  el.textContent = ''
+  // 2026-11-01: a trailing-line class left behind would keep the CSS ::after
+  // empty line after send/draft-clear even though the DOM is empty.
+  el.classList.remove('trailing-line')
 }
 
 function syncInputText() {
@@ -1423,6 +1860,10 @@ function debouncedSyncInputText() {
 // 导致 caret-follow 无法计算滚动目标（新换行行滑出可视区，鼠标也无法命中；2026-10-08 实测）。
 // 用瞬时 ZWSP marker 量出光标所在行的行盒，测后移除并还原选区（csswg-drafts#2514 同款技术）；
 // 组字（IME）期间与非常规选区不注入节点。
+// 行盒测量兜底（W11）：折叠选区 getClientRects/包围矩形全零（Shift+Enter 新空行
+// 零矩形：collapsed range 无 client rects，见 SO 59767515 / ckeditor5#14028）时
+// 插入临时 \u200b（ZWSP）标记实测行位，测完即除并还原选区；isComposing（IME 组字中）
+// 直接返回 null——组字期插入标记会破坏输入法状态。
 function measureCaretLineRect(range: Range): DOMRect | null {
   if (isComposing.value || !range.collapsed) return null
   const sel = window.getSelection()
@@ -1450,6 +1891,8 @@ function measureCaretLineRect(range: Range): DOMRect | null {
 function scrollCaretIntoView() {
   const area = inputAreaRef.value
   if (!area) return
+  removeStrayLineAnchors()
+  ensureTrailingLineAnchor()
   const sel = window.getSelection()
   if (!sel || sel.rangeCount === 0) return
   const range = sel.getRangeAt(0)
@@ -1473,6 +1916,53 @@ function scrollCaretIntoView() {
   }
 }
 
+// 幽灵空行锚点：末尾 \n/<br> 在本盒（固定高+pre-wrap）不生成行盒——scrollHeight
+// 不涨、空行光标零矩形且不可滚（用户症状：填满后 Shift+Enter 可视区不随光标）。
+// 实测（probe7/8）：追加 \n\n/裸 \u200b 均 +0 高，唯「透明实字符」span 撑起行盒
+// （+22px）；但透明实字符会被用户看见成「缩进」且 contenteditable=false 的 span
+// 在删到空时不可删（2026-11-01 用户复现：3 次 Backspace 后卡在
+// "\n<span class=line-anchor>X</span>"，再按 3 次无变化）。
+// 现行锚点 = 零宽 inline-block（width:0;height:1.4em）——仍有行盒、永不显示缩进；
+// 三条不变量：① 只在严格末尾且逻辑文本非空时存在；② 任何非末尾锚点立即清除；
+// ③ 逻辑文本为空时 Backspace/Delete 清空整行（含锚点），绝不让不可删字符留下。
+//
+// 两条铁律（保留）：① 绝不改写既有文本节点——textContent 写入会把 live
+// selection 重置到节点开头（光标跳顶实测）；② extractEditorText 连同 .note-tag
+// 一并剥除 .line-anchor，消息文本不受染。
+function _endsWithBreak(node: Node | null): boolean {
+  return !!node && (
+    (node.nodeType === Node.TEXT_NODE && /\n$/.test(node.textContent || '')) ||
+    (node.nodeType === Node.ELEMENT_NODE && (node as HTMLElement).tagName === 'BR')
+  )
+}
+
+/** Legacy cleanup: earlier builds appended an invisible `.line-anchor` span
+ *  after the trailing break. It is no longer created (the CSS pseudo-element
+ *  below is the line box), but a hot-reloaded/restored DOM may still carry one;
+ *  remove it so it can never become an undeletable mid-line character. */
+function removeStrayLineAnchors() {
+  const el = editorRef.value
+  if (!el) return
+  el.querySelectorAll('.line-anchor').forEach(a => a.remove())
+}
+
+/** Toggle the trailing-empty-line line box.
+ *
+ *  A fixed-height `white-space: pre-wrap` contenteditable gives a trailing
+ *  newline no line box (scrollHeight does not grow, caret rect is zero, the
+ *  viewport cannot follow). A real character fixes the box but is an
+ *  undeletable invisible glyph (the 2026-11-01 ghost-line report). The box is
+ *  now generated by CSS `::after` (`display:block;height:1.4em`) on this
+ *  class — no editable artifact, no indent, and deleting the newline removes
+ *  the class on the next input event. */
+function ensureTrailingLineAnchor() {
+  const el = editorRef.value
+  if (!el) return
+  removeStrayLineAnchors()
+  const logical = (el.textContent || '').replace(/\u200B/g, '').trim()
+  el.classList.toggle('trailing-line', !!logical && _endsWithBreak(el.lastChild))
+}
+
 function onEditorInput() {
   // Caret-following: with the constant-height scrollable text area, keep the
   // caret visible on every edit (native caret-scroll-into-view is unreliable
@@ -1484,9 +1974,13 @@ function onEditorInput() {
   editorHasContent.value = !!text.length
   if (!isComposing.value) {
     debouncedSyncInputText()
-    if (text.startsWith('/') && !skillPopupDismissed) {
-      const query = text.slice(1)
-      if (query.length <= 30 && !query.includes(' ')) {
+    const skillText = text.replace(/^[\r\n]+/, '')
+    if (skillText.startsWith('/')) {
+      // The trailing <br>/line-anchor artifact makes getEditorText() end with
+      // "\n" after deleting the only character. Strip only trailing newlines
+      // (not spaces: a real space must still close the menu).
+      const query = skillText.slice(1).replace(/[\r\n]+$/, '')
+      if (query.length <= 30 && !query.includes(' ') && !query.includes('\n') && !query.includes('\r')) {
         skillSearchQuery.value = query
         if (!showSkillPopup.value) {
           openSkillPopup()
@@ -1567,9 +2061,28 @@ function onEditorEscape() {
 }
 
 onMounted(() => {
+  // W32：联动上下文挂载即热（按钮标签首屏即正确）
+  void refreshExecContext()
   document.addEventListener('keydown', handleKeyDown)
     document.addEventListener('click', handleOutsideClick)
   chatStore.loadModels() // 模型别名能力表（思考菜单驱动），懒加载一次
+  // G7：新会话起点来自用户默认，而非上一会话残留；设备可用性同时核验。
+  // execUserSelected 护栏：恢复在途时显式选择不得被晚到结果覆盖。
+  void chatStore.resolveDefaultExecutionTarget()
+    .then((resolution) => {
+      if (!execUserSelected.value && !chatStore.currentConversationId) {
+        chatStore.executionTarget = resolution.target
+        chatStore.executionTargetUserSelected = false
+        chatStore.notifyDefaultExecutionTarget(resolution)
+      }
+    })
+    .catch(() => {
+      if (!execUserSelected.value && !chatStore.currentConversationId) {
+        chatStore.executionTarget = null
+        chatStore.executionTargetUserSelected = false
+        showToast('默认执行环境读取失败，请检查设备状态', 'error')
+      }
+    })
   if (editorRef.value && inputText.value) {
     editorRef.value.textContent = inputText.value
     // Draft restored into the DOM — the placeholder class binds to
@@ -1605,12 +2118,24 @@ function handleOutsideClick(e: MouseEvent) {
   }
 }
 
-function setEditContent(text: string, messageId: string) {
+function setEditContent(text: string, messageId: string, noteRefs?: NoteRefData[]) {
   inputText.value = text
   editorHasContent.value = !!text.length
   editMessageId.value = messageId
+  // Note refs restore (2026-11-04, same loss class as the 2026-10-09 file
+  // chips): re-seat the session — replaces refs restored by an earlier
+  // abandoned edit (even when this message carries none), keeps refs the
+  // user manually added, tags the incoming ones `restored` (a later normal
+  // send drops them — restoreEditNotes/dropRestoredNotes mirror fileRefs).
+  referencedNotes.value = restoreEditNotes(referencedNotes.value, noteRefs ?? [])
+  previewingNoteIdx.value = null
   if (editorRef.value) {
     editorRef.value.textContent = text
+    // The chips MUST exist as .note-tag elements in the editor DOM:
+    // syncInputText() drops any referencedNote without a DOM tag (browser-
+    // deletion sync), so a state-only restore is silently lost on the next
+    // keystroke or on send (handleSend syncs first).
+    insertNoteTagElements(referencedNotes.value)
     editorRef.value.focus()
     // Place cursor at end
     const range = document.createRange()
@@ -1622,6 +2147,20 @@ function setEditContent(text: string, messageId: string) {
       sel.addRange(range)
     }
   }
+}
+
+/** Insert note chips at the top of the editor (message content order: the
+ *  [note-ref] blocks precede the body). Mirrors insertNoteReferences' tag +
+ *  zero-width spacer shape so extractEditorText ignores them. */
+function insertNoteTagElements(refs: NoteRef[]) {
+  const el = editorRef.value
+  if (!el || refs.length === 0) return
+  const frag = document.createDocumentFragment()
+  for (const noteRef of refs) {
+    frag.appendChild(createNoteTagElement(noteRef))
+    frag.appendChild(document.createTextNode('\u200B'))
+  }
+  el.insertBefore(frag, el.firstChild)
 }
 
 const emit = defineEmits<{ (e: 'sent'): void }>()
@@ -1910,6 +2449,18 @@ defineExpose({ setEditContent })
   display: none;
 }
 
+/* 尾随空行行盒（2026-11-01 幽灵缩进根治）：固定高 + pre-wrap 的
+   contenteditable 对末尾换行不生成行盒；过去用透明实字符 span 撑高，但那个
+   span 在光标落到其后输入/删到空时变成不可删除的隐形字符（用户报「诡异的
+   缩进和换行」）。改为纯 CSS 块级伪元素：无 DOM 字符、零宽、不可点击；逻辑
+   文本为空或末尾不再是换行时由 ensureTrailingLineAnchor() 摘掉 class。 */
+.chat-input.trailing-line::after {
+  content: '';
+  display: block;
+  height: 1.5em;
+  pointer-events: none;
+}
+
 .send-btn {
   flex-shrink: 0;
   width: 38px;
@@ -1956,7 +2507,7 @@ defineExpose({ setEditContent })
   font-size: 11px;
   color: var(--color-text-light);
   opacity: 0.7;
-  margin-top: 8px;
+  margin-top: 2px;
 }
 
 .reasoning-toggle-group {
@@ -2022,6 +2573,12 @@ defineExpose({ setEditContent })
   padding: 8px;
   min-width: 160px;
   animation: menu-pop-up 0.15s ease-out;
+}
+
+/* 执行环境菜单：设备多时防越出视口（底部锚定向上生长）——内部滚动 */
+.exec-menu {
+  max-height: min(70vh, 560px);
+  overflow-y: auto;
 }
 
 @keyframes menu-pop-up {
@@ -2143,6 +2700,69 @@ defineExpose({ setEditContent })
   padding: 4px 8px 8px;
   border-bottom: 1px solid var(--color-border);
   margin-bottom: 4px;
+}
+
+/* W16 执行环境菜单：设备在线状态点 */
+.exec-online-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-text-light);
+  margin-right: 6px;
+  vertical-align: middle;
+  opacity: 0.5;
+}
+
+.exec-online-dot.online {
+  background: #22c55e;
+  opacity: 1;
+}
+
+/* W18 G5：设备管理——撤销二段确认 + 配对码块 + 离线按钮态 */
+.exec-device-row {
+  cursor: pointer;
+}
+
+.exec-revoke-btn {
+  margin-left: 8px;
+  padding: 1px 8px;
+  font-size: 11px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background: transparent;
+  color: var(--color-text-light);
+  cursor: pointer;
+}
+
+.exec-revoke-btn.armed {
+  border-color: #ef4444;
+  color: #ef4444;
+}
+
+.exec-pair-section {
+  border-top: 1px solid var(--color-border);
+  margin-top: 4px;
+  padding-top: 4px;
+}
+
+.exec-pair-code {
+  padding: 6px 12px 8px;
+}
+
+.exec-pair-code code {
+  display: block;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 2px;
+  padding: 6px 10px;
+  margin-bottom: 4px;
+  border-radius: var(--radius-md);
+  background: var(--color-hover);
+}
+
+.exec-env-btn.offline {
+  opacity: 0.55;
 }
 
 .reasoning-menu-item {
@@ -2983,7 +3603,7 @@ defineExpose({ setEditContent })
 }
 
 .input-hint {
-  margin-top: 10px;
+  margin-top: 2px;
   opacity: 0.82;
 }
 
@@ -3349,6 +3969,24 @@ defineExpose({ setEditContent })
     background: var(--surface-panel-strong);
   }
 
+  /* 任务块 12/13：输入板底衬收零（三皮肤覆写为 calc(8px+safe) 松值）。
+     html[data-skin] + scoped data-v 提升特异性 (0,3,1) 压过皮肤 (0,2,1)——
+     hint 行盒底=板缘，gapB=0+slabGap */
+  html[data-skin] .chat-input-wrapper {
+    padding-bottom: 0;
+  }
+
+  /* 任务块 14（用户裁定·三皮肤位置解耦）：
+     verdant——胶囊在绿区居中（offset 76 → slabGap 12=下隙），hint mt 12 → gapA=gapB=12 等距；
+     mono——hint 在卡黑色硬影底（卡底+5）与胶囊顶之间居中：mt 7 → 影上隙 2 = 下隙 2；
+     ink 保持基座 mt 2（gapA=gapB=2） */
+  html[data-skin="verdant-flat"] .input-hint {
+    margin-top: 12px;
+  }
+  html[data-skin="mono-brutal"] .input-hint {
+    margin-top: 7px;
+  }
+
   .chat-input-wrapper.voice-active {}
 
   .drafts-panel {
@@ -3401,6 +4039,14 @@ defineExpose({ setEditContent })
   .input-bottom-toolbar .toolbar-btn svg {
     width: 14px;
     height: 14px;
+  }
+
+  /* 更多：移动端纯纵向三点（⋮）图标钮——输入行拥挤治理（2026-10-11 用户指令）；
+     文字由全局 toolbar-btn-label--full 规则在 ≤767px 隐藏，此处只收窄成方形触区 */
+  .input-bottom-toolbar .more-btn {
+    min-width: 32px;
+    padding-left: 6px;
+    padding-right: 6px;
   }
 
   .toolbar-btn-label {
@@ -3516,7 +4162,7 @@ defineExpose({ setEditContent })
 
   .input-hint {
     font-size: 10px;
-    margin-top: 10px;
+    margin-top: 2px;
   }
 }
 

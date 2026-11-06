@@ -28,6 +28,18 @@ from app.services.workspace_service import ensure_user_workspace
 from app.services.markdown_sanitizer import sanitize_markdown
 
 config = get_config()
+
+
+def promote_last_draft_without_final(display_sequence: list[dict], final_text: str) -> bool:
+    """If a scheduled run produced no terminal answer, un-collapse its last
+    pre-tool text so the only deliverable is visible (review R2 Important)."""
+    if final_text:
+        return False
+    for item in reversed(display_sequence):
+        if isinstance(item, dict) and item.get("type") == "text" and item.get("superseded"):
+            item["superseded"] = False
+            return True
+    return False
 logger = logging.getLogger(__name__)
 
 _TZ_CN = timezone(timedelta(hours=8))
@@ -232,6 +244,12 @@ class AgentScheduler:
             except Exception:
                 logger.exception("activate_user_overrides failed for scheduled task %s", task.id)
             try:
+                from app.services.user_mcp_service import ensure_user_mcp_tools
+                async with AsyncSessionLocal() as mcp_db:
+                    await ensure_user_mcp_tools(mcp_db, task.user_id)
+            except Exception:
+                logger.exception("ensure_user_mcp_tools failed for scheduled task %s", task.id)
+            try:
                 await self._execute_scheduled_task(task, now)
             except Exception:
                 logger.exception("Failed to execute scheduled task %s", task.id)
@@ -343,7 +361,16 @@ class AgentScheduler:
                 all_msgs = await resolve_message_fields(list(all_msgs), setup_db)
                 cfg = get_config()
                 context_limit = cfg.agent_conversation_context_limit
-                recent = all_msgs[-context_limit:] if len(all_msgs) > context_limit else all_msgs
+                from app.services.history_window_service import (
+                    resolve_history_token_budget,
+                    select_history_window,
+                )
+                recent = select_history_window(
+                    all_msgs, context_limit,
+                    resolve_history_token_budget(cfg),
+                    mode=getattr(cfg, "agent_context_window_mode", "legacy"),
+                    min_messages=getattr(cfg, "agent_conversation_min_messages", 0),
+                )
                 for m in recent:
                     if m.role in ("user", "assistant") and m.content:
                         # build_history_message: conv-a040c24e citation
@@ -450,7 +477,38 @@ class AgentScheduler:
                     enable_reasoning=False,
                     enable_compression=cfg.agent_compression_enabled,
                     session_factory=AsyncSessionLocal,
+                    user_id=str(task.user_id) if task.user_id else None,
                 )
+                # W17-P1（审计 I-1）：定时任务同口径轮次门控（同 worker）。
+                # 复审 MINOR-1：整块 fail-open（异常保持默认 True，不拖挂任务）。
+                try:
+                    from app.services.vibeweaver_turn_gate import (
+                        explicit_trigger_hit as _vw_explicit,
+                        extract_recent_user_text as _vw_extract,
+                        resolve_effective_active as _vw_resolve_eff,
+                    )
+                    _vw_last, _vw_ctx = _vw_extract(messages)
+                    try:
+                        _vw_gating = bool(cfg.vibeweaver_task_gating_enabled)
+                    except Exception:
+                        _vw_gating = True
+                    try:
+                        _vw_off = str(getattr(cfg, "vibeweaver_mode", "auto") or "auto") == "off"
+                    except Exception:
+                        _vw_off = False
+                    loop.vibeweaver_active = _vw_resolve_eff(_vw_last, None, _vw_gating, context_text=_vw_ctx)
+                    if _vw_off:
+                        loop.vibeweaver_active = False  # D9：mode=off 全关（含后台/定时面）
+                    logger.info(
+                        "vibeweaver turn gate active=%s explicit=%s coding=None gating=%s task=%s",
+                        loop.vibeweaver_active, _vw_explicit(_vw_last), _vw_gating,
+                        setup_scalars.get("task_id"),
+                    )
+                except Exception:
+                    logger.debug(
+                        "vibeweaver turn gate wiring failed (fail-open to active=True)",
+                        exc_info=True,
+                    )
 
                 tool_results_list = []
                 last_activity_ts = _time.monotonic()
@@ -531,7 +589,8 @@ class AgentScheduler:
                         seg_text = _strip_dsml_all(assistant_content).strip()
                         if seg_text:
                             content_segments.append(seg_text)
-                            display_sequence.append({"type": "text", "content": seg_text})
+                            # P0 R2: pre-tool prose is a draft/process unit.
+                            display_sequence.append({"type": "text", "content": seg_text, "superseded": True})
                         display_sequence.append({"type": "tool_placeholder"})
                         assistant_content = ""
                         last_activity_ts = now_mono
@@ -556,6 +615,10 @@ class AgentScheduler:
                         "title": "💭 思考过程",
                         "content": rseg,
                     })
+                # If the run ended without a terminal answer, the last pre-tool
+                # segment IS the deliverable — promoting it avoids hiding the
+                # only output under a collapsed draft (review R2 Important).
+                promote_last_draft_without_final(display_sequence, final_text)
 
                 from app.api.chat import _transform_tool_loop_results
                 if tool_results_list:
@@ -710,7 +773,7 @@ class AgentScheduler:
                 stmt = (
                     select(AgentTask)
                     .where(
-                        AgentTask.status.in_(("completed", "failed", "cancelled")),
+                        AgentTask.status.in_(("completed", "failed", "cancelled", "timed_out")),
                         AgentTask.completed_at < agent_cutoff,
                     )
                 )

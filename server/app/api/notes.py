@@ -20,7 +20,23 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc, func
 from typing import List
 
+from app.core.config import get_config
 from app.db.database import get_db, User, Notebook, Note
+
+
+async def _record_user_note_provenance(
+    db: AsyncSession, user_id: str, note_id: str,
+) -> None:
+    """UI/API note writes are user-authored (trusted, origin=user)."""
+    try:
+        from app.services import taint_service
+        from app.services.tenant_service import tenant_segment
+        await taint_service.record_artifact_taint(
+            db, str(user_id), "note", str(note_id), "trusted",
+            origin="user", tenant_id=tenant_segment(),
+        )
+    except Exception:
+        pass
 from app.services.playwright_thread import pw_ephemeral, pw_thread
 from app.services.workspace_service import ensure_user_workspace
 from app.schemas.notes import (
@@ -180,6 +196,8 @@ router = APIRouter(prefix="/api/notes", tags=["notes"])
 
 def get_content_preview(content: str, max_length: int = 100) -> str:
     text = content.strip()
+    # 列表边界屏障是内部序列化标记，不得泄漏进笔记列表/选择器预览（评审 B I5）
+    text = text.replace("<!--list-break-->", "").strip()
     if len(text) <= max_length:
         return text
     return text[:max_length] + "..."
@@ -2313,6 +2331,10 @@ def _build_note_md(note, workspace_root: str | None = None) -> str:
     content = note.content or ""
     # Exports never embed media resources (product decision): strip them.
     content = _strip_media_tags(content)
+    # 列表边界屏障（<!--list-break-->）**保留在导出里**（评审 B I4 · D-106 裁决）：
+    # 剥掉会让两个独立编号列表在导出 PDF/md 里重新合并成 1..4（语义损坏）；
+    # 注释在渲染视图（Typora/GitHub/WeasyPrint）不可见，仅 raw 源可见 ——
+    # 语义正确性 > raw 观感。
     # ECharts fences become self-contained SVG data-URI images in the .md.
     content = _materialize_echarts_blocks(content, as_markdown=True)
     if workspace_root:
@@ -2329,6 +2351,8 @@ def _render_note_pdf(note, workspace_root: str | None = None, endnote_enabled: b
     content = note.content or ""
     # Exports never embed media resources (product decision): strip them.
     content = _strip_media_tags(content)
+    # 屏障标记保留（见 _build_note_md 注释，D-106）：PDF 渲染里注释不可见，
+    # 但保留它才能让两个编号列表在 PDF 里保持拆分。
     if workspace_root:
         content = _materialize_note_images(content, workspace_root)
     html_body = _markdown_to_html_with_mermaid(content, endnote_enabled=endnote_enabled)
@@ -2677,6 +2701,12 @@ async def delete_notebook(
         raise HTTPException(status_code=400, detail="Cannot delete default notebook")
 
     await db.delete(notebook)
+    from sqlalchemy import text as _text
+    await db.execute(_text(
+        "DELETE FROM artifact_taint WHERE user_id = :uid "
+        "AND artifact_type = 'note' AND artifact_id IN "
+        "(SELECT id FROM notes WHERE notebook_id = :nid)"
+    ), {"uid": current_user.id, "nid": notebook_id})
     await db.commit()
     return {"status": "ok"}
 
@@ -2775,7 +2805,7 @@ async def bulk_export_notes(
                  *(f"{n.id}:{n.updated_at}" for n in notes),
                  str(endnote_enabled) if fmt == "pdf" else "-",
                  workspace_fingerprint(workspace_root))
-    output_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "output_files")
+    output_dir = str(get_config().backend_root / "output_files")
     os.makedirs(output_dir, exist_ok=True)
     file_path, _name, _cached = await render_with_dedup(
         db, current_user.id, task_type="note-sync-bulk", fmt=fmt,
@@ -2824,7 +2854,7 @@ async def export_note(
     key_parts = ("note-sync", fmt, title, getattr(note, "content", "") or "",
                  str(note.updated_at), str(endnote_enabled) if fmt == "pdf" else "-",
                  workspace_fingerprint(workspace_root))
-    output_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "output_files")
+    output_dir = str(get_config().backend_root / "output_files")
     os.makedirs(output_dir, exist_ok=True)
     if fmt == "md":
         render_fn = lambda: _build_note_md(note, workspace_root).encode("utf-8")
@@ -2926,6 +2956,7 @@ async def create_note(
     db.add(note)
     await db.commit()
     await db.refresh(note)
+    await _record_user_note_provenance(db, current_user.id, note.id)
 
     return NoteResponse(
         id=note.id,
@@ -2969,6 +3000,7 @@ async def update_note(
 
     await db.commit()
     await db.refresh(note)
+    await _record_user_note_provenance(db, current_user.id, note.id)
 
     return NoteResponse(
         id=note.id,
@@ -2998,6 +3030,11 @@ async def delete_note(
         raise HTTPException(status_code=404, detail="Note not found")
 
     await db.delete(note)
+    from sqlalchemy import text as _text
+    await db.execute(_text(
+        "DELETE FROM artifact_taint WHERE user_id = :uid "
+        "AND artifact_type = 'note' AND artifact_id = :aid"
+    ), {"uid": current_user.id, "aid": note_id})
     await db.commit()
     return {"status": "ok"}
 
@@ -3039,6 +3076,7 @@ async def create_quick_note(
     db.add(note)
     await db.commit()
     await db.refresh(note)
+    await _record_user_note_provenance(db, current_user.id, note.id)
 
     return NoteResponse(
         id=note.id,

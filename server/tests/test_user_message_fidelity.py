@@ -30,10 +30,11 @@ from app.services.agent_loop import (  # noqa: E402
 )
 from app.services.context_compressor import estimate_text_tokens_rough  # noqa: E402
 
-_AGENT_LOOP_SRC = open(
-    os.path.join(os.path.dirname(__file__), "..", "app", "services", "agent_loop.py"),
-    encoding="utf-8",
-).read()
+_SERVICE_DIR = os.path.join(os.path.dirname(__file__), "..", "app", "services")
+_AGENT_LOOP_SRC = "\n".join(
+    open(os.path.join(_SERVICE_DIR, name), encoding="utf-8").read()
+    for name in ("agent_loop.py", "agent_loop_audit.py")
+)
 
 # a104 形态：长表格粘贴，中段有唯一标记，尾部是真实诉求
 _HEAD = "表6-2 基准回归设定与执行状态（样本区间：2018—2025年，重点2022—2025年）\n"

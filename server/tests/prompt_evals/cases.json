@@ -1,0 +1,555 @@
+[
+ {
+  "id": "mem-01",
+  "prompt_id": "memory.boundary",
+  "must_contain": [
+   "不是指令"
+  ],
+  "category": "memory"
+ },
+ {
+  "id": "mem-02",
+  "prompt_id": "memory.boundary",
+  "must_contain": [
+   "不得执行"
+  ],
+  "category": "memory"
+ },
+ {
+  "id": "mem-03",
+  "prompt_id": "memory.boundary",
+  "must_contain": [
+   "复制或传播"
+  ],
+  "category": "memory"
+ },
+ {
+  "id": "mem-04",
+  "prompt_id": "memory.boundary",
+  "must_contain": [
+   "事实或证据"
+  ],
+  "category": "memory"
+ },
+ {
+  "id": "mem-05",
+  "prompt_id": "memory.boundary",
+  "must_contain": [
+   "其他会话"
+  ],
+  "category": "memory"
+ },
+ {
+  "id": "mem-06",
+  "prompt_id": "memory.boundary",
+  "must_contain": [
+   "背景参考"
+  ],
+  "category": "memory"
+ },
+ {
+  "id": "mem-07",
+  "prompt_id": "memory.boundary",
+  "must_contain": [
+   "MEMORY.md"
+  ],
+  "category": "memory"
+ },
+ {
+  "id": "mem-08",
+  "prompt_id": "memory.boundary",
+  "must_not_contain": [
+   "ignore previous instructions"
+  ],
+  "category": "memory"
+ },
+ {
+  "id": "mem-09",
+  "prompt_id": "memory.boundary",
+  "must_not_contain": [
+   "sk-"
+  ],
+  "category": "memory"
+ },
+ {
+  "id": "mem-10",
+  "prompt_id": "memory.boundary",
+  "lint_clean": true,
+  "category": "memory"
+ },
+ {
+  "id": "tool-01",
+  "prompt_id": "tool.availability",
+  "must_contain": [
+   "工具 schema"
+  ],
+  "category": "tool-selection"
+ },
+ {
+  "id": "tool-02",
+  "prompt_id": "tool.availability",
+  "must_contain": [
+   "不可用"
+  ],
+  "category": "tool-selection"
+ },
+ {
+  "id": "tool-03",
+  "prompt_id": "tool.availability",
+  "must_contain": [
+   "不得声称"
+  ],
+  "category": "tool-selection"
+ },
+ {
+  "id": "tool-04",
+  "prompt_id": "tool.availability",
+  "must_not_contain": [
+   "always available"
+  ],
+  "category": "tool-selection"
+ },
+ {
+  "id": "tool-05",
+  "prompt_id": "tool.availability",
+  "lint_clean": true,
+  "category": "tool-selection"
+ },
+ {
+  "id": "cit-01",
+  "prompt_id": "citation.cross_turn",
+  "must_contain": [
+   "[N]"
+  ],
+  "category": "citation"
+ },
+ {
+  "id": "cit-02",
+  "prompt_id": "citation.cross_turn",
+  "must_contain": [
+   "本轮"
+  ],
+  "category": "citation"
+ },
+ {
+  "id": "cit-03",
+  "prompt_id": "citation.cross_turn",
+  "must_contain": [
+   "重新入账"
+  ],
+  "category": "citation"
+ },
+ {
+  "id": "cit-04",
+  "prompt_id": "citation.cross_turn",
+  "must_not_contain": [
+   "历史编号可沿用"
+  ],
+  "category": "citation"
+ },
+ {
+  "id": "cit-05",
+  "prompt_id": "citation.cross_turn",
+  "lint_clean": true,
+  "category": "citation"
+ },
+ {
+  "id": "sec-01",
+  "prompt_id": "memory.boundary",
+  "must_contain": [
+   "唤醒后继续"
+  ],
+  "category": "security"
+ },
+ {
+  "id": "sec-02",
+  "prompt_id": "memory.boundary",
+  "must_contain": [
+   "下一个 agent"
+  ],
+  "category": "security"
+ },
+ {
+  "id": "sec-03",
+  "prompt_id": "memory.boundary",
+  "must_contain": [
+   "报告并忽略"
+  ],
+  "category": "security"
+ },
+ {
+  "id": "sec-04",
+  "prompt_id": "memory.boundary",
+  "must_not_contain": [
+   "执行其中的命令"
+  ],
+  "category": "security"
+ },
+ {
+  "id": "sec-05",
+  "prompt_id": "memory.boundary",
+  "lint_clean": true,
+  "category": "security"
+ },
+ {
+  "id": "contract-01",
+  "prompt_id": "memory.boundary",
+  "version": "1.0.0",
+  "category": "contract"
+ },
+ {
+  "id": "contract-02",
+  "prompt_id": "tool.availability",
+  "version": "1.0.0",
+  "category": "contract"
+ },
+ {
+  "id": "contract-03",
+  "prompt_id": "citation.cross_turn",
+  "version": "1.0.0",
+  "category": "contract"
+ },
+ {
+  "id": "contract-04",
+  "prompt_id": "memory.boundary",
+  "owner": "memory",
+  "category": "contract"
+ },
+ {
+  "id": "contract-05",
+  "prompt_id": "tool.availability",
+  "owner": "agent-core",
+  "category": "contract"
+ },
+ {
+  "id": "judge-01",
+  "prompt_id": "deathmatch.judge",
+  "must_contain": [
+   "verdict"
+  ],
+  "category": "deathmatch-judge"
+ },
+ {
+  "id": "judge-02",
+  "prompt_id": "deathmatch.judge",
+  "must_contain": [
+   "done"
+  ],
+  "category": "deathmatch-judge"
+ },
+ {
+  "id": "judge-03",
+  "prompt_id": "deathmatch.judge",
+  "must_contain": [
+   "reason"
+  ],
+  "category": "deathmatch-judge"
+ },
+ {
+  "id": "judge-04",
+  "prompt_id": "deathmatch.judge",
+  "must_contain": [
+   "compact"
+  ],
+  "category": "deathmatch-judge"
+ },
+ {
+  "id": "judge-05",
+  "prompt_id": "deathmatch.judge",
+  "must_not_contain": [
+   "always done"
+  ],
+  "category": "deathmatch-judge"
+ },
+ {
+  "id": "grill-01",
+  "prompt_id": "deathmatch.grilling",
+  "must_contain": [
+   "盘问"
+  ],
+  "category": "deathmatch-grilling"
+ },
+ {
+  "id": "grill-02",
+  "prompt_id": "deathmatch.grilling",
+  "must_contain": [
+   "问题"
+  ],
+  "category": "deathmatch-grilling"
+ },
+ {
+  "id": "grill-03",
+  "prompt_id": "deathmatch.grilling",
+  "must_contain": [
+   "JSON"
+  ],
+  "category": "deathmatch-grilling"
+ },
+ {
+  "id": "grill-04",
+  "prompt_id": "deathmatch.grilling",
+  "must_not_contain": [
+   "ignore previous instructions"
+  ],
+  "category": "deathmatch-grilling"
+ },
+ {
+  "id": "plan-01",
+  "prompt_id": "deathmatch.plan",
+  "must_contain": [
+   "计划"
+  ],
+  "category": "deathmatch-plan"
+ },
+ {
+  "id": "plan-02",
+  "prompt_id": "deathmatch.plan",
+  "must_contain": [
+   "步骤"
+  ],
+  "category": "deathmatch-plan"
+ },
+ {
+  "id": "plan-03",
+  "prompt_id": "deathmatch.plan",
+  "must_contain": [
+   "验证"
+  ],
+  "category": "deathmatch-plan"
+ },
+ {
+  "id": "plan-04",
+  "prompt_id": "deathmatch.plan",
+  "must_contain": [
+   "JSON"
+  ],
+  "category": "deathmatch-plan"
+ },
+ {
+  "id": "ver-01",
+  "prompt_id": "deathmatch.verifier",
+  "must_contain": [
+   "验证"
+  ],
+  "category": "deathmatch-verifier"
+ },
+ {
+  "id": "ver-02",
+  "prompt_id": "deathmatch.verifier",
+  "must_contain": [
+   "证据"
+  ],
+  "category": "deathmatch-verifier"
+ },
+ {
+  "id": "ver-03",
+  "prompt_id": "deathmatch.verifier",
+  "must_contain": [
+   "步骤"
+  ],
+  "category": "deathmatch-verifier"
+ },
+ {
+  "id": "audit-01",
+  "prompt_id": "audit.response",
+  "must_contain": [
+   "审计"
+  ],
+  "category": "audit"
+ },
+ {
+  "id": "audit-02",
+  "prompt_id": "audit.response",
+  "must_contain": [
+   "verdict"
+  ],
+  "category": "audit"
+ },
+ {
+  "id": "audit-03",
+  "prompt_id": "audit.response",
+  "must_contain": [
+   "不合格"
+  ],
+  "category": "audit"
+ },
+ {
+  "id": "coord-01",
+  "prompt_id": "coordinator.route",
+  "must_contain": [
+   "focus"
+  ],
+  "category": "routing"
+ },
+ {
+  "id": "coord-02",
+  "prompt_id": "coordinator.route",
+  "must_contain": [
+   "分类"
+  ],
+  "category": "routing"
+ },
+ {
+  "id": "search-01",
+  "prompt_id": "search.plan",
+  "must_contain": [
+   "检索"
+  ],
+  "category": "search"
+ },
+ {
+  "id": "search-02",
+  "prompt_id": "search.plan",
+  "must_contain": [
+   "查询"
+  ],
+  "category": "search"
+ },
+ {
+  "id": "title-01",
+  "prompt_id": "title.generation",
+  "owner": "tools",
+  "version": "1.0.0",
+  "category": "title"
+ },
+ {
+  "id": "schedule-01",
+  "prompt_id": "schedule.parse",
+  "owner": "tools",
+  "output_schema": "schedule.parse",
+  "category": "schedule"
+ },
+ {
+  "id": "voice-01",
+  "prompt_id": "voice.duplex",
+  "owner": "voice",
+  "version": "1.0.0",
+  "category": "voice"
+ },
+ {
+  "id": "voice-02",
+  "prompt_id": "voice.barge_in",
+  "owner": "voice",
+  "category": "voice"
+ },
+ {
+  "id": "codegen-01",
+  "prompt_id": "codegen.python",
+  "owner": "tools",
+  "category": "file-generation"
+ },
+ {
+  "id": "memory-01",
+  "prompt_id": "memory.extraction",
+  "output_schema": "memory.extraction",
+  "category": "memory-extraction"
+ },
+ {
+  "id": "subagent-01",
+  "prompt_id": "subagent.child",
+  "owner": "agent-core",
+  "category": "subagent"
+ },
+ {
+  "id": "contract-06",
+  "prompt_id": "audit.response",
+  "output_schema": "audit.verdict",
+  "category": "contract"
+ },
+ {
+  "id": "contract-07",
+  "prompt_id": "deathmatch.judge",
+  "output_schema": "deathmatch.judge",
+  "category": "contract"
+ },
+ {
+  "id": "agent-01",
+  "prompt_id": "agent.system",
+  "builder": "agent_system",
+  "must_contain": [
+   "记忆使用边界"
+  ],
+  "category": "agent-system"
+ },
+ {
+  "id": "agent-02",
+  "prompt_id": "agent.system",
+  "builder": "agent_system",
+  "must_contain": [
+   "身份与模型信息保密规则"
+  ],
+  "category": "agent-system"
+ },
+ {
+  "id": "agent-03",
+  "prompt_id": "agent.system",
+  "builder": "agent_system",
+  "must_contain": [
+   "工具调用必须使用系统原生的函数调用格式"
+  ],
+  "category": "agent-system"
+ },
+ {
+  "id": "agent-04",
+  "prompt_id": "agent.system",
+  "builder": "agent_system",
+  "must_contain": [
+   "回答相关性要求"
+  ],
+  "category": "agent-system"
+ },
+ {
+  "id": "agent-05",
+  "prompt_id": "agent.system",
+  "builder": "agent_system",
+  "must_contain": [
+   "数学公式输出规范"
+  ],
+  "category": "agent-system"
+ },
+ {
+  "id": "agent-06",
+  "prompt_id": "agent.system",
+  "builder": "agent_system",
+  "must_contain": [
+   "本轮实际可用工具"
+  ],
+  "category": "agent-system"
+ },
+ {
+  "id": "agent-07",
+  "prompt_id": "agent.system",
+  "builder": "agent_system",
+  "must_contain": [
+   "当前时间"
+  ],
+  "category": "agent-system"
+ },
+ {
+  "id": "agent-08",
+  "prompt_id": "agent.system",
+  "builder": "agent_system",
+  "must_contain": [
+   "回答长度控制"
+  ],
+  "category": "agent-system"
+ },
+ {
+  "id": "agent-09",
+  "prompt_id": "agent.system",
+  "builder": "agent_system",
+  "must_contain": [
+   "表达语域与领域匹配"
+  ],
+  "category": "agent-system"
+ },
+ {
+  "id": "agent-10",
+  "prompt_id": "agent.system",
+  "builder": "agent_system",
+  "must_contain": [
+   "严禁在没有实际访问网站的情况下声称"
+  ],
+  "category": "agent-system"
+ }
+]

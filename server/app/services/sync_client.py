@@ -15,13 +15,14 @@ import hashlib
 import json
 import logging
 import os
+import re
 import uuid
 from contextlib import suppress
 from datetime import datetime
 from pathlib import Path
 
 import httpx
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, or_, select
 from sqlalchemy.exc import IntegrityError
 
 from app.core.config import get_config
@@ -359,6 +360,32 @@ class SyncClient:
                     logger.warning("resync tombstone entry not a dict — skipped: %r", t)
                     continue
                 try:
+                    # L2（W36）：resync 墓碑是离线设备的主要收敛路径；删除前记住
+                    # 本地 message→conversation，删除后补做 delta 同款派生清理。
+                    local_conv_id = None
+                    local_message_ids = []
+                    if t.get("entity_type") == "messages":
+                        try:
+                            from app.db.database import Message as _Msg
+                            row = await db.get(_Msg, t.get("entity_id"))
+                            if row is not None:
+                                local_conv_id = getattr(row, "conversation_id", None)
+                        except Exception:
+                            logger.debug("resync message pre-read failed (%s)",
+                                         t.get("entity_id"), exc_info=True)
+                    elif t.get("entity_type") == "conversations":
+                        local_conv_id = str(t.get("entity_id") or "")
+                        try:
+                            from app.db.database import Message as _Msg
+                            local_message_ids = [
+                                str(r[0]) for r in (await db.execute(
+                                    select(_Msg.id).where(
+                                        _Msg.conversation_id == local_conv_id)
+                                )).all()
+                            ]
+                        except Exception:
+                            logger.debug("resync conversation pre-read failed (%s)",
+                                         local_conv_id, exc_info=True)
                     async with db.begin_nested():
                         origin_ctx = set_origin_device("rx:resync")
                         try:
@@ -383,6 +410,12 @@ class SyncClient:
                     # _merge_default_assistant 同款：resync 删除后清该实体
                     # （含自然键命中的本地行）的待推队列。
                     await self._clear_queued_events(db, user, t)
+                    if t.get("entity_type") == "messages":
+                        await self._purge_local_message_derivatives(
+                            db, user, [t.get("entity_id")], local_conv_id)
+                    elif t.get("entity_type") == "conversations" and local_message_ids:
+                        await self._purge_local_message_derivatives(
+                            db, user, local_message_ids, local_conv_id)
                 except Exception as exc:  # noqa: BLE001
                     logger.warning(
                         "resync tombstone failed (%s %s): %s",
@@ -665,6 +698,17 @@ class SyncClient:
                     local_ts = getattr(row, "updated_at", None)
         remote_ts = parse_dt((ev.get("payload") or {}).get("updated_at"))
 
+        # messages delete：删除前记住本地会话 id，供删除后失效本地摘要/续聊锚点。
+        local_message_conv_id = None
+        if ev.get("entity_type") == "messages" and ev.get("op") == "delete":
+            try:
+                from app.db.database import Message as _Msg
+                row = await db.get(_Msg, ev.get("entity_id"))
+                if row is not None:
+                    local_message_conv_id = getattr(row, "conversation_id", None)
+            except Exception:
+                logger.debug("sync delete pre-read failed (%s)", ev.get("entity_id"), exc_info=True)
+
         origin_ctx = set_origin_device(f"rx:{ev.get('origin_device') or 'cloud'}")
         try:
             result = await apply_change(
@@ -672,6 +716,10 @@ class SyncClient:
             )
         finally:
             reset_origin_device(origin_ctx)
+        if ev.get("op") == "delete":
+            # 下游 L2（UPSTREAM_TODO_20261031 §5.3）：远端删除必须清本地待推队列，
+            # 否则 push 重试可把已删实体复活；messages 还要清本地派生记忆/摘要。
+            await self._after_remote_delete(db, user, ev, local_message_conv_id)
         if result == APPLIED and ev.get("entity_type") in (
             "memory_episodes", "memory_concepts"
         ):
@@ -693,6 +741,67 @@ class SyncClient:
                 direction="pull", reason="lww_remote_newer",
                 local_updated_at=local_ts, remote_updated_at=remote_ts,
             ))
+
+    async def _purge_local_message_derivatives(self, db, user, message_ids,
+                                               conversation_id=None) -> None:
+        """按 message id 清本地派生记忆/摘要（L2；delta 与 resync 共用）。
+
+        message id 来自远端事件，先做 UUID 形状校验 + LIKE 转义，防通配符
+        过度匹配（评审 Minor #5）。批 500，失败只告警。
+        """
+        ids = [str(x) for x in (message_ids or [])
+               if x and re.fullmatch(r"[A-Za-z0-9-]{1,64}", str(x))]
+        if ids:
+            try:
+                from app.db.database import SubconsciousLog
+                for i in range(0, len(ids), 500):
+                    chunk = ids[i:i + 500]
+                    pats = [
+                        SubconsciousLog.source_ids.like(
+                            f'%"{mid.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")}"%',
+                            escape="\\",
+                        )
+                        for mid in chunk
+                    ]
+                    await db.execute(
+                        delete(SubconsciousLog).where(
+                            SubconsciousLog.user_id == user.id,
+                            or_(*pats),
+                        )
+                    )
+            except Exception:  # noqa: BLE001
+                logger.debug("local subconscious purge failed", exc_info=True)
+            try:
+                from app.services.memory_retrieval_service import invalidate_session_cache_for_user
+                invalidate_session_cache_for_user(user.id)
+            except Exception:  # noqa: BLE001
+                logger.debug("local retrieval cache invalidation failed", exc_info=True)
+        if conversation_id:
+            try:
+                from app.services.context_continuity_service import invalidate_continuity
+                await invalidate_continuity(db, str(conversation_id))
+            except Exception:  # noqa: BLE001
+                logger.debug("local continuity invalidation failed (%s)", conversation_id,
+                             exc_info=True)
+
+    async def _after_remote_delete(self, db, user, ev: dict, conversation_id=None) -> None:
+        """远端 delete 落地后的本地派生清理（下游 L2，2026-11-05）。
+
+        - 清本地待推队列：防 push 重试把已删消息复活（与 `_resync` 的
+          `_clear_queued_events` 同源；只清非 rx 事件）。
+        - messages：按 message id 清本地 SubconsciousLog 引用 + 失效检索缓存 +
+          失效该会话的 rolling summary/resume 快照（对齐服务端
+          `_delete_message_slice` 的 purge 面）。失败只告警，不阻断同步事件应用。
+        """
+        try:
+            await self._clear_queued_events(db, user, ev)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("sync delete queue cleanup failed (%s): %s",
+                           ev.get("entity_id"), exc)
+        if ev.get("entity_type") != "messages":
+            return
+        await self._purge_local_message_derivatives(
+            db, user, [ev.get("entity_id")], conversation_id)
 
     # ── workspace 文件物化（2026-09-29 波）──────────────────────────────
     # 云端 workspace → 本地：全量同步自动拉取小文件（resync 钩子调用；超出

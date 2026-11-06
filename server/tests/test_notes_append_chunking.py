@@ -82,7 +82,8 @@ class TestAppendNoteAction:
         )))
         assert result.get("success") is True
         assert note.content == "开头\n\n第二批内容"
-        assert db.committed == 1
+        # P1d: note commit + artifact_taint provenance commit.
+        assert db.committed == 2
 
     def test_append_requires_content(self):
         db = _FakeDB(_FakeNote())
