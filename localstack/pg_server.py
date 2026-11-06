@@ -68,7 +68,16 @@ def cmd_start(args) -> int:
         running = False
     if not running:
         log = data_dir / 'postgres.log'
-        sock = f'"{data_dir}"' if ' ' in str(data_dir) else str(data_dir)
+        # macOS `sun_path` 上限 104 字节：Unix socket 目录必须**短**。旧实现把 socket
+        # 放在 pgdata 内，长 userData（/private/var/folders/... 或长用户名）会让
+        # initdb/pg_ctl 以「端口占用」式的误导性错误失败（W39 实测：短路径即通）。
+        # 注意 tempfile.gettempdir() 在 macOS 返回 /var/folders/...（同样长）→ 固定 /tmp。
+        sockdir = Path('/tmp') / f'wt-pg-{args.port}'
+        try:
+            sockdir.mkdir(mode=0o700, parents=True, exist_ok=True)
+        except OSError:
+            sockdir = Path('/tmp')
+        sock = str(sockdir)
         _pg_ctl(data_dir, [
             '-w',
             '-o', f'-p {args.port} -c listen_addresses=127.0.0.1 -k {sock}',

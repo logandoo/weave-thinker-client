@@ -101,6 +101,13 @@ function readSidecarBuildId() {
 // 只读取 access_token，不落盘、不打印。注意：语音 WS 的鉴权契约本身是 `?token=`，
 // 服务端 access log 会记录该 URL —— 这是产品既有契约，本探针只在**一次性 profile** 内使用，
 // 残余风险已登记（见 tests/verification_log.md W39 iter 3 + docs 审计 §6.2）。
+function resolveLocalStackHome() {
+  // 与 desktop/local-stack.cjs 同源：探针账号存在**这个目录里的 DB**，
+  // 所以口令文件必须跟着它走（否则「新 userData + 旧 DB」→ 登录 401 假红）。
+  if (process.env.WEAVE_LOCALSTACK_HOME) return process.env.WEAVE_LOCALSTACK_HOME
+  return path.join(app.getPath('userData'), 'localstack')
+}
+
 function probePassword(profileDir) {
   const pwFile = path.join(profileDir, '.w39_probe_pw')
   try {
@@ -120,17 +127,17 @@ function probePassword(profileDir) {
 async function mintProbeToken(apiBase) {
   const base = String(apiBase || '').replace(/\/+$/, '')
   if (!base) return ''
-  const profileDir = app.getPath('userData')
-  const creds = { username: 'w39_smoke_probe', password: probePassword(profileDir) }
-  const opts = {
+  const creds = { username: 'w39_smoke_probe', password: probePassword(resolveLocalStackHome()) }
+  // 每次请求独立 signal（复用同一个 AbortSignal 会在第一次超时后把后续调用一并 abort）
+  const post = (url, body, timeoutMs = 5000) => fetch(url, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(creds),
-    signal: AbortSignal.timeout(5000)
-  }
+    body,
+    signal: AbortSignal.timeout(timeoutMs)
+  })
   const login = async () => {
     try {
-      const r = await fetch(base + '/api/auth/login', opts)
+      const r = await post(base + '/api/auth/login', JSON.stringify(creds))
       if (!r.ok) return ''
       const j = await r.json().catch(() => ({}))
       return String(j.access_token || '')
@@ -139,7 +146,7 @@ async function mintProbeToken(apiBase) {
   let tok = await login()
   if (tok) return tok
   try {
-    const reg = await fetch(base + '/api/auth/register', opts)
+    const reg = await post(base + '/api/auth/register', JSON.stringify(creds))
     if (!reg.ok && reg.status !== 409) return ''
   } catch { return '' }
   return login()
@@ -495,6 +502,20 @@ async function runSmoke(win) {
     try {
       const u = new URL(runtimeApiBase)
       const port = Number(u.port || (u.protocol === 'https:' ? 443 : 80))
+      const runtimeBuildId = await (async () => {
+        // 运行中侧车自报 build_id（/api/client-exec/status）；比文件更权威
+        try {
+          const tok = await mintProbeToken(runtimeApiBase)
+          if (!tok) return ''
+          const r = await fetch(runtimeApiBase.replace(/\/+$/, '') + '/api/client-exec/status', {
+            headers: { Authorization: 'Bearer ' + tok },
+            signal: AbortSignal.timeout(5000)
+          })
+          if (!r.ok) return ''
+          const j = await r.json().catch(() => ({}))
+          return String(j.build_id || '')
+        } catch { return '' }
+      })()
       const token = await mintProbeToken(runtimeApiBase)
       // 用 Authorization: Bearer 头而不是 ?token= —— 服务端 `extract_websocket_token`
       // 支持两条路（query 优先、header 兜底）；走 header 可避免 access log 落 JWT。
@@ -502,6 +523,7 @@ async function runSmoke(win) {
       voiceRoute = {
         tokenMinted: !!token,
         authVia: token ? 'header' : 'none',
+        runtimeBuildId,
         // ① 有 token → 语音路由必须 **101**（路由存在 + 鉴权通过；101 由 accept() 发出，
         //    早于读取 audio_protocol ⇒ 不主张参数接线）
         voice: await wsUpgradeStatus(u.hostname, port, '/api/voice/ws?audio_protocol=epoch_v1', auth),
@@ -546,6 +568,9 @@ async function runSmoke(win) {
     // W39 ②：SPA 与侧车同一构建世代（同一 BID 单源注入，拒绝「新侧车 + 旧 SPA」混装）
     buildIdSameGeneration: !localRequested || !runtimeApiBase
       || (!!probe.buildId && probe.buildId !== 'dev' && probe.buildId === sidecarBuildId),
+    // m5：SPA 世代 == **运行中侧车自报** build_id（文件核对之外的活体核对）
+    runtimeBuildIdMatch: !localRequested || !runtimeApiBase
+      || !!(voiceRoute && voiceRoute.runtimeBuildId === probe.buildId),
     screenshot: fs.existsSync(shot) && fs.statSync(shot).size > 1000
   }
   const pass = Object.values(checks).every(Boolean)

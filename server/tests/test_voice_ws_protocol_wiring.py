@@ -86,15 +86,9 @@ def test_unknown_audio_protocol_is_passed_through_and_normalized_by_session(monk
         pass
 
     assert captured["sessions"][0]["audio_protocol"] == "epoch_v2"
-    # 归一语义在 voice_service.VoiceDuplexSession.__init__（epoch_v1 → 新协议，其它 → legacy）
-    from app.services.voice_service import VoiceDuplexSession as RealSession
-
-    import inspect
-
-    src = inspect.getsource(RealSession.__init__)
-    assert '"epoch_v1" if audio_protocol == "epoch_v1" else "legacy"' in src, (
-        "session-side normalization contract changed — update this test with the new semantics"
-    )
+    # 归一语义（epoch_v1 → 新协议，其它/缺省 → legacy）由会话自身承担，行为面已由
+    # 上游 `test_voice_audio_protocol.py::test_audio_protocol_negotiation_preserves_legacy_clients`
+    # 覆盖；此处只钉「路由层原样透传」，不再做源码文本断言（脆且重复）。
 
 
 def test_missing_token_closes_policy_violation(monkeypatch):

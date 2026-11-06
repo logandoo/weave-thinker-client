@@ -8,6 +8,8 @@ mkdir -p logs dist_installer build
 if [ -f "$ROOT/assets/icon.png" ]; then cp "$ROOT/assets/icon.png" "$ROOT/build/icon.png"; fi
 LOG="$ROOT/logs/package_macos.log"
 {
+  echo "== [0/4] 发布前卫生：未跟踪件守卫（W39）=="
+  bash "$ROOT/script/linux/check_untracked.sh"
   echo "== [0/4] BUILD_ID（单源：同一 BID 注入 SPA 与侧车，W39 同源核对）=="
   BID="$(date +%Y%m%d%H%M)-$(git rev-parse --short HEAD 2>/dev/null || echo nogit)"
   export WEAVE_BUILD_ID="$BID"
@@ -163,5 +165,7 @@ LOG="$ROOT/logs/package_macos.log"
   "$ROOT/node_modules/.bin/electron-builder" --mac --arm64 --config electron-builder.yml --publish never
   echo "== PACKAGE OK =="
   ls -lh dist_installer/*.dmg 2>/dev/null || true
-  ( cd dist_installer && shasum -a 256 *.dmg ) | tee dist_installer/SHA256SUMS.txt
+  # 只列**本版本**产物：目录里可能残留历史 DMG；README 的 `shasum -c` 会因缺文件判 FAILED。
+  VER="$(node -p "require('./package.json').version")"
+  ( cd dist_installer && shasum -a 256 "WeaveThinker-${VER}-"*.dmg ) | tee dist_installer/SHA256SUMS.txt
 } 2>&1 | tee "$LOG"
